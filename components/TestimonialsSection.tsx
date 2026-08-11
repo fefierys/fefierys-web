@@ -56,9 +56,14 @@ export default function TestimonialsSection() {
                 </p>
 
                 {testimonial.social && (
-                  <p className="text-sm text-white/50 mt-1">
+                  <a
+                    href={testimonial.socialUrl}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="text-sm text-white/70 underline underline-offset-2 decoration-white/30 hover:text-white hover:decoration-white transition"
+                  >
                     {testimonial.social}
-                  </p>
+                  </a>
                 )}
               </div>
             </div>

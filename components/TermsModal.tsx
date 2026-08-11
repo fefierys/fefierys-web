@@ -50,58 +50,47 @@ export default function TermsModal({ open, onClose }: TermsModalProps) {
             {/* Scrollable content */}
             <div className="flex-1 overflow-y-auto overscroll-contain px-8 pb-8 md:px-10 md:pb-10 space-y-8">
               <section className="space-y-3">
-                <h3 className="text-xl font-medium text-white">Payment</h3>
+                <h3 className="text-xl font-medium text-white">Booking and Payment options</h3>
                 <p className="text-sm leading-relaxed text-white/80">
-                  A 50% upfront payment is required before any work begins.
-                  The remaining 50% is due upon completion, before the final
-                  high-resolution files are delivered. Payments are made in USD
-                  through the agreed payment method.
+                Commissions can be booked via Behance or through direct contact ví­a Paypal.
+                A portion of the payment is required upfront, and the remainder is due upon receipt of the sketch.
+                <br/>Small and medium projects: 50% upfront
+                <br/>Large projects ($1000+): 30% upfront
                 </p>
               </section>
 
               <section className="space-y-3">
-                <h3 className="text-xl font-medium text-white">Revisions</h3>
+                <h3 className="text-xl font-medium text-white">Delivery Time</h3>
                 <p className="text-sm leading-relaxed text-white/80">
-                  Reasonable revisions are included during the sketch and
-                  refinement stages. Major changes requested after a stage has
-                  been approved may incur an additional fee.
+                  The standard turnaround time ranges from one week to one month depending on the artwork’s complexity, 
+				  while larger projects will be discussed directly with the client. 
+
                 </p>
               </section>
 
               <section className="space-y-3">
-                <h3 className="text-xl font-medium text-white">Turnaround Time</h3>
+                <h3 className="text-xl font-medium text-white">Refund Policy</h3>
                 <p className="text-sm leading-relaxed text-white/80">
-                  Completion times vary depending on the complexity of the
-                  commission and current workload. Any estimated delivery date
-                  is an estimate rather than a guarantee.
+                  No refunds.
                 </p>
               </section>
 
               <section className="space-y-3">
-                <h3 className="text-xl font-medium text-white">Copyright & Usage</h3>
+                <h3 className="text-xl font-medium text-white">Brief & Revisions</h3>
                 <p className="text-sm leading-relaxed text-white/80">
-                  Unless an extended commercial or merchandising license is
-                  purchased, the artwork is provided for personal use or the
-                  specific licensed purpose discussed during the commission.
-                  Redistribution, resale, or use in merchandise is not
-                  permitted without prior agreement.
+                  To create the illustration, I’ll need a description and/or reference images; a Pinterest/mood board is always very helpful!
+                  <br/>Revisions will be modifications that don’t require redoing the entire sketch.
+                  The price includes three revisions: two during the sketch stage and one in the final stage.
+                  In the final revision, we can make minor adjustments to color, lighting, and details.
+
                 </p>
               </section>
 
               <section className="space-y-3">
-                <h3 className="text-xl font-medium text-white">Commercial Use</h3>
+                <h3 className="text-xl font-medium text-white">Personal & Commercial Use</h3>
                 <p className="text-sm leading-relaxed text-white/80">
-                  Commercial use licenses are available for projects such as
-                  book publication, monetized streaming, promotional campaigns,
-                  or other business-related purposes. The exact scope of
-                  commercial rights will be agreed upon before work begins.
-                </p>
-              </section>
-
-              <section className="space-y-3">
-                <h3 className="text-xl font-medium text-white">Merchandising License</h3>
-                <p className="text-sm leading-relaxed text-white/80">
-                  If the artwork will be used to produce physical products for
+                  Artworks are for personal use with proper credit unless commercial rights are explicitly requested and purchased.
+			            If the artwork will be used to produce physical products for
                   sale (such as prints, apparel, stickers, books, or other
                   merchandise), an additional merchandising license fee will
                   apply.
@@ -109,29 +98,41 @@ export default function TermsModal({ open, onClose }: TermsModalProps) {
               </section>
 
               <section className="space-y-3">
-                <h3 className="text-xl font-medium text-white">Cancellations & Refunds</h3>
+                <h3 className="text-xl font-medium text-white">Copyright & Promotion</h3>
                 <p className="text-sm leading-relaxed text-white/80">
-                  If a commission is cancelled before work has started, the
-                  initial payment will be refunded. Once work has begun,
-                  refunds will depend on the amount of work already completed.
+                  I retain the original copyright of the artwork and reserve the right to post the process and final piece in my professional portfolio. 
+				          If you need the illustration to be published after a certain date or to be completely private, this must be agreed upon at the beginning.
                 </p>
               </section>
 
               <section className="space-y-3">
-                <h3 className="text-xl font-medium text-white">Portfolio Rights</h3>
+                <h3 className="text-xl font-medium text-white">Cancellation Right</h3>
                 <p className="text-sm leading-relaxed text-white/80">
-                  I reserve the right to display completed artwork in my
-                  portfolio, social media, and promotional materials unless a
-                  confidentiality agreement has been arranged beforehand.
+                 I reserve the right to decline or cancel a commission at any time if the client displays disrespectful behavior or if the initial agreement changes drastically. 
                 </p>
               </section>
 
+              
               <section className="space-y-3">
                 <h3 className="text-xl font-medium text-white">Communication</h3>
                 <p className="text-sm leading-relaxed text-white/80">
-                  Clear and respectful communication helps the process move
+				          We can communicate via email or Discord. I avoid using platforms like Instagram or TikTok because messages often glitch or get lost.
+                  <br/>Clear and respectful communication helps the process move
                   smoothly. I will do my best to respond within a reasonable
                   timeframe, and I appreciate the same courtesy from clients.
+                </p>
+              </section>
+			  
+			  
+			        <section className="space-y-3">
+                <h3 className="text-xl font-medium text-white">Extra info</h3>
+                <p className="text-sm leading-relaxed text-white/80">
+                  Base prices apply to standard designs. Highly detailed or complex requests
+                  may be subject to an additional complexity fee.{' '}
+                  <br/>
+                  <strong>
+                    <em>For anything not listed, feel free to request a custom quote!</em>
+                  </strong>
                 </p>
               </section>
             </div>
