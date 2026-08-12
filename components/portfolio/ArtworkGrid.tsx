@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useRef, useEffect } from 'react';
 import { Artwork } from '@/data/portfolio/types';
 import ArtworkLightbox from './ArtworkLightbox';
 import { motion } from 'framer-motion';
@@ -14,10 +14,11 @@ interface ArtworkGridProps {
 export default function ArtworkGrid({
   artworks,
 }: ArtworkGridProps) {
-  const PAGE_UNITS = 6;
-
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [currentPage, setCurrentPage] = useState(0);
+
+  const galleryRef = useRef<HTMLDivElement | null>(null);
+  const previousPageRef = useRef(currentPage);
 
   const containerVariants = {
     hidden: {},
@@ -54,94 +55,121 @@ export default function ArtworkGrid({
 
   const pageArtworks = pages[safeCurrentPage] ?? [];
 
-  const selectedArtwork =
+  const globalIndex =
     selectedIndex !== null
-      ? pageArtworks[selectedIndex]
+      ? artworks.findIndex((a) => a.id === pageArtworks[selectedIndex]?.id)
       : null;
+
+  const selectedArtwork =
+    globalIndex !== null && globalIndex >= 0
+      ? artworks[globalIndex]
+      : null;
+
+  // Scroll solo cuando cambia la página
+  useEffect(() => {
+    if (previousPageRef.current === currentPage) return;
+
+    previousPageRef.current = currentPage;
+
+    if (galleryRef.current) {
+      const navbarOffset = 96; // ajusta este valor según la altura de tu navbar
+      const y =
+        galleryRef.current.getBoundingClientRect().top +
+        window.pageYOffset -
+        navbarOffset;
+
+      window.scrollTo({
+        top: y,
+        behavior: 'smooth',
+      });
+    }
+  }, [currentPage]);
 
   return (
     <>
-      <motion.div
-        key={safeCurrentPage}
-        variants={containerVariants}
-        initial="hidden"
-        animate="show"
-        className="
-          mx-auto
-          w-full
-          max-w-7xl
+      <div ref={galleryRef}>
+        <motion.div
+          key={safeCurrentPage}
+          variants={containerVariants}
+          initial="hidden"
+          animate="show"
+          className="
+            mx-auto
+            w-full
+            max-w-7xl
 
-          grid
-          grid-cols-1
-          md:grid-cols-3
+            grid
+            grid-cols-1
+            md:grid-cols-3
 
-          gap-8
-          auto-rows-130
-        "
-      >
-        {pageArtworks.map((artwork, index) => (
-          <motion.div
-            variants={itemVariants}
-            key={artwork.id}
-            onClick={() => setSelectedIndex(index)}
-            className={`
-              group
-              relative
-              overflow-hidden
-              rounded-2xl
-              cursor-pointer
-              ${
-                artwork.orientation === 'landscape'
-                  ? 'md:col-span-3 h-130'
-                  : 'h-130'
-              }
-              ${
-                artwork.featured
-                  ? 'ring-1 ring-white/10 shadow-2xl'
-                  : ''
-              }
-            `}
-          >
-            <Image
-              src={artwork.src}
-              alt={artwork.alt}
-              fill
-              className="
-                object-cover
+            gap-8
+            auto-rows-130
+          "
+        >
+          {pageArtworks.map((artwork, index) => (
+            <motion.div
+              variants={itemVariants}
+              key={artwork.id}
+              onClick={() => setSelectedIndex(index)}
+              className={`
+                group
+                relative
+                overflow-hidden
                 rounded-2xl
-
-                transition
-                duration-700
-
-                group-hover:scale-105
-              "
-            />
-
-            <div
-              className="
-                absolute inset-0
-                flex items-end
-                p-5
-                bg-gradient-to-t from-black/55 via-black/10 to-transparent
-                opacity-0
-                transition duration-300
-                group-hover:opacity-100
-              "
+                cursor-pointer
+                ${
+                  artwork.orientation === 'landscape'
+                    ? 'md:col-span-3 h-130'
+                    : 'h-130'
+                }
+                ${
+                  artwork.featured
+                    ? 'ring-1 ring-white/10 shadow-2xl'
+                    : ''
+                }
+              `}
             >
-              <span
+              <Image
+                src={artwork.src}
+                alt={artwork.alt}
+                fill
                 className="
-                  text-sm
-                  tracking-[0.12em]
-                  uppercase
-                  text-white
+                  object-cover
+                  rounded-2xl
+
+                  transition
+                  duration-700
+
+                  group-hover:scale-105
+                "
+              />
+
+              <div
+                className="
+                  absolute inset-0
+                  flex items-end
+                  p-5
+                  bg-gradient-to-t from-black/55 via-black/10 to-transparent
+                  opacity-0
+                  transition duration-300
+                  group-hover:opacity-100
                 "
               >
-                {artwork.title}
-              </span>
-            </div>
-          </motion.div>
-        ))}
-      </motion.div>
+                <span
+                  className="
+                    text-sm
+                    tracking-[0.12em]
+                    uppercase
+                    text-white
+                  "
+                >
+                  {artwork.title}
+                </span>
+              </div>
+            </motion.div>
+          ))}
+        </motion.div>
+      </div>
 
       {pages.length > 1 && (
         <div className="mt-12 flex items-center justify-center gap-3">
@@ -196,41 +224,43 @@ export default function ArtworkGrid({
         </div>
       )}
 
-      {selectedArtwork && (
+      {selectedArtwork && globalIndex !== null && (
         <ArtworkLightbox
           artwork={selectedArtwork}
-          hasPrevious={
-            !(safeCurrentPage === 0 && selectedIndex === 0)
-          }
-          hasNext={
-            !(
-              safeCurrentPage === pages.length - 1 &&
-              selectedIndex === pageArtworks.length - 1
-            )
-          }
+          currentIndex={globalIndex}
+          total={artworks.length}
           previous={() => {
-            if (selectedIndex === null) return;
+            const newIndex =
+              (globalIndex - 1 + artworks.length) % artworks.length;
 
-            if (selectedIndex > 0) {
-              setSelectedIndex(selectedIndex - 1);
-            } else if (safeCurrentPage > 0) {
-              const previousPage = safeCurrentPage - 1;
-              setCurrentPage(previousPage);
-              setSelectedIndex(
-                pages[previousPage].length - 1
-              );
-            }
+            const newArtwork = artworks[newIndex];
+
+            const newPage = pages.findIndex((page) =>
+              page.some((item) => item.id === newArtwork.id)
+            );
+
+            const newLocalIndex = pages[newPage].findIndex(
+              (item) => item.id === newArtwork.id
+            );
+
+            setCurrentPage(newPage);
+            setSelectedIndex(newLocalIndex);
           }}
           next={() => {
-            if (selectedIndex === null) return;
+            const newIndex = (globalIndex + 1) % artworks.length;
 
-            if (selectedIndex < pageArtworks.length - 1) {
-              setSelectedIndex(selectedIndex + 1);
-            } else if (safeCurrentPage < pages.length - 1) {
-              const nextPage = safeCurrentPage + 1;
-              setCurrentPage(nextPage);
-              setSelectedIndex(0);
-            }
+            const newArtwork = artworks[newIndex];
+
+            const newPage = pages.findIndex((page) =>
+              page.some((item) => item.id === newArtwork.id)
+            );
+
+            const newLocalIndex = pages[newPage].findIndex(
+              (item) => item.id === newArtwork.id
+            );
+
+            setCurrentPage(newPage);
+            setSelectedIndex(newLocalIndex);
           }}
           close={() => setSelectedIndex(null)}
         />

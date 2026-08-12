@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 :root {
-  --background: #0a0a0a;
+  --background: #6b6fa8;
   --foreground: #ededed;
   --font-lexend: "Lexend", sans-serif;
 }
@@ -11,15 +11,19 @@
 }
 
 html {
+  background-color: #6b6fa8; /* solo para cubrir el overscroll */
   scroll-behavior: smooth;
+  overscroll-behavior: none;
 }
 
 body {
   min-height: 100vh;
+  background: transparent; /* deja visible tu componente Background */
   color: white;
   font-family: var(--font-lexend);
 }
 
+/* Glass card */
 .glass-card {
   @apply rounded-3xl
          border border-white/10

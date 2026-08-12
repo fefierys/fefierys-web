@@ -343,12 +343,6 @@ export const commissions: Record<string, CommissionData> = {
           "If you plan to use the artwork to manufacture physical goods for sale (such as apparel, prints, stickers, etc.) an extended license fee will apply.",
         ],
       },
-      {
-        title: "Complexity fee.",
-        details: [
-          "Base price apply to standard designs. Highly detailed or complex requests may be subject to an additional complexity fee.",
-        ],
-      },
     ],
     cta: "Start an environment commission",
   },
