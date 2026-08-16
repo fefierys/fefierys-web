@@ -113,11 +113,11 @@ export default function Navbar() {
 
                 rounded-2xl
 
-                bg-white/10
+              bg-[#4a4594]/50
                 backdrop-blur-xl
 
                 border
-                border-white/10
+                border-[#3A4D84]/10
 
                 px-6
                 py-4

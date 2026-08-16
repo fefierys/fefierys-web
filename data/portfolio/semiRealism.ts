@@ -17,7 +17,7 @@ export const semiRealism: PortfolioData = {
               "title": "Front Cover",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Elf Glowing Night Fantasy Book Cover Frontcover illustration by Fefierys"
+              "alt": "Elf Glowing Night Fantasy Book Cover Front cover illustration by Fefierys"
             },
             {
               "id": 2,
@@ -25,7 +25,7 @@ export const semiRealism: PortfolioData = {
               "title": "Front Cover",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Elf With Baby Fox Coastal heath Fantasy Book Cover Frontcover illustration by Fefierys"
+              "alt": "Elf With Baby Fox Coastal heath Fantasy Book Cover Front cover illustration by Fefierys"
             },
             {
               "id": 3,
@@ -33,7 +33,7 @@ export const semiRealism: PortfolioData = {
               "title": "Full Wrap Cover",
               "orientation": "landscape",
               "featured": true,
-              "alt": "Elf With Baby Fox Coastal heath Fantasy Book Cover Fullwrap illustration by Fefierys"
+              "alt": "Elf With Baby Fox Coastal heath Fantasy Book Cover Full wrap illustration by Fefierys"
             }
           ]
         },
@@ -55,7 +55,7 @@ export const semiRealism: PortfolioData = {
               "title": "Full Page",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Fairy On Hand Fantasy Book Fullpage illustration by Fefierys"
+              "alt": "Fairy On Hand Fantasy Book Full page illustration by Fefierys"
             },
             {
               "id": 3,
@@ -63,7 +63,7 @@ export const semiRealism: PortfolioData = {
               "title": "Full Page",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Girl Leopard Forest Fantasy Book Fullpage illustration by Fefierys"
+              "alt": "Girl Leopard Forest Fantasy Book Full page illustration by Fefierys"
             },
             {
               "id": 4,
@@ -71,7 +71,7 @@ export const semiRealism: PortfolioData = {
               "title": "Full Page",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Great Door With Tree Painting Fantasy Book Fullpage illustration by Fefierys"
+              "alt": "Great Door With Tree Painting Fantasy Book Full page illustration by Fefierys"
             },
             {
               "id": 5,
@@ -79,7 +79,7 @@ export const semiRealism: PortfolioData = {
               "title": "Full Page",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Greenhouse Full Of Flowers Fantasy Book Fullpage illustration by Fefierys"
+              "alt": "Greenhouse Full Of Flowers Fantasy Book Full page illustration by Fefierys"
             },
             {
               "id": 6,
@@ -87,7 +87,7 @@ export const semiRealism: PortfolioData = {
               "title": "Full Page",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Hall With Constelation Fantasy Book Fullpage illustration by Fefierys"
+              "alt": "Hall With Constelation Fantasy Book Full page illustration by Fefierys"
             },
             {
               "id": 7,
@@ -95,7 +95,7 @@ export const semiRealism: PortfolioData = {
               "title": "Full Page",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Hand With A Key Office Fantasy Book Fullpage illustration by Fefierys"
+              "alt": "Hand With A Key Office Fantasy Book Full page illustration by Fefierys"
             },
             {
               "id": 8,
@@ -103,7 +103,7 @@ export const semiRealism: PortfolioData = {
               "title": "Full Page",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Old Tree Rainy Night Fantasy Book Fullpage illustration by Fefierys"
+              "alt": "Old Tree Rainy Night Fantasy Book Full page illustration by Fefierys"
             },
             {
               "id": 9,
@@ -111,7 +111,7 @@ export const semiRealism: PortfolioData = {
               "title": "Full Page",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Old Woman Front Of A Hearth Fantasy Book Fullpage illustration by Fefierys"
+              "alt": "Old Woman Front Of A Hearth Fantasy Book Full page illustration by Fefierys"
             },
             {
               "id": 10,
@@ -119,7 +119,7 @@ export const semiRealism: PortfolioData = {
               "title": "Full Page",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Portrait On Shelf Fantasy Book Fullpage illustration by Fefierys"
+              "alt": "Portrait On Shelf Fantasy Book Full page illustration by Fefierys"
             },
             {
               "id": 11,
@@ -127,7 +127,7 @@ export const semiRealism: PortfolioData = {
               "title": "Full Page",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Swan In A Koi Fish Pond Fantasy Book Fullpage illustration by Fefierys"
+              "alt": "Swan In A Koi Fish Pond Fantasy Book Full page illustration by Fefierys"
             },
             {
               "id": 12,
@@ -135,7 +135,7 @@ export const semiRealism: PortfolioData = {
               "title": "Full Page",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Teens Kitchen Book Moonlight Fantasy Book Fullpage illustration by Fefierys"
+              "alt": "Teens Kitchen Book Moonlight Fantasy Book Full page illustration by Fefierys"
             },
             {
               "id": 13,
@@ -143,7 +143,7 @@ export const semiRealism: PortfolioData = {
               "title": "Full Page",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Teens Kitchen Warm Light Fantasy Book Fullpage illustration by Fefierys"
+              "alt": "Teens Kitchen Warm Light Fantasy Book Full page illustration by Fefierys"
             },
             {
               "id": 14,
@@ -151,7 +151,7 @@ export const semiRealism: PortfolioData = {
               "title": "Full Page",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Warehouse Winter Night Fantasy Book Fullpage illustration by Fefierys"
+              "alt": "Warehouse Winter Night Fantasy Book Full page illustration by Fefierys"
             },
             {
               "id": 15,
@@ -159,7 +159,7 @@ export const semiRealism: PortfolioData = {
               "title": "Full Page",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Well In Snowy Town Fantasy Book Fullpage illustration by Fefierys"
+              "alt": "Well In Snowy Town Fantasy Book Full page illustration by Fefierys"
             }
           ]
         }
@@ -179,7 +179,7 @@ export const semiRealism: PortfolioData = {
               "title": "Full Render - Smooth Finish",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Alistar Anthropomorphic Character Lol Fanart Smoothfullrender illustration by Fefierys"
+              "alt": "Alistar Anthropomorphic Character Lol Fanart Full render smooth finish illustration by Fefierys"
             },
             {
               "id": 2,
@@ -187,7 +187,7 @@ export const semiRealism: PortfolioData = {
               "title": "Lineart - Textured Finish",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Axolotl Amphibious D&D Pirate Texturedlineart illustration by Fefierys"
+              "alt": "Axolotl Amphibious D&D Pirate Lineart textured finish illustration by Fefierys"
             },
             {
               "id": 3,
@@ -195,7 +195,7 @@ export const semiRealism: PortfolioData = {
               "title": "Full Render - Textured Finish",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Blond Girl Snow Portrait Texturedfullrender illustration by Fefierys"
+              "alt": "Blond Girl Snow Portrait Full render textured finish illustration by Fefierys"
             },
             {
               "id": 4,
@@ -203,7 +203,7 @@ export const semiRealism: PortfolioData = {
               "title": "Full Render - Smooth Finish",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Bunny Anthro Character Furry Smoothfullrender illustration by Fefierys"
+              "alt": "Bunny Anthro Character Furry Full render smooth finish illustration by Fefierys"
             },
             {
               "id": 5,
@@ -211,7 +211,7 @@ export const semiRealism: PortfolioData = {
               "title": "Full Render - Smooth Finish",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Canine Anthro Furry Queer Smoothfullrender illustration by Fefierys"
+              "alt": "Canine Anthro Furry Queer Full render smooth finish illustration by Fefierys"
             },
             {
               "id": 6,
@@ -219,7 +219,7 @@ export const semiRealism: PortfolioData = {
               "title": "Full Render - Smooth Finish",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Demon Angel Girl Portrait Fantasy Smoothfullrender illustration by Fefierys"
+              "alt": "Demon Angel Girl Portrait Fantasy Full render smooth finish illustration by Fefierys"
             },
             {
               "id": 7,
@@ -227,7 +227,7 @@ export const semiRealism: PortfolioData = {
               "title": "Full Render - Smooth Finish",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Demon Girl Fantasy Roleplay Smoothfullrender illustration by Fefierys"
+              "alt": "Demon Girl Fantasy Roleplay Full render smooth finish illustration by Fefierys"
             },
             {
               "id": 8,
@@ -235,7 +235,7 @@ export const semiRealism: PortfolioData = {
               "title": "Full Render - Smooth Finish",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Demon Girl POC Fantasy Smoothfullrender illustration by Fefierys"
+              "alt": "Demon Girl POC Fantasy Full render smooth finish illustration by Fefierys"
             },
             {
               "id": 9,
@@ -243,7 +243,7 @@ export const semiRealism: PortfolioData = {
               "title": "Full Render - Textured Finish",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Druid Fantasy D&D Texturedfullrender illustration by Fefierys"
+              "alt": "Druid Fantasy D&D Full render textured finish illustration by Fefierys"
             },
             {
               "id": 10,
@@ -251,7 +251,7 @@ export const semiRealism: PortfolioData = {
               "title": "Full Render - Smooth Finish",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Dwarf Blue Skin Warrior Smoothfullrender illustration by Fefierys"
+              "alt": "Dwarf Blue Skin Warrior Full render smooth finish illustration by Fefierys"
             },
             {
               "id": 11,
@@ -259,7 +259,7 @@ export const semiRealism: PortfolioData = {
               "title": "Lineart - Textured Finish",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Elf Race D&D Texturedlineart illustration by Fefierys"
+              "alt": "Elf Race D&D Lineart textured finish illustration by Fefierys"
             },
             {
               "id": 12,
@@ -267,7 +267,7 @@ export const semiRealism: PortfolioData = {
               "title": "Flat - Textured Finish",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Female Angel D&D RPG Roleplay Texturedflat illustration by Fefierys"
+              "alt": "Female Angel D&D RPG Roleplay Flat textured finish illustration by Fefierys"
             },
             {
               "id": 13,
@@ -275,7 +275,7 @@ export const semiRealism: PortfolioData = {
               "title": "Shaded - Textured Finish",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Female Character Art Roleplay VTM Texturedshaded illustration by Fefierys"
+              "alt": "Female Character Art Roleplay VTM Shaded textured finish illustration by Fefierys"
             },
             {
               "id": 14,
@@ -283,7 +283,7 @@ export const semiRealism: PortfolioData = {
               "title": "Shaded - Textured Finish",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Female Character Fantasy POC VTM Texturedshaded illustration by Fefierys"
+              "alt": "Female Character Fantasy POC VTM Shaded textured finish illustration by Fefierys"
             },
             {
               "id": 15,
@@ -291,7 +291,7 @@ export const semiRealism: PortfolioData = {
               "title": "Shaded - Textured Finish",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Female Character Roleplay VTM Texturedshaded illustration by Fefierys"
+              "alt": "Female Character Roleplay VTM Shaded textured finish illustration by Fefierys"
             },
             {
               "id": 16,
@@ -299,7 +299,7 @@ export const semiRealism: PortfolioData = {
               "title": "Flat - Textured Finish",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Female Elf D&D RPG Texturedflat illustration by Fefierys"
+              "alt": "Female Elf D&D RPG Flat textured finish illustration by Fefierys"
             },
             {
               "id": 17,
@@ -307,7 +307,7 @@ export const semiRealism: PortfolioData = {
               "title": "Full Render - Textured Finish",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Female Elf Girl  Healer D&D Texturedfullrender illustration by Fefierys"
+              "alt": "Female Elf Girl  Healer D&D Full render textured finish illustration by Fefierys"
             },
             {
               "id": 18,
@@ -315,7 +315,7 @@ export const semiRealism: PortfolioData = {
               "title": "Full Render - Textured Finish",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Female Elf Pink Hair D&D Portrait Texturedfullrender illustration by Fefierys"
+              "alt": "Female Elf Pink Hair D&D Portrait Full render textured finish illustration by Fefierys"
             },
             {
               "id": 19,
@@ -323,7 +323,7 @@ export const semiRealism: PortfolioData = {
               "title": "Full Render - Smooth Finish",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Female Warrior Amazon D&D Roleplay Smoothfullrender illustration by Fefierys"
+              "alt": "Female Warrior Amazon D&D Roleplay Full render smooth finish illustration by Fefierys"
             },
             {
               "id": 20,
@@ -331,7 +331,7 @@ export const semiRealism: PortfolioData = {
               "title": "Lineart - Textured Finish",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Female Yuanti Lizard Folk D&D Texturedlineart illustration by Fefierys"
+              "alt": "Female Yuanti Lizard Folk D&D Lineart textured finish illustration by Fefierys"
             },
             {
               "id": 21,
@@ -339,7 +339,7 @@ export const semiRealism: PortfolioData = {
               "title": "Full Render - Smooth Finish",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Girl Afro Hair Portrait POC Smoothfullrender illustration by Fefierys"
+              "alt": "Girl Afro Hair Portrait POC Full render smooth finish illustration by Fefierys"
             },
             {
               "id": 22,
@@ -347,7 +347,7 @@ export const semiRealism: PortfolioData = {
               "title": "Shaded - Textured Finish",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Girl Corset Portrait Texturedshaded illustration by Fefierys"
+              "alt": "Girl Corset Portrait Shaded textured finish illustration by Fefierys"
             },
             {
               "id": 23,
@@ -355,7 +355,7 @@ export const semiRealism: PortfolioData = {
               "title": "Full Render - Smooth Finish",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Girl Portrait POC Smoothfullrender illustration by Fefierys"
+              "alt": "Girl Portrait POC Full render smooth finish illustration by Fefierys"
             },
             {
               "id": 24,
@@ -363,7 +363,7 @@ export const semiRealism: PortfolioData = {
               "title": "Lineart - Textured Finish",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Girl Portrait Semirealistic Texturedlineart illustration by Fefierys"
+              "alt": "Girl Portrait Semirealistic Lineart textured finish illustration by Fefierys"
             },
             {
               "id": 25,
@@ -371,7 +371,7 @@ export const semiRealism: PortfolioData = {
               "title": "Full Render - Smooth Finish",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Healer Female Elf D&D Character Smoothfullrender illustration by Fefierys"
+              "alt": "Healer Female Elf D&D Character Full render smooth finish illustration by Fefierys"
             },
             {
               "id": 26,
@@ -379,7 +379,7 @@ export const semiRealism: PortfolioData = {
               "title": "Full Render - Smooth Finish",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Human Male Roleplay D&D Smoothfullrender illustration by Fefierys"
+              "alt": "Human Male Roleplay D&D Full render smooth finish illustration by Fefierys"
             },
             {
               "id": 27,
@@ -387,7 +387,7 @@ export const semiRealism: PortfolioData = {
               "title": "Shaded - Textured Finish",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Male Character Roleplay VTM Texturedshaded illustration by Fefierys"
+              "alt": "Male Character Roleplay VTM Shaded textured finish illustration by Fefierys"
             },
             {
               "id": 28,
@@ -395,7 +395,7 @@ export const semiRealism: PortfolioData = {
               "title": "Full Render - Smooth Finish",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Male Elf Character D&D Smoothfullrender illustration by Fefierys"
+              "alt": "Male Elf Character D&D Full render smooth finish illustration by Fefierys"
             },
             {
               "id": 29,
@@ -403,7 +403,7 @@ export const semiRealism: PortfolioData = {
               "title": "Full Render - Smooth Finish",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Male Human Character D&D Smoothfullrender illustration by Fefierys"
+              "alt": "Male Human Character D&D Full render smooth finish illustration by Fefierys"
             },
             {
               "id": 30,
@@ -411,7 +411,7 @@ export const semiRealism: PortfolioData = {
               "title": "Full Render - Textured Finish",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Male Warrior Elf D&D Texturedfullrender illustration by Fefierys"
+              "alt": "Male Warrior Elf D&D Full render textured finish illustration by Fefierys"
             },
             {
               "id": 31,
@@ -419,7 +419,7 @@ export const semiRealism: PortfolioData = {
               "title": "Lineart - Textured Finish",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Minotaur D&D Character Fantasy Texturedlineart illustration by Fefierys"
+              "alt": "Minotaur D&D Character Fantasy Lineart textured finish illustration by Fefierys"
             },
             {
               "id": 32,
@@ -427,7 +427,7 @@ export const semiRealism: PortfolioData = {
               "title": "Full Render - Textured Finish",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Pink Hair Girl Cloud Top Fantasy Texturedfullrender illustration by Fefierys"
+              "alt": "Pink Hair Girl Cloud Top Fantasy Full render textured finish illustration by Fefierys"
             },
             {
               "id": 33,
@@ -435,7 +435,7 @@ export const semiRealism: PortfolioData = {
               "title": "Shaded - Textured Finish",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Priest VTM D&D POC Texturedshaded illustration by Fefierys"
+              "alt": "Priest VTM D&D POC Shaded textured finish illustration by Fefierys"
             },
             {
               "id": 34,
@@ -443,7 +443,7 @@ export const semiRealism: PortfolioData = {
               "title": "Full Render - Smooth Finish",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Redhead Girl Portrait Ginger Smoothfullrender illustration by Fefierys"
+              "alt": "Redhead Girl Portrait Ginger Full render smooth finish illustration by Fefierys"
             },
             {
               "id": 35,
@@ -459,7 +459,7 @@ export const semiRealism: PortfolioData = {
               "title": "Full Render - Smooth Finish",
               "orientation": "portrait",
               "featured": false,
-              "alt": "The Witcher Ciri Fantasy Smoothfullrender illustration by Fefierys"
+              "alt": "The Witcher Ciri Fantasy Full render smooth finish illustration by Fefierys"
             },
             {
               "id": 37,
@@ -467,15 +467,15 @@ export const semiRealism: PortfolioData = {
               "title": "Full Render - Smooth Finish",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Tiefling D&D Art Male Smoothfullrender illustration by Fefierys"
+              "alt": "Tiefling D&D Art Male Full render smooth finish illustration by Fefierys"
             },
             {
               "id": 38,
-              "src": "/images/portfolio/semi-realism/general/icons/vampire-male-character-vtm-texturedfullrender.webp",
-              "title": "Full Render - Textured Finish",
+              "src": "/images/portfolio/semi-realism/general/icons/vampire-male-character-vtm-fullrender.webp",
+              "title": "Full Render",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Vampire Male Character VTM Texturedfullrender illustration by Fefierys"
+              "alt": "Vampire Male Character VTM Fullrender illustration by Fefierys"
             }
           ]
         },
@@ -489,7 +489,7 @@ export const semiRealism: PortfolioData = {
               "title": "Full Render - Smooth Finish",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Capybara With Bird Pet D&D Smoothfullrender illustration by Fefierys"
+              "alt": "Capybara With Bird Pet D&D Full render smooth finish illustration by Fefierys"
             },
             {
               "id": 2,
@@ -497,7 +497,7 @@ export const semiRealism: PortfolioData = {
               "title": "Lineart - Textured Finish with Diorama",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Dwarf And Dog D&D Character Diorama Texturedlineart illustration by Fefierys"
+              "alt": "Dwarf And Dog D&D Character Diorama Lineart textured finish illustration by Fefierys"
             },
             {
               "id": 3,
@@ -505,7 +505,7 @@ export const semiRealism: PortfolioData = {
               "title": "Full Render - Smooth Finish with Diorama",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Dwarf And Dog D&D Character Summer Diorama Smoothfullrender illustration by Fefierys"
+              "alt": "Dwarf And Dog D&D Character Summer Diorama Full render smooth finish illustration by Fefierys"
             },
             {
               "id": 4,
@@ -513,7 +513,7 @@ export const semiRealism: PortfolioData = {
               "title": "Full Render - Smooth Finish with Diorama",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Dwarf And Dog D&D Character Winter Diorama Smoothfullrender illustration by Fefierys"
+              "alt": "Dwarf And Dog D&D Character Winter Diorama Full render smooth finish illustration by Fefierys"
             },
             {
               "id": 5,
@@ -521,7 +521,7 @@ export const semiRealism: PortfolioData = {
               "title": "Full Render - Smooth Finish",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Elf Elegant Dress D&D Smoothfullrender illustration by Fefierys"
+              "alt": "Elf Elegant Dress D&D Full render smooth finish illustration by Fefierys"
             },
             {
               "id": 6,
@@ -529,7 +529,7 @@ export const semiRealism: PortfolioData = {
               "title": "Lineart - Textured Finish",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Female Elf D&D Art Texturedlineart illustration by Fefierys"
+              "alt": "Female Elf D&D Art Lineart textured finish illustration by Fefierys"
             },
             {
               "id": 7,
@@ -537,7 +537,7 @@ export const semiRealism: PortfolioData = {
               "title": "Full Render - Smooth Finish",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Female Fantasy Character Roleplay Fantasy Book By Ally Marr Smoothfullrender illustration by Fefierys"
+              "alt": "Female Fantasy Character Roleplay Fantasy Book By Ally Marr Full render smooth finish illustration by Fefierys"
             },
             {
               "id": 8,
@@ -545,7 +545,7 @@ export const semiRealism: PortfolioData = {
               "title": "Shaded - Smooth Finish",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Female Green Tiefling D&D Sorcerer Smoothshaded illustration by Fefierys"
+              "alt": "Female Green Tiefling D&D Sorcerer Shaded smooth finish illustration by Fefierys"
             },
             {
               "id": 9,
@@ -553,7 +553,7 @@ export const semiRealism: PortfolioData = {
               "title": "Shaded - Smooth Finish",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Female Pink Tiefling D&D Smoothshaded illustration by Fefierys"
+              "alt": "Female Pink Tiefling D&D Shaded smooth finish illustration by Fefierys"
             },
             {
               "id": 10,
@@ -561,7 +561,7 @@ export const semiRealism: PortfolioData = {
               "title": "Lineart - Textured Finish",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Female Wizard Broom Character Hogwarts Legacy Art Texturedlineart illustration by Fefierys"
+              "alt": "Female Wizard Broom Character Hogwarts Legacy Art Lineart textured finish illustration by Fefierys"
             },
             {
               "id": 11,
@@ -569,7 +569,7 @@ export const semiRealism: PortfolioData = {
               "title": "Lineart - Textured Finish",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Female Wizard Wand Character Hogwarts Legacy Art Texturedlineart illustration by Fefierys"
+              "alt": "Female Wizard Wand Character Hogwarts Legacy Art Lineart textured finish illustration by Fefierys"
             },
             {
               "id": 12,
@@ -577,7 +577,7 @@ export const semiRealism: PortfolioData = {
               "title": "Full Render - Smooth Finish",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Gypsy POC Girl D&D Art Smoothfullrender illustration by Fefierys"
+              "alt": "Gypsy POC Girl D&D Art Full render smooth finish illustration by Fefierys"
             },
             {
               "id": 13,
@@ -585,7 +585,7 @@ export const semiRealism: PortfolioData = {
               "title": "Lineart - Smooth Finish",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Gypsy POC Girl D&D Art Smoothlineart illustration by Fefierys"
+              "alt": "Gypsy POC Girl D&D Art Lineart smooth finish illustration by Fefierys"
             },
             {
               "id": 14,
@@ -593,7 +593,7 @@ export const semiRealism: PortfolioData = {
               "title": "Full Render - Smooth Finish",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Male Fantasy Character Roleplay Fantasy Book By Ally Marr Smoothfullrender illustration by Fefierys"
+              "alt": "Male Fantasy Character Roleplay Fantasy Book By Ally Marr Full render smooth finish illustration by Fefierys"
             },
             {
               "id": 15,
@@ -601,15 +601,15 @@ export const semiRealism: PortfolioData = {
               "title": "Full Render - Smooth Finish",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Orc Elf Human D&D Characters Smoothfullrender illustration by Fefierys"
+              "alt": "Orc Elf Human D&D Characters Full render smooth finish illustration by Fefierys"
             },
             {
               "id": 16,
-              "src": "/images/portfolio/semi-realism/general/character-design/panda-anthropomorphic-female-character-dnd-smoothfullrender.webp",
-              "title": "Full Render - Smooth Finish",
+              "src": "/images/portfolio/semi-realism/general/character-design/panda-anthropomorphic-female-character-dnd-diorama-smoothfullrender.webp",
+              "title": "Full Render - Smooth Finish with Diorama",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Panda Anthropomorphic Female Character D&D Smoothfullrender illustration by Fefierys"
+              "alt": "Panda Anthropomorphic Female Character D&D Diorama Full render smooth finish illustration by Fefierys"
             },
             {
               "id": 17,
@@ -617,7 +617,7 @@ export const semiRealism: PortfolioData = {
               "title": "Full Render - Smooth Finish",
               "orientation": "portrait",
               "featured": false,
-              "alt": "RPG Character Fantasy Wizard Smoothfullrender illustration by Fefierys"
+              "alt": "RPG Character Fantasy Wizard Full render smooth finish illustration by Fefierys"
             },
             {
               "id": 18,
@@ -625,7 +625,7 @@ export const semiRealism: PortfolioData = {
               "title": "Lineart - Smooth Finish",
               "orientation": "portrait",
               "featured": false,
-              "alt": "RPG Roleplay Character Wizard Art Smoothlineart illustration by Fefierys"
+              "alt": "RPG Roleplay Character Wizard Art Lineart smooth finish illustration by Fefierys"
             },
             {
               "id": 19,
@@ -633,7 +633,7 @@ export const semiRealism: PortfolioData = {
               "title": "Lineart - Textured Finish",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Usagi Tsukino Fanart Texturedlineart illustration by Fefierys"
+              "alt": "Usagi Tsukino Fanart Lineart textured finish illustration by Fefierys"
             }
           ]
         },
@@ -647,7 +647,7 @@ export const semiRealism: PortfolioData = {
               "title": "Single Character",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Big Mushroom Elf Child Fantasy Forest Single illustration by Fefierys"
+              "alt": "Big Mushroom Elf Child Fantasy Forest Single Character illustration by Fefierys"
             },
             {
               "id": 2,
@@ -663,7 +663,7 @@ export const semiRealism: PortfolioData = {
               "title": "Single Character",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Elf Deer Redhead Girl Fantasy Single illustration by Fefierys"
+              "alt": "Elf Deer Redhead Girl Fantasy Single Character illustration by Fefierys"
             },
             {
               "id": 4,
@@ -671,7 +671,7 @@ export const semiRealism: PortfolioData = {
               "title": "Single Character",
               "orientation": "landscape",
               "featured": true,
-              "alt": "Elf Looking Far Away Castle Fantasy Sea Environment Single illustration by Fefierys"
+              "alt": "Elf Looking Far Away Castle Fantasy Sea Environment Single Character illustration by Fefierys"
             },
             {
               "id": 5,
@@ -679,7 +679,7 @@ export const semiRealism: PortfolioData = {
               "title": "Single Character",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Elf Silvan Female D&D Roleplay Single illustration by Fefierys"
+              "alt": "Elf Silvan Female D&D Roleplay Single Character illustration by Fefierys"
             },
             {
               "id": 6,
@@ -687,87 +687,127 @@ export const semiRealism: PortfolioData = {
               "title": "Single Character",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Fairy Night Forest Butterflies Fantasy Single illustration by Fefierys"
+              "alt": "Fairy Night Forest Butterflies Fantasy Single Character illustration by Fefierys"
             },
             {
               "id": 7,
+              "src": "/images/portfolio/semi-realism/general/character-illustrations/fairy-on-hand-fantasy-book-single.webp",
+              "title": "Single Character",
+              "orientation": "portrait",
+              "featured": false,
+              "alt": "Fairy On Hand Fantasy Book Single Character illustration by Fefierys"
+            },
+            {
+              "id": 8,
               "src": "/images/portfolio/semi-realism/general/character-illustrations/female-character-fantasy-dnd-egypt-inspired-single.webp",
               "title": "Single Character",
               "orientation": "landscape",
               "featured": true,
-              "alt": "Female Character Fantasy D&D Egypt Inspired Single illustration by Fefierys"
+              "alt": "Female Character Fantasy D&D Egypt Inspired Single Character illustration by Fefierys"
             },
             {
-              "id": 8,
+              "id": 9,
               "src": "/images/portfolio/semi-realism/general/character-illustrations/female-elf-character-sunset-art-single.webp",
               "title": "Single Character",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Female Elf Character Sunset Art Single illustration by Fefierys"
+              "alt": "Female Elf Character Sunset Art Single Character illustration by Fefierys"
             },
             {
-              "id": 9,
+              "id": 10,
               "src": "/images/portfolio/semi-realism/general/character-illustrations/forest-creature-fantasy-roleplay-single.webp",
               "title": "Single Character",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Forest Creature Fantasy Roleplay Single illustration by Fefierys"
+              "alt": "Forest Creature Fantasy Roleplay Single Character illustration by Fefierys"
             },
             {
-              "id": 10,
+              "id": 11,
               "src": "/images/portfolio/semi-realism/general/character-illustrations/girl-in-a-garden-with-peonies-fantasy-single.webp",
               "title": "Single Character",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Girl In A Garden With Peonies Fantasy Single illustration by Fefierys"
+              "alt": "Girl In A Garden With Peonies Fantasy Single Character illustration by Fefierys"
             },
             {
-              "id": 11,
+              "id": 12,
+              "src": "/images/portfolio/semi-realism/general/character-illustrations/girl-leopard-forest-fantasy-book-single.webp",
+              "title": "Single Character",
+              "orientation": "portrait",
+              "featured": false,
+              "alt": "Girl Leopard Forest Fantasy Book Single Character illustration by Fefierys"
+            },
+            {
+              "id": 13,
               "src": "/images/portfolio/semi-realism/general/character-illustrations/green-skin-elf-deer-dnd-roleplay-fantasy-single.webp",
               "title": "Single Character",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Green Skin Elf Deer D&D Roleplay Fantasy Single illustration by Fefierys"
+              "alt": "Green Skin Elf Deer D&D Roleplay Fantasy Single Character illustration by Fefierys"
             },
             {
-              "id": 12,
+              "id": 14,
               "src": "/images/portfolio/semi-realism/general/character-illustrations/magic-girl-fantasy-water-themed-single.webp",
               "title": "Single Character",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Magic Girl Fantasy Water Themed Single illustration by Fefierys"
+              "alt": "Magic Girl Fantasy Water Themed Single Character illustration by Fefierys"
             },
             {
-              "id": 13,
+              "id": 15,
+              "src": "/images/portfolio/semi-realism/general/character-illustrations/old-woman-front-of-a-hearth-fantasy-book-single.webp",
+              "title": "Single Character",
+              "orientation": "portrait",
+              "featured": false,
+              "alt": "Old Woman Front Of A Hearth Fantasy Book Single Character illustration by Fefierys"
+            },
+            {
+              "id": 16,
               "src": "/images/portfolio/semi-realism/general/character-illustrations/religious-demon-fantasy-girl-single.webp",
               "title": "Single Character",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Religious Demon Fantasy Girl Single illustration by Fefierys"
+              "alt": "Religious Demon Fantasy Girl Single Character illustration by Fefierys"
             },
             {
-              "id": 14,
+              "id": 17,
+              "src": "/images/portfolio/semi-realism/general/character-illustrations/swan-in-a-koi-fish-pond-fantasy-book-single.webp",
+              "title": "Single Character",
+              "orientation": "portrait",
+              "featured": false,
+              "alt": "Swan In A Koi Fish Pond Fantasy Book Single Character illustration by Fefierys"
+            },
+            {
+              "id": 18,
+              "src": "/images/portfolio/semi-realism/general/character-illustrations/teens-kitchen-book-moonlight-fantasy-book-single.webp",
+              "title": "Single Character",
+              "orientation": "portrait",
+              "featured": false,
+              "alt": "Teens Kitchen Book Moonlight Fantasy Book Single Character illustration by Fefierys"
+            },
+            {
+              "id": 19,
               "src": "/images/portfolio/semi-realism/general/character-illustrations/valkyrie-pegasus-fantasy-illustration-single.webp",
               "title": "Single Character",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Valkyrie Pegasus Fantasy Illustration Single illustration by Fefierys"
+              "alt": "Valkyrie Pegasus Fantasy Illustration Single Character illustration by Fefierys"
             },
             {
-              "id": 15,
+              "id": 20,
               "src": "/images/portfolio/semi-realism/general/character-illustrations/warrior-fighting-dragon-fantasy-rpg-single.webp",
               "title": "Single Character",
               "orientation": "landscape",
               "featured": true,
-              "alt": "Warrior Fighting Dragon Fantasy RPG Single illustration by Fefierys"
+              "alt": "Warrior Fighting Dragon Fantasy RPG Single Character illustration by Fefierys"
             },
             {
-              "id": 16,
+              "id": 21,
               "src": "/images/portfolio/semi-realism/general/character-illustrations/water-genasi-female-character-dnd-single.webp",
               "title": "Single Character",
               "orientation": "landscape",
               "featured": true,
-              "alt": "Water Genasi Female Character D&D Single illustration by Fefierys"
+              "alt": "Water Genasi Female Character D&D Single Character illustration by Fefierys"
             }
           ]
         },
@@ -789,7 +829,15 @@ export const semiRealism: PortfolioData = {
               "title": "Full Pack",
               "orientation": "landscape",
               "featured": true,
-              "alt": "Elf Character D&D Ref Sheet Fullpack illustration by Fefierys"
+              "alt": "Elf Character D&D Ref Sheet Full pack illustration by Fefierys"
+            },
+            {
+              "id": 3,
+              "src": "/images/portfolio/semi-realism/general/ref-sheets/halfling-dnd-character-ref-sheet-custom.webp",
+              "title": "Full Render",
+              "orientation": "landscape",
+              "featured": true,
+              "alt": "Halfling D&D Character Ref Sheet Custom illustration by Fefierys"
             }
           ]
         },
@@ -800,7 +848,7 @@ export const semiRealism: PortfolioData = {
             {
               "id": 1,
               "src": "/images/portfolio/semi-realism/general/environments/adventurers-path-fantasy-landscape-natural.webp",
-              "title": "Full Render",
+              "title": "Natural Landscape",
               "orientation": "landscape",
               "featured": true,
               "alt": "Adventurers Path Fantasy Landscape Natural illustration by Fefierys"
@@ -808,7 +856,7 @@ export const semiRealism: PortfolioData = {
             {
               "id": 2,
               "src": "/images/portfolio/semi-realism/general/environments/girl-cat-lake-fantasy-natural.webp",
-              "title": "Full Render",
+              "title": "Natural Landscape",
               "orientation": "portrait",
               "featured": false,
               "alt": "Girl Cat Lake Fantasy Natural illustration by Fefierys"
@@ -816,26 +864,82 @@ export const semiRealism: PortfolioData = {
             {
               "id": 3,
               "src": "/images/portfolio/semi-realism/general/environments/glowing-flower-night-sky-fantasy-natural.webp",
-              "title": "Full Render",
+              "title": "Natural Landscape",
               "orientation": "portrait",
               "featured": false,
               "alt": "Glowing Flower Night Sky Fantasy Natural illustration by Fefierys"
             },
             {
               "id": 4,
+              "src": "/images/portfolio/semi-realism/general/environments/great-door-with-tree-painting-fantasy-book-structures.webp",
+              "title": "Structure & Interiors",
+              "orientation": "portrait",
+              "featured": false,
+              "alt": "Great Door With Tree Painting Fantasy Book Structures illustration by Fefierys"
+            },
+            {
+              "id": 5,
+              "src": "/images/portfolio/semi-realism/general/environments/greenhouse-full-of-flowers-fantasy-book-structures.webp",
+              "title": "Structure & Interiors",
+              "orientation": "portrait",
+              "featured": false,
+              "alt": "Greenhouse Full Of Flowers Fantasy Book Structures illustration by Fefierys"
+            },
+            {
+              "id": 6,
+              "src": "/images/portfolio/semi-realism/general/environments/hall-with-constelation-fantasy-book-structures.webp",
+              "title": "Structure & Interiors",
+              "orientation": "portrait",
+              "featured": false,
+              "alt": "Hall With Constelation Fantasy Book Structures illustration by Fefierys"
+            },
+            {
+              "id": 7,
+              "src": "/images/portfolio/semi-realism/general/environments/hand-with-a-key-office-fantasy-book-natural.webp",
+              "title": "Natural Landscape",
+              "orientation": "portrait",
+              "featured": false,
+              "alt": "Hand With A Key Office Fantasy Book Natural illustration by Fefierys"
+            },
+            {
+              "id": 8,
               "src": "/images/portfolio/semi-realism/general/environments/kitten-clouds-magical-painting-natural.webp",
-              "title": "Full Render",
+              "title": "Natural Landscape",
               "orientation": "portrait",
               "featured": false,
               "alt": "Kitten Clouds Magical Painting Natural illustration by Fefierys"
             },
             {
-              "id": 5,
+              "id": 9,
               "src": "/images/portfolio/semi-realism/general/environments/magical-forest-with-runes-fantasy-dnd-natural.webp",
-              "title": "Full Render",
+              "title": "Natural Landscape",
               "orientation": "landscape",
               "featured": true,
               "alt": "Magical Forest With Runes Fantasy D&D Natural illustration by Fefierys"
+            },
+            {
+              "id": 10,
+              "src": "/images/portfolio/semi-realism/general/environments/old-tree-rainy-night-fantasy-book-natural.webp",
+              "title": "Natural Landscape",
+              "orientation": "portrait",
+              "featured": false,
+              "alt": "Old Tree Rainy Night Fantasy Book Natural illustration by Fefierys"
+            },
+            {
+              "id": 11,
+              "src": "/images/portfolio/semi-realism/general/environments/warehouse-winter-night-fantasy-book-structures.webp",
+              "title": "Structure & Interiors",
+              "orientation": "portrait",
+              "featured": false,
+              "alt": "Warehouse Winter Night Fantasy Book Structures illustration by Fefierys"
+            },
+            {
+              "id": 12,
+              "src": "/images/portfolio/semi-realism/general/environments/well-in-snowy-town-fantasy-book-structures.webp",
+              "title": "Structure & Interiors",
+              "orientation": "portrait",
+              "featured": false,
+              "alt": "Well In Snowy Town Fantasy Book Structures illustration by Fefierys"
             }
           ]
         },
@@ -846,7 +950,7 @@ export const semiRealism: PortfolioData = {
             {
               "id": 1,
               "src": "/images/portfolio/semi-realism/general/pets/cat-red-scarf-pet-potrait-bust.webp",
-              "title": "Full Render",
+              "title": "Bust Up",
               "orientation": "portrait",
               "featured": false,
               "alt": "Cat Red Scarf Pet Portrait Bust illustration by Fefierys"
@@ -857,12 +961,12 @@ export const semiRealism: PortfolioData = {
               "title": "Full Body",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Dog Bandana Pet Portrait Fullbody illustration by Fefierys"
+              "alt": "Dog Bandana Pet Portrait Full body illustration by Fefierys"
             },
             {
               "id": 3,
               "src": "/images/portfolio/semi-realism/general/pets/dog-pet-portrait-memorial-halo-bust.webp",
-              "title": "Full Render",
+              "title": "Bust Up",
               "orientation": "portrait",
               "featured": false,
               "alt": "Dog Pet Portrait Memorial Halo Bust illustration by Fefierys"
@@ -873,12 +977,12 @@ export const semiRealism: PortfolioData = {
               "title": "Full Body",
               "orientation": "landscape",
               "featured": true,
-              "alt": "Family Pet Portrait Bunny Dogs Fullbody illustration by Fefierys"
+              "alt": "Family Pet Portrait Bunny Dogs Full body illustration by Fefierys"
             },
             {
               "id": 5,
               "src": "/images/portfolio/semi-realism/general/pets/french-bulldog-portrait-bust.webp",
-              "title": "Full Render",
+              "title": "Bust Up",
               "orientation": "portrait",
               "featured": false,
               "alt": "French Bulldog Portrait Bust illustration by Fefierys"
@@ -889,7 +993,7 @@ export const semiRealism: PortfolioData = {
               "title": "Full Body",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Labrador Painterly Pet Portrait Fullbody illustration by Fefierys"
+              "alt": "Labrador Painterly Pet Portrait Full body illustration by Fefierys"
             },
             {
               "id": 7,
@@ -897,7 +1001,7 @@ export const semiRealism: PortfolioData = {
               "title": "Full Body",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Labrador Pet Portrait Fullbody illustration by Fefierys"
+              "alt": "Labrador Pet Portrait Full body illustration by Fefierys"
             },
             {
               "id": 8,
@@ -905,7 +1009,7 @@ export const semiRealism: PortfolioData = {
               "title": "Full Body",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Purplefinch Bird Portrait Fullbody illustration by Fefierys"
+              "alt": "Purplefinch Bird Portrait Full body illustration by Fefierys"
             },
             {
               "id": 9,
@@ -913,7 +1017,7 @@ export const semiRealism: PortfolioData = {
               "title": "Full Body",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Sleeping Cat Portrait Fullbody illustration by Fefierys"
+              "alt": "Sleeping Cat Portrait Full body illustration by Fefierys"
             },
             {
               "id": 10,
@@ -921,7 +1025,7 @@ export const semiRealism: PortfolioData = {
               "title": "Full Body",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Tricolor Cat Pet Portrait Fullbody illustration by Fefierys"
+              "alt": "Tricolor Cat Pet Portrait Full body illustration by Fefierys"
             }
           ]
         }

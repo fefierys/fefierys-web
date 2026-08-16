@@ -23,19 +23,29 @@ export const testimonials: Testimonial[] = [
   },
   {
     id: 'client-2',
-    image: '/images/home/testimonials/girl-in-a-garden-with-peonies-fantasy-single.webp',
+    image: '/images/home/testimonials/demon-girl-book-chibis-fullbody.webp',
     quote:
-      'Space for customer testimonial.',
-    name: 'Client Name',
-    role: 'Private commission',
-    commissionType: 'Character illustration',
+      'Fefi was an absolute DELIGHT to work with! Her talent made the process so smooth, and any tweaks I requested were done diligently. I was blown away by her attention to detail and so pleased with the experience!',
+    name: 'Lylah Taylor',
+    role: 'Fantasy and Romance author',
+    commissionType: 'Chibis commission',
     social: '@client',
   },
   {
     id: 'client-3',
     image: '/images/home/testimonials/green-skin-elf-deer-dnd-roleplay-fantasy-single.webp',
     quote:
-      'Space for customer testimonial.',
+      'Space for customer testimonial - 3.',
+    name: 'Client Name',
+    role: 'Book cover client',
+    commissionType: 'Interior illustration',
+    social: '@client',
+  },
+  {
+    id: 'client-4',
+    image: '/images/home/testimonials/green-skin-elf-deer-dnd-roleplay-fantasy-single.webp',
+    quote:
+      'Space for customer testimonial - 4.',
     name: 'Client Name',
     role: 'Book cover client',
     commissionType: 'Interior illustration',

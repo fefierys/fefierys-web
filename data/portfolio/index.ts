@@ -5,7 +5,7 @@ import { chibis } from "./chibis";
 
 export const portfolioSections = [
   {
-    title: "Semi Realism",
+    title: "Semirealism",
     slug: "semi-realism",
     data: semiRealism,
   },

@@ -213,6 +213,7 @@ export default function PortfolioCategory({
       {/* Modal de comisión */}
       {commission && (
         <CommissionModal
+          key={commission.id}
           open={commissionOpen}
           onClose={() => setCommissionOpen(false)}
           commission={commission}

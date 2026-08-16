@@ -8,7 +8,7 @@ export default function AboutPage() {
           <div className="grid gap-12 md:grid-cols-[320px_1fr] md:items-center">
             {/* Foto */}
             <div className="flex justify-center md:justify-start">
-              <div className="relative h-64 w-64 overflow-hidden rounded-full border border-white/15 md:h-80 md:w-80">
+              <div className="relative h-64 w-64 overflow-hidden rounded-full border-white/15 md:h-80 md:w-80">
                 <Image
                   src="/images/about/fefi-profile.png"
                   alt="Fefierys portrait"
@@ -52,8 +52,8 @@ export default function AboutPage() {
                   Helping someone bring a story, a character, or an entire world to life is what I enjoy the most.
                 </p>
 
-                <p className="text-xl text-white">
-                  <strong>I’d be thrilled to work with you and help bring your world to life.</strong>
+                <p className="text-xl text-white italic">
+                  <strong>I’d be thrilled to work with you and help bring your world to life!</strong>
                 </p>
               </div>
 
