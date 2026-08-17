@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { useMemo, useState, useRef, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import { Artwork } from '@/data/portfolio/types';
 import ArtworkLightbox from './ArtworkLightbox';
 import { motion } from 'framer-motion';
@@ -9,25 +9,15 @@ import { buildPortfolioPages } from '@/lib/portfolio/layoutEngine';
 
 interface ArtworkGridProps {
   artworks: Artwork[];
+  scrollTargetRef?: () => void;
 }
 
 export default function ArtworkGrid({
   artworks,
+  scrollTargetRef,
 }: ArtworkGridProps) {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [currentPage, setCurrentPage] = useState(0);
-
-  // Imagen que tiene el título visible en dispositivos táctiles
-  const [tappedIndex, setTappedIndex] = useState<number | null>(null);
-
-  // Detectamos si el dispositivo no tiene hover real
-  const [isTouchDevice, setIsTouchDevice] = useState(false);
-
-  const galleryRef = useRef<HTMLDivElement | null>(null);
-  const previousPageRef = useRef(currentPage);
-
-  // Timer para ocultar el título después del tap
-  const tapTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const containerVariants = {
     hidden: {},
@@ -53,18 +43,28 @@ export default function ArtworkGrid({
     },
   };
 
+  /*
+   * ============================================================
+   * PÁGINAS
+   * ============================================================
+   *
+   * El layoutEngine organiza automáticamente las obras
+   * según su orientación y configuración.
+   */
   const pages = useMemo(() => {
     return buildPortfolioPages(artworks);
   }, [artworks]);
 
   /*
-   * Orden visual real de las obras.
+   * ============================================================
+   * ORDEN VISUAL REAL
+   * ============================================================
    *
-   * El layoutEngine puede reorganizar las obras para construir
-   * las composiciones de cada página.
+   * Este es el orden que realmente ve el usuario.
    *
-   * Por eso el Lightbox debe utilizar este orden y no el
-   * orden original de `artworks`.
+   * Es importante utilizarlo también en el Lightbox para que
+   * Previous / Next y el contador sigan exactamente el orden
+   * visual de la galería.
    */
   const orderedArtworks = useMemo(() => {
     return pages.flat();
@@ -78,7 +78,13 @@ export default function ArtworkGrid({
   const pageArtworks = pages[safeCurrentPage] ?? [];
 
   /*
-   * Índice global según el orden visual generado por layoutEngine.
+   * ============================================================
+   * ÍNDICE GLOBAL
+   * ============================================================
+   *
+   * selectedIndex es local a la página actual.
+   *
+   * globalIndex es el índice dentro de orderedArtworks.
    */
   const globalIndex =
     selectedIndex !== null
@@ -93,133 +99,109 @@ export default function ArtworkGrid({
       ? orderedArtworks[globalIndex]
       : null;
 
-  /*
-   * Detectamos dispositivos sin hover.
-   *
-   * Esto es mejor que usar simplemente el ancho de pantalla porque
-   * también funciona con tablets, dispositivos híbridos, etc.
-   */
-  useEffect(() => {
-    const mediaQuery = window.matchMedia('(hover: none)');
-
-    const updateTouchState = () => {
-      setIsTouchDevice(mediaQuery.matches);
-    };
-
-    updateTouchState();
-
-    mediaQuery.addEventListener('change', updateTouchState);
-
-    return () => {
-      mediaQuery.removeEventListener('change', updateTouchState);
-    };
-  }, []);
-
-  /*
-   * Limpiamos el timer cuando el componente desaparece.
-   */
-  useEffect(() => {
-    return () => {
-      if (tapTimeoutRef.current) {
-        clearTimeout(tapTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  /*
-   * Cuando cambiamos de página, ocultamos cualquier título
-   * que estuviera activo.
-   */
-  useEffect(() => {
-    setTappedIndex(null);
-
-    if (tapTimeoutRef.current) {
-      clearTimeout(tapTimeoutRef.current);
-      tapTimeoutRef.current = null;
-    }
-  }, [currentPage]);
-
-  /*
-   * Scroll solo cuando cambia la página
-   */
-  useEffect(() => {
-    if (previousPageRef.current === currentPage) return;
-
-    previousPageRef.current = currentPage;
-
-    if (galleryRef.current) {
-      const navbarOffset = 96;
-
-      const y =
-        galleryRef.current.getBoundingClientRect().top +
-        window.pageYOffset -
-        navbarOffset;
-
-      window.scrollTo({
-        top: y,
-        behavior: 'smooth',
-      });
-    }
-  }, [currentPage]);
-
   if (artworks.length === 0) {
     return null;
   }
 
   /*
-   * Maneja el click/tap sobre una ilustración.
+   * ============================================================
+   * CAMBIAR DE PÁGINA
+   * ============================================================
    *
-   * DESKTOP:
-   *   click → abre directamente el Lightbox.
+   * Cambiamos la página y llevamos al usuario nuevamente
+   * hacia el botón "Commission this style".
    *
-   * TABLET / MÓVIL:
-   *   primer tap → muestra título
-   *   segundo tap → abre Lightbox
+   * No utilizamos useEffect para esto, evitando el error:
+   *
+   * "Calling setState synchronously within an effect"
+   */
+  const changePage = (newPage: number) => {
+    if (newPage < 0 || newPage >= pages.length) {
+      return;
+    }
+
+    setCurrentPage(newPage);
+
+    /*
+     * Esperamos al siguiente frame para que el layout pueda
+     * actualizarse antes de realizar el scroll.
+     */
+    if (scrollTargetRef) {
+      requestAnimationFrame(() => {
+        scrollTargetRef();
+      });
+    }
+  };
+
+  /*
+   * ============================================================
+   * ABRIR LIGHTBOX
+   * ============================================================
+   *
+   * Desktop:
+   *   click → abre Lightbox
+   *
+   * Tablet:
+   *   tap → abre Lightbox
+   *
+   * Móvil:
+   *   tap → abre Lightbox
+   *
+   * Ya no existe el sistema de doble tap.
    */
   const handleArtworkClick = (index: number) => {
-    if (!isTouchDevice) {
-      setSelectedIndex(index);
+    setSelectedIndex(index);
+  };
+
+  /*
+   * ============================================================
+   * CAMBIAR OBRA DESDE EL LIGHTBOX
+   * ============================================================
+   *
+   * Busca la nueva obra dentro del orden visual real,
+   * encuentra la página correspondiente y actualiza ambos
+   * índices.
+   */
+  const goToArtwork = (newIndex: number) => {
+    if (orderedArtworks.length === 0) {
       return;
     }
 
-    /*
-     * Si tocamos nuevamente la misma imagen mientras
-     * su título está visible, abrimos el Lightbox.
-     */
-    if (tappedIndex === index) {
-      if (tapTimeoutRef.current) {
-        clearTimeout(tapTimeoutRef.current);
-        tapTimeoutRef.current = null;
-      }
+    const normalizedIndex =
+      (newIndex + orderedArtworks.length) %
+      orderedArtworks.length;
 
-      setTappedIndex(null);
-      setSelectedIndex(index);
+    const newArtwork = orderedArtworks[normalizedIndex];
 
+    const newPage = pages.findIndex((page) =>
+      page.some(
+        (item) => item.id === newArtwork.id
+      )
+    );
+
+    if (newPage === -1) {
       return;
     }
 
-    /*
-     * Si tocamos una imagen diferente, mostramos su título.
-     */
-    if (tapTimeoutRef.current) {
-      clearTimeout(tapTimeoutRef.current);
-      tapTimeoutRef.current = null;
+    const newLocalIndex = pages[newPage].findIndex(
+      (item) => item.id === newArtwork.id
+    );
+
+    if (newLocalIndex === -1) {
+      return;
     }
 
-    setTappedIndex(index);
-
-    /*
-     * Después de 3 segundos el título desaparece.
-     */
-    tapTimeoutRef.current = setTimeout(() => {
-      setTappedIndex(null);
-      tapTimeoutRef.current = null;
-    }, 3000);
+    setCurrentPage(newPage);
+    setSelectedIndex(newLocalIndex);
   };
 
   return (
     <>
-      <div ref={galleryRef}>
+      {/* ======================================================
+          GALERÍA
+      ====================================================== */}
+
+      <div>
         <motion.div
           key={safeCurrentPage}
           variants={containerVariants}
@@ -239,9 +221,6 @@ export default function ArtworkGrid({
           "
         >
           {pageArtworks.map((artwork, index) => {
-            const titleVisible =
-              isTouchDevice && tappedIndex === index;
-
             return (
               <motion.div
                 variants={itemVariants}
@@ -267,7 +246,10 @@ export default function ArtworkGrid({
                   }
                 `}
               >
-                {/* IMAGEN */}
+                {/* ==================================================
+                    IMAGEN
+                ================================================== */}
+
                 <Image
                   src={artwork.src}
                   alt={artwork.alt}
@@ -288,13 +270,24 @@ export default function ArtworkGrid({
                   "
                 />
 
-                {/* OVERLAY DEL TÍTULO */}
+                {/* ==================================================
+                    OVERLAY DEL TÍTULO
+                   
+                    MÓVIL / TABLET:
+                    siempre visible.
+
+                    DESKTOP:
+                    aparece únicamente con hover.
+                ================================================== */}
+
                 <div
-                  className={`
+                  className="
                     absolute
                     inset-0
+
                     flex
                     items-end
+
                     p-5
 
                     bg-gradient-to-t
@@ -302,27 +295,17 @@ export default function ArtworkGrid({
                     via-black/15
                     to-transparent
 
-                    transition-all
+                    opacity-100
+
+                    md:opacity-0
+                    md:group-hover:opacity-100
+
+                    transition-opacity
                     duration-500
                     ease-out
-
-                    ${
-                      titleVisible
-                        ? 'opacity-100'
-                        : 'opacity-0 group-hover:opacity-100'
-                    }
-                  `}
+                  "
                 >
-                  <motion.span
-                    initial={false}
-                    animate={{
-                      opacity: titleVisible ? 1 : undefined,
-                      y: titleVisible ? 0 : undefined,
-                    }}
-                    transition={{
-                      duration: 0.4,
-                      ease: [0.22, 1, 0.36, 1],
-                    }}
+                  <span
                     className="
                       text-sm
                       tracking-[0.12em]
@@ -332,7 +315,7 @@ export default function ArtworkGrid({
                     "
                   >
                     {artwork.title}
-                  </motion.span>
+                  </span>
                 </div>
               </motion.div>
             );
@@ -340,12 +323,20 @@ export default function ArtworkGrid({
         </motion.div>
       </div>
 
-      {/* PAGINACIÓN */}
+      {/* ======================================================
+          PAGINACIÓN
+      ====================================================== */}
+
       {pages.length > 1 && (
         <div className="mt-12 flex items-center justify-center gap-3">
+          {/* PREVIOUS */}
+
           <button
+            type="button"
             onClick={() =>
-              setCurrentPage((p) => Math.max(p - 1, 0))
+              changePage(
+                Math.max(safeCurrentPage - 1, 0)
+              )
             }
             disabled={safeCurrentPage === 0}
             className="
@@ -369,10 +360,13 @@ export default function ArtworkGrid({
             Previous
           </button>
 
+          {/* NÚMEROS */}
+
           {pages.map((_, index) => (
             <button
+              type="button"
               key={index}
-              onClick={() => setCurrentPage(index)}
+              onClick={() => changePage(index)}
               className={`
                 h-10
                 w-10
@@ -392,10 +386,16 @@ export default function ArtworkGrid({
             </button>
           ))}
 
+          {/* NEXT */}
+
           <button
+            type="button"
             onClick={() =>
-              setCurrentPage((p) =>
-                Math.min(p + 1, pages.length - 1)
+              changePage(
+                Math.min(
+                  safeCurrentPage + 1,
+                  pages.length - 1
+                )
               )
             }
             disabled={
@@ -424,92 +424,35 @@ export default function ArtworkGrid({
         </div>
       )}
 
-      {/* LIGHTBOX */}
+      {/* ======================================================
+          LIGHTBOX
+      ====================================================== */}
+
       {selectedArtwork && globalIndex !== null && (
         <ArtworkLightbox
           artwork={selectedArtwork}
-
-          /*
-           * Ahora el índice y el total corresponden al orden
-           * visual real generado por layoutEngine.
-           */
           currentIndex={globalIndex}
           total={orderedArtworks.length}
 
-          previousArtwork={
-            artworks[
-              (globalIndex - 1 + artworks.length) % artworks.length
-            ]
-          }
-
-          nextArtwork={
-            artworks[
-              (globalIndex + 1) % artworks.length
-            ]
-          }
-
+          /*
+           * OBRA ANTERIOR
+           */
           previous={() => {
-            if (globalIndex === null) return;
-
-            const newIndex =
-              (globalIndex - 1 + orderedArtworks.length) %
-              orderedArtworks.length;
-
-            const newArtwork = orderedArtworks[newIndex];
-
-            const newPage = pages.findIndex((page) =>
-              page.some(
-                (item) => item.id === newArtwork.id
-              )
-            );
-
-            if (newPage === -1) return;
-
-            const newLocalIndex = pages[newPage].findIndex(
-              (item) => item.id === newArtwork.id
-            );
-
-            if (newLocalIndex === -1) return;
-
-            setCurrentPage(newPage);
-            setSelectedIndex(newLocalIndex);
+            goToArtwork(globalIndex - 1);
           }}
 
+          /*
+           * SIGUIENTE OBRA
+           */
           next={() => {
-            if (globalIndex === null) return;
-
-            const newIndex =
-              (globalIndex + 1) %
-              orderedArtworks.length;
-
-            const newArtwork = orderedArtworks[newIndex];
-
-            const newPage = pages.findIndex((page) =>
-              page.some(
-                (item) => item.id === newArtwork.id
-              )
-            );
-
-            if (newPage === -1) return;
-
-            const newLocalIndex = pages[newPage].findIndex(
-              (item) => item.id === newArtwork.id
-            );
-
-            if (newLocalIndex === -1) return;
-
-            setCurrentPage(newPage);
-            setSelectedIndex(newLocalIndex);
+            goToArtwork(globalIndex + 1);
           }}
 
+          /*
+           * CERRAR
+           */
           close={() => {
             setSelectedIndex(null);
-            setTappedIndex(null);
-
-            if (tapTimeoutRef.current) {
-              clearTimeout(tapTimeoutRef.current);
-              tapTimeoutRef.current = null;
-            }
           }}
         />
       )}

@@ -118,7 +118,7 @@ export const commissions: Record<string, CommissionData> = {
             ]
         }, 
     ],
-    cta: "Start a cover commission",
+    cta: "Start a interior illustration commission",
   },
   "semi-icons": {
     id: "semi-icons",
@@ -173,7 +173,7 @@ export const commissions: Record<string, CommissionData> = {
             ]
         }, 
     ],
-    cta: "Start a cover commission",
+    cta: "Start a icon commission",
   },
   "semi-character-design": {
     id: "semi-character-design",
@@ -229,7 +229,7 @@ export const commissions: Record<string, CommissionData> = {
             ]
         },
     ],
-    cta: "Start a cover commission",
+    cta: "Start a character design commission",
   },
   "semi-character-illustrations": {
     id: "semi-character-illustrations",
@@ -272,7 +272,7 @@ export const commissions: Record<string, CommissionData> = {
             ]
         },
     ],
-    cta: "Start a cover commission",
+    cta: "Start a character illustration commission",
   },
   "semi-ref-sheets": {
     id: "semi-ref-sheets",
@@ -675,7 +675,7 @@ export const commissions: Record<string, CommissionData> = {
             ]
         },
     ],
-    cta: "Start a cover commission",
+    cta: "Start a chibi commission",
   },
   "custom": {
     id: "custom",
@@ -711,6 +711,6 @@ export const commissions: Record<string, CommissionData> = {
     ],
     notes: [
     ],
-    cta: "Start a cover commission",
+    cta: "Start a emote commission",
   },
 };

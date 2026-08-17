@@ -87,13 +87,13 @@ export default function Footer() {
           "
         >
           <Image
-            src="/images/footer/artstation.png"
+            src="/images/footer/logo-artstation.png"
             alt="ArtStation"
             width={26}
             height={26}
             className="
-              h-6
-              w-6
+              h-5.5
+              w-5.5
               object-contain
               opacity-40
               transition-all

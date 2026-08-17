@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { PortfolioData } from '@/data/portfolio/types';
 import ArtworkGrid from './ArtworkGrid';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -17,7 +17,8 @@ export default function PortfolioCategory({
   const [selectedGroupIndex, setSelectedGroupIndex] = useState(0);
   const selectedGroup = data.groups[selectedGroupIndex];
 
-  const [selectedSubcategoryIndex, setSelectedSubcategoryIndex] = useState(0);
+  const [selectedSubcategoryIndex, setSelectedSubcategoryIndex] =
+    useState(0);
 
   const selectedSubcategory =
     selectedGroup.subcategories[selectedSubcategoryIndex];
@@ -28,6 +29,13 @@ export default function PortfolioCategory({
   // Comisión asociada a la subcategoría actual
   const commission = commissions[selectedSubcategory.id];
 
+  /*
+   * Punto al que volverá el scroll cuando se cambie
+   * de página dentro de la galería.
+   */
+  const commissionButtonRef =
+    useRef<HTMLDivElement | null>(null);
+
   function changeGroup(index: number) {
     setSelectedGroupIndex(index);
 
@@ -35,11 +43,34 @@ export default function PortfolioCategory({
     setSelectedSubcategoryIndex(0);
   }
 
+  /*
+   * Scroll hacia el botón de comisión.
+   *
+   * No utilizamos useEffect porque el scroll ocurre como
+   * consecuencia directa de una interacción del usuario.
+   */
+  const scrollToCommission = () => {
+    if (!commissionButtonRef.current) return;
+
+    const navbarOffset = 100;
+
+    const y =
+      commissionButtonRef.current.getBoundingClientRect().top +
+      window.scrollY -
+      navbarOffset;
+
+    window.scrollTo({
+      top: y,
+      behavior: 'smooth',
+    });
+  };
+
   return (
     <>
       <section className="min-h-screen px-6 py-24 md:py-32">
         <div className="mx-auto max-w-6xl text-white">
-          {/* Título */}
+
+          {/* TÍTULO */}
           <h1 className="mb-12 text-center text-3xl font-light md:mb-16 md:text-5xl">
             {data.title}
           </h1>
@@ -53,6 +84,7 @@ export default function PortfolioCategory({
             <div className="flex flex-wrap justify-center gap-6 md:gap-16">
               {data.groups.map((group, index) => (
                 <button
+                  type="button"
                   key={group.id}
                   onClick={() => changeGroup(index)}
                   className="
@@ -100,7 +132,7 @@ export default function PortfolioCategory({
           </div>
 
           {/* CATEGORY */}
-          <div className="mb-14 md:mb-20 flex flex-col items-center">
+          <div className="mb-14 flex flex-col items-center md:mb-20">
             <p className="mb-3 text-[11px] uppercase tracking-[0.22em] text-white/45">
               Category
             </p>
@@ -114,67 +146,91 @@ export default function PortfolioCategory({
                 md:gap-8
               "
             >
-              {selectedGroup.subcategories.map((subcategory, index) => (
-                <button
-                  key={subcategory.id}
-                  onClick={() => setSelectedSubcategoryIndex(index)}
-                  className="
-                    relative
-                    pb-2
-                    text-[11px]
-                    md:text-sm
-                    tracking-[0.15em]
-                    uppercase
-                    transition-colors
-                    duration-300
-                  "
-                >
-                  <span
-                    className={
-                      selectedSubcategoryIndex === index
-                        ? 'text-white'
-                        : 'text-white/50 hover:text-white'
+              {selectedGroup.subcategories.map(
+                (subcategory, index) => (
+                  <button
+                    type="button"
+                    key={subcategory.id}
+                    onClick={() =>
+                      setSelectedSubcategoryIndex(index)
                     }
+                    className="
+                      relative
+                      pb-2
+                      text-[11px]
+                      md:text-sm
+                      tracking-[0.15em]
+                      uppercase
+                      transition-colors
+                      duration-300
+                    "
                   >
-                    {subcategory.title}
-                  </span>
+                    <span
+                      className={
+                        selectedSubcategoryIndex === index
+                          ? 'text-white'
+                          : 'text-white/50 hover:text-white'
+                      }
+                    >
+                      {subcategory.title}
+                    </span>
 
-                  {selectedSubcategoryIndex === index && (
-                    <motion.div
-                      layoutId="subcategory-underline"
-                      className="
-                        absolute
-                        left-0
-                        right-0
-                        -bottom-0.5
-                        h-px
-                        bg-white
-                      "
-                      transition={{
-                        type: 'spring',
-                        stiffness: 500,
-                        damping: 40,
-                      }}
-                    />
-                  )}
-                </button>
-              ))}
+                    {selectedSubcategoryIndex === index && (
+                      <motion.div
+                        layoutId="subcategory-underline"
+                        className="
+                          absolute
+                          left-0
+                          right-0
+                          -bottom-0.5
+                          h-px
+                          bg-white
+                        "
+                        transition={{
+                          type: 'spring',
+                          stiffness: 500,
+                          damping: 40,
+                        }}
+                      />
+                    )}
+                  </button>
+                )
+              )}
             </div>
           </div>
 
           {/* BOTÓN DE COMISIÓN */}
           {commission && (
-            <div className="mb-10 flex justify-center md:mb-12 md:justify-end">
+            <div
+              ref={commissionButtonRef}
+              className="mb-10 flex justify-center md:mb-12 md:justify-end"
+            >
               <button
+                type="button"
                 onClick={() => setCommissionOpen(true)}
                 className="
-                  group inline-flex w-full max-w-sm md:w-auto
-                  items-center justify-center gap-2
-                  rounded-full border border-white/20
-                  bg-white/10 px-5 py-3
-                  text-xs uppercase tracking-[0.18em]
-                  text-white transition duration-300
-                  hover:bg-white hover:text-[#2f3558]
+                  group
+                  inline-flex
+                  w-full
+                  max-w-sm
+                  md:w-auto
+                  items-center
+                  justify-center
+                  gap-2
+                  rounded-full
+                  border
+                  border-white/20
+                  bg-white/10
+                  px-5
+                  py-3
+                  text-xs
+                  uppercase
+                  tracking-[0.18em]
+                  text-white
+                  transition
+                  duration-300
+                  hover:bg-white
+                  hover:text-[#2f3558]
                 "
               >
                 <svg
@@ -192,7 +248,7 @@ export default function PortfolioCategory({
             </div>
           )}
 
-          {/* Galería */}
+          {/* GALERÍA */}
           <AnimatePresence mode="wait">
             <motion.div
               key={selectedSubcategory.id}
@@ -204,13 +260,16 @@ export default function PortfolioCategory({
                 ease: [0.22, 1, 0.36, 1],
               }}
             >
-              <ArtworkGrid artworks={selectedSubcategory.artworks} />
+              <ArtworkGrid
+                artworks={selectedSubcategory.artworks}
+                scrollTargetRef={scrollToCommission}
+              />
             </motion.div>
           </AnimatePresence>
         </div>
       </section>
 
-      {/* Modal de comisión */}
+      {/* MODAL DE COMISIÓN */}
       {commission && (
         <CommissionModal
           key={commission.id}

@@ -1,4 +1,4 @@
- 'use client';
+'use client';
 
 import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
@@ -68,14 +68,7 @@ export default function CommissionModal({
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        setSelectedOption(commission.options[0]?.title ?? '');
-        setShowIndieBubble(true);
-
-        if (document.activeElement instanceof HTMLElement) {
-          document.activeElement.blur();
-        }
-
-        onClose();
+        handleClose();
       }
     };
 
@@ -92,7 +85,7 @@ export default function CommissionModal({
         <motion.div
           className="
             fixed inset-0 z-50 flex items-center justify-center
-            bg-[#6b6fa8]/55 backdrop-blur-lg p-6
+            bg-[#6b6fa8]/55 backdrop-blur-lg p-4 sm:p-6
           "
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -105,7 +98,8 @@ export default function CommissionModal({
               w-full max-w-4xl max-h-[91vh]
               rounded-[2rem] border border-white/10
               bg-[#5966A5]/55 backdrop-blur-2xl
-              text-white shadow-[0_30px_80px_rgba(70,70,120,0.25)]
+              text-white
+              shadow-[0_30px_80px_rgba(70,70,120,0.25)]
               overflow-visible
               flex flex-col
             "
@@ -115,25 +109,77 @@ export default function CommissionModal({
             transition={{ duration: 0.25 }}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Header */}
-            <div className="px-8 pt-8 md:px-10 md:pt-10 pb-6">
-              <h2 className="mb-3 text-4xl font-light tracking-tight text-white">
+            {/* BOTÓN CERRAR */}
+            <button
+              type="button"
+              onClick={handleClose}
+              aria-label="Close commission modal"
+              className="
+                absolute
+                top-3
+                right-3
+                md:top-5
+                md:right-5
+                z-50
+
+                flex
+                h-11
+                w-11
+                md:h-10
+                md:w-10
+                items-center
+                justify-center
+
+                rounded-full
+                border
+                border-white/15
+                bg-black/10
+                backdrop-blur-md
+
+                text-2xl
+                font-light
+                leading-none
+                text-white/75
+
+                transition-all
+                duration-100
+
+                hover:bg-white/15
+                hover:text-white
+                hover:scale-105
+
+                active:scale-95
+              "
+            >
+              ×
+            </button>
+
+            {/* HEADER */}
+            <div className="px-6 pt-8 pb-6 sm:px-8 md:px-10 md:pt-10">
+              <h2 className="mb-3 text-3xl font-light tracking-tight text-white sm:text-4xl pr-10">
                 {commission.title}
               </h2>
 
-              <p className="whitespace-pre-line text-white/80 leading-relaxedtext-white/80">
+              <p className="whitespace-pre-line leading-relaxed text-white/80">
                 {commission.subtitle}
               </p>
             </div>
 
-            {/* Contenido con scroll */}
+            {/* CONTENIDO CON SCROLL */}
             <div
               className="
-                flex-1 overflow-y-auto overscroll-contain
-                px-8 pb-8 md:px-10 md:pb-10
+                flex-1
+                overflow-y-auto
+                overscroll-contain
+                px-6
+                pb-6
+                sm:px-8
+                sm:pb-8
+                md:px-10
+                md:pb-10
               "
             >
-              {/* Hero Image */}
+              {/* HERO IMAGE */}
               <div className="mb-6">
                 <div className="relative aspect-[16/6] w-full overflow-hidden rounded-[1.5rem] border border-white/10">
                   <Image
@@ -143,12 +189,10 @@ export default function CommissionModal({
                     className="object-cover object-center"
                     priority
                   />
-
-                  
                 </div>
               </div>
 
-              {/* Opciones */}
+              {/* OPCIONES */}
               <div className="mb-6 grid gap-5 md:grid-cols-2">
                 {commission.options.map((option) => {
                   const isSelected = selectedOption === option.title;
@@ -159,8 +203,14 @@ export default function CommissionModal({
                       type="button"
                       onClick={() => setSelectedOption(option.title)}
                       className={`
-                        rounded-2xl border p-6 text-left
-                        transition duration-200
+                        rounded-2xl
+                        border
+                        p-5
+                        sm:p-6
+                        text-left
+                        transition
+                        duration-200
+
                         ${
                           isSelected
                             ? 'border-white/30 bg-white/18 shadow-lg'
@@ -172,7 +222,7 @@ export default function CommissionModal({
                         {option.title}
                       </h3>
 
-                      <p className="mb-3 text-2xl font-light text-white whitespace-pre-wrap">
+                      <p className="mb-3 whitespace-pre-wrap text-2xl font-light text-white">
                         {option.price}
                       </p>
 
@@ -184,7 +234,7 @@ export default function CommissionModal({
                 })}
               </div>
 
-              {/* Notas */}
+              {/* NOTAS */}
               <ul className="space-y-4 text-sm text-white/80">
                 {commission.notes.map((note, index) => (
                   <li key={index} className="flex gap-3">
@@ -206,20 +256,21 @@ export default function CommissionModal({
               </ul>
             </div>
 
-            {/* Chibi + burbuja (desktop) */}
+            {/* CHIBI + BURBUJA DESKTOP */}
             {showIndieBubble && (
               <div
                 className="
                   absolute
                   -right-120
                   -bottom-10
-                  hidden lg:block
-                  w-100
+                  hidden
                   h-90
+                  w-100
+                  xl:block
                 "
                 onClick={(e) => e.stopPropagation()}
               >
-                <div className="relative rounded-2xl border border-white/10 bg-white/12 p-4 backdrop-blur-xl shadow-lg">
+                <div className="relative rounded-2xl border border-white/10 bg-white/12 p-4 shadow-lg backdrop-blur-xl">
                   <button
                     type="button"
                     onClick={(e) => {
@@ -227,11 +278,23 @@ export default function CommissionModal({
                       setShowIndieBubble(false);
                     }}
                     className="
-                      absolute -top-2 -right-2
-                      flex h-6 w-6 items-center justify-center
-                      rounded-full border border-white/20 bg-white/10
-                      text-white/80 transition
-                      hover:bg-white hover:text-[#2f3558]
+                      absolute
+                      -top-2
+                      -right-2
+                      flex
+                      h-6
+                      w-6
+                      items-center
+                      justify-center
+                      rounded-full
+                      border
+                      border-white/20
+                      bg-white/10
+                      text-white/80
+                      transition
+
+                      hover:bg-white
+                      hover:text-[#2f3558]
                     "
                     aria-label="Close indie author message"
                   >
@@ -240,22 +303,29 @@ export default function CommissionModal({
 
                   <div
                     className="
-                      absolute left-58 top-full h-4 w-4
-                      -translate-y-2 rotate-45
-                      border-l border-b border-white/10
+                      absolute
+                      left-58
+                      top-full
+                      h-4
+                      w-4
+                      -translate-y-2
+                      rotate-45
+                      border-l
+                      border-b
+                      border-white/10
                       bg-white/12
                     "
                   />
 
                   <p className="text-[11px] leading-relaxed text-white/90">
-                    If you’re an indie author with a special or tight budget, please don’t
-                    hesitate to{' '}
+                    If you’re an indie author with a special or tight budget,
+                    please don’t hesitate to{' '}
                     <Link
                       href="/contact"
-                      className="underline underline-offset-2 decoration-white/60 hover:decoration-white transition"
+                      className="underline underline-offset-2 decoration-white/60 transition hover:decoration-white"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      contact me 
+                      contact me
                     </Link>{' '}
                     directly so we can work out a special agreement!
                   </p>
@@ -266,19 +336,31 @@ export default function CommissionModal({
                   alt="Fefierys chibi"
                   width={200}
                   height={120}
-                  className="mt-4 ml-40 drop-shadow-2xl"
+                  className="ml-40 mt-4 drop-shadow-2xl"
                 />
               </div>
             )}
 
-            {/* Footer fijo */}
-            <div className="p-6 bg-transparent">
+            {/* FOOTER FIJO */}
+            <div className="bg-transparent p-4 sm:p-6">
               <button
                 className="
-                  w-full rounded-full border border-white/20 bg-white/10
-                  px-6 py-3 text-sm uppercase tracking-[0.15em]
-                  text-white transition duration-150
-                  hover:bg-white hover:text-[#2f3558]
+                  w-full
+                  rounded-full
+                  border
+                  border-white/20
+                  bg-white/10
+                  px-6
+                  py-3
+                  text-sm
+                  uppercase
+                  tracking-[0.15em]
+                  text-white
+                  transition
+                  duration-150
+
+                  hover:bg-white
+                  hover:text-[#2f3558]
                 "
                 onClick={() => {
                   router.push(
@@ -297,21 +379,21 @@ export default function CommissionModal({
             </div>
           </motion.div>
 
-          {/* Chibi + burbuja (bloque mobile: flotante con botón cerrar) */}
+          {/* CHIBI + BURBUJA MOBILE / TABLET */}
           {showIndieBubble && (
             <div
               className="
-                lg:hidden
                 fixed
                 bottom-4
                 right-4
-                z-[60]
+                z-60
                 w-56
                 pointer-events-auto
+                xl:hidden
               "
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="relative rounded-2xl border border-white/10 bg-[#5966A5]/80 p-3 backdrop-blur-xl shadow-2xl">
+              <div className="relative rounded-2xl border border-white/10 bg-[#5966A5]/80 p-3 shadow-2xl backdrop-blur-xl">
                 <button
                   type="button"
                   onClick={(e) => {
@@ -319,11 +401,23 @@ export default function CommissionModal({
                     setShowIndieBubble(false);
                   }}
                   className="
-                    absolute -top-2 -right-2
-                    flex h-6 w-6 items-center justify-center
-                    rounded-full border border-white/20 bg-white/10
-                    text-white/80 transition
-                    hover:bg-white hover:text-[#2f3558]
+                    absolute
+                    -top-2
+                    -right-2
+                    flex
+                    h-6
+                    w-6
+                    items-center
+                    justify-center
+                    rounded-full
+                    border
+                    border-white/20
+                    bg-white/10
+                    text-white/80
+                    transition
+
+                    hover:bg-white
+                    hover:text-[#2f3558]
                   "
                   aria-label="Close indie author message"
                 >
@@ -332,22 +426,29 @@ export default function CommissionModal({
 
                 <div
                   className="
-                    absolute right-8 top-full h-3 w-3
-                    -translate-y-1.5 rotate-45
-                    border-r border-b border-white/10
+                    absolute
+                    right-8
+                    top-full
+                    h-3
+                    w-3
+                    -translate-y-1.5
+                    rotate-45
+                    border-r
+                    border-b
+                    border-white/10
                     bg-[#5966A5]/80
                   "
                 />
 
                 <p className="text-[11px] leading-relaxed text-white/90">
-                  If you’re an indie author with a special or tight budget, please don’t
-                  hesitate to{' '}
+                  If you’re an indie author with a special or tight budget,
+                  please don’t hesitate to{' '}
                   <Link
                     href="/contact"
-                    className="underline underline-offset-2 decoration-white/60 hover:decoration-white transition"
+                    className="underline underline-offset-2 decoration-white/60 transition hover:decoration-white"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    contact me 
+                    contact me
                   </Link>{' '}
                   directly so we can work out a special agreement!
                 </p>
@@ -358,7 +459,7 @@ export default function CommissionModal({
                 alt="Fefierys chibi"
                 width={84}
                 height={84}
-                className="mt-2 ml-auto drop-shadow-2xl"
+                className="ml-auto mt-2 drop-shadow-2xl"
               />
             </div>
           )}
