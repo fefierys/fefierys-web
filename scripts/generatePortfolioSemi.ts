@@ -52,7 +52,7 @@ const TITLE_MAP: Record<string, string> = {
   structures: 'Structure & Interiors',
   
   bust: 'Bust Up',
-
+  custom: 'Custom',
 };
 
 /*
@@ -76,7 +76,8 @@ const ALT_MAP: Record<string, string> = {
   smoothflat: 'flat smooth finish',
   smoothshaded: 'shaded smooth finish',
   fullpack: 'full pack',
-  single: 'Single Character',
+  single: 'single character',
+  custom: 'custom',
 };
 
 const WORD_MAP: Record<string, string> = {

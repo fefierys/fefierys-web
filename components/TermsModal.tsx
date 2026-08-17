@@ -41,9 +41,15 @@ export default function TermsModal({ open, onClose }: TermsModalProps) {
                 Terms of Service
               </h2>
 
-              <p className="text-white/80">
+              <p className="text-sm leading-relaxed text-white/80">
                 These terms are here to make the commission process clear,
                 transparent, and enjoyable for both of us.
+              </p>
+              <br/>
+              <p className="text-sm leading-relaxed text-white/80 italic">
+                <strong>
+                  &quot;All my commissions are delivered digitally. The resolution and format will depend on each client&apos;s needs&quot;
+                </strong>
               </p>
             </div>
 

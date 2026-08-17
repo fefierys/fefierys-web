@@ -29,7 +29,8 @@ export const testimonials: Testimonial[] = [
     name: 'Lylah Taylor',
     role: 'Fantasy and Romance author',
     commissionType: 'Chibis commission',
-    social: '@client',
+    social: '@lylahtaylorwrites',
+    socialUrl: "https://www.instagram.com/lylahtaylorwrites/",
   },
   {
     id: 'client-3',

@@ -447,11 +447,11 @@ export const semiRealism: PortfolioData = {
             },
             {
               "id": 35,
-              "src": "/images/portfolio/semi-realism/general/icons/snowwhite-fanart--fantasy-texrturedfullrender.webp",
-              "title": "Full Render",
+              "src": "/images/portfolio/semi-realism/general/icons/snowwhite-fanart-fantasy-texturedfullrender.webp",
+              "title": "Full Render - Textured Finish",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Snowwhite Fanart  Fantasy Texrturedfullrender illustration by Fefierys"
+              "alt": "Snowwhite Fanart  Fantasy Full render textured finish illustration by Fefierys"
             },
             {
               "id": 36,
@@ -471,11 +471,11 @@ export const semiRealism: PortfolioData = {
             },
             {
               "id": 38,
-              "src": "/images/portfolio/semi-realism/general/icons/vampire-male-character-vtm-fullrender.webp",
-              "title": "Full Render",
+              "src": "/images/portfolio/semi-realism/general/icons/vampire-male-character-vtm-texturedfullrender.webp",
+              "title": "Full Render - Textured Finish",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Vampire Male Character VTM Fullrender illustration by Fefierys"
+              "alt": "Vampire Male Character VTM Full render textured finish illustration by Fefierys"
             }
           ]
         },
@@ -834,7 +834,7 @@ export const semiRealism: PortfolioData = {
             {
               "id": 3,
               "src": "/images/portfolio/semi-realism/general/ref-sheets/halfling-dnd-character-ref-sheet-custom.webp",
-              "title": "Full Render",
+              "title": "Custom",
               "orientation": "landscape",
               "featured": true,
               "alt": "Halfling D&D Character Ref Sheet Custom illustration by Fefierys"
@@ -895,11 +895,11 @@ export const semiRealism: PortfolioData = {
             },
             {
               "id": 7,
-              "src": "/images/portfolio/semi-realism/general/environments/hand-with-a-key-office-fantasy-book-natural.webp",
-              "title": "Natural Landscape",
+              "src": "/images/portfolio/semi-realism/general/environments/hand-with-a-key-office-fantasy-book-structures.webp",
+              "title": "Structure & Interiors",
               "orientation": "portrait",
               "featured": false,
-              "alt": "Hand With A Key Office Fantasy Book Natural illustration by Fefierys"
+              "alt": "Hand With A Key Office Fantasy Book Structure & Interiors illustration by Fefierys"
             },
             {
               "id": 8,

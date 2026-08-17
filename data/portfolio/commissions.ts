@@ -190,21 +190,21 @@ export const commissions: Record<string, CommissionData> = {
       },
       {
         title: "Flat",
-        price: "$80 USD",
+        price: "$100 USD",
         description:
           "Lineart filled with solid, base colors to establish the character palette with soft gradients.",
       },
       {
         title: "Shaded",
-        price: "$120 USD",
+        price: "$140 USD",
         description:
           "Lineart and colored artwork with shadows to add depth and dimension.",
       },
       {
         title: "Full render",
-        price: "$160 USD",
+        price: "$180 USD",
         description:
-          "Fully polished artwork featuring complex lighting, detailed textures, soft blending, and fine atmospheric effects. This option does not have lineart.",
+          "Fully polished artwork featuring complex lighting, detailed textures, soft blending, and fine atmospheric effects. This option does not have lineart for a more realistic finish.",
       },
     ],
     notes: [

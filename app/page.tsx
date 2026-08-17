@@ -16,7 +16,7 @@ export default function Home() {
           relative
           z-10
           bg-[#55609b]/90
-          rounded-t-[2rem]
+          rounded-[2rem]
           -mt-10
           md:-mt-20
           pt-2

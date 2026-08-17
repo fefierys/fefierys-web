@@ -33,7 +33,7 @@ export default function AboutPage() {
                 <p>
                   I’m a fantasy illustrator with
                   <strong className="text-white font-medium"> 8 years of experience </strong>
-                  creating characters, magical worlds.
+                  creating characters and magical worlds.
                 </p>
 
                 <p>
