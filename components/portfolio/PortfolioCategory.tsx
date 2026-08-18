@@ -81,6 +81,14 @@ export default function PortfolioCategory({
     });
   };
 
+  console.log("COMMISSION CHECK", {
+    subcategory: selectedSubcategory.id,
+    title: selectedSubcategory.title,
+    commissionId: commission?.id,
+    heroImage: commission?.heroImage,
+    prices: commission?.options.map(o => o.price),
+  });
+
   return (
     <>
       <section className="min-h-screen px-6 py-24 md:py-32">

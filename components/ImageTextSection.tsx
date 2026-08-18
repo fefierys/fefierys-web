@@ -9,6 +9,7 @@ interface ImageTextSectionProps {
   title: string;
   text: string;
   reverse?: boolean;
+  className?: string;
 }
 
 export default function ImageTextSection({
@@ -17,6 +18,7 @@ export default function ImageTextSection({
   title,
   text,
   reverse = false,
+  className,
 }: ImageTextSectionProps) {
   const mediaRef = useRef<HTMLDivElement | null>(null);
   const [shouldLoadVideo, setShouldLoadVideo] = useState(false);
@@ -115,7 +117,11 @@ export default function ImageTextSection({
               {title}
             </h2>
 
-            <p className="text-lg leading-relaxed text-white">
+            <p
+              className={`text-lg leading-relaxed text-white ${
+                className ?? ''
+              }`}
+            >
               {text}
             </p>
           </div>

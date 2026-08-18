@@ -131,7 +131,7 @@ export const commissions: Record<string, CommissionData> = {
         title: "Lineart",
         price: "$35 USD",
         description:
-          "Detailed black and white drawing without color or shading. It can be smooth or textured.",
+          "Detailed black and white drawing without color or shading.",
       },
       {
         title: "Flat",
@@ -149,7 +149,7 @@ export const commissions: Record<string, CommissionData> = {
         title: "Full render",
         price: "$80 USD",
         description:
-          "Fully polished artwork featuring complex lighting, detailed textures, soft blending, and fine atmospheric effects. This option does not have lineart.",
+          "Fully polished artwork featuring complex lighting, detailed textures, soft blending, and fine atmospheric effects. This option does not have lineart for a more realistic finish.",
       },
     ],
     notes: [
@@ -605,7 +605,7 @@ export const commissions: Record<string, CommissionData> = {
   },
   "sty-pets": {
     id: "sty-pets",
-    title: "Stylized Pets",
+    title: "Pets",
     subtitle:
       "Portrait in my stylized art style of your pet, with a blurred or simple background. \nYou can choose between a smooth or textured finish.",
     heroImage: "/images/commissions/stylized/general/pets/pets.webp",

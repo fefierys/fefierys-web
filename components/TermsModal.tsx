@@ -194,12 +194,11 @@ export default function TermsModal({
                   is required upfront, and the remainder is due upon
                   receipt of the sketch.
 
-                  <br />
-
-                  Small and medium projects: 50% upfront
-
-                  <br />
-
+                  <br/>
+                  Small projects under $100: 100% upfront
+                  <br/>
+                  Medium projects: 50% upfront
+                  <br/>
                   Large projects ($1000+): 30% upfront
                 </p>
               </section>

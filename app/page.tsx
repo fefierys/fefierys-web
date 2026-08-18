@@ -36,9 +36,9 @@ export default function Home() {
           <ImageTextSection
             image="/images/home/scroll/home-illustrations.webp"
             title="My illustrations"
-            text="
-              My work focuses on creating characters and worlds that exist in our imagination.
-            "
+            text={`My work focuses on creating characters and worlds that exist in our imagination.
+            In my portfolio, you'll find three main collections: Semirealism, Stylized and Chibis & Emotes, along with their respective subcategories.`}
+            className="whitespace-pre-line"
           />
         </div>
 

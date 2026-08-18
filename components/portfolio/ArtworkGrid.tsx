@@ -325,8 +325,8 @@ export default function ArtworkGrid({
 
                     opacity-100
 
-                    md:opacity-0
-                    md:group-hover:opacity-100
+                    lg:opacity-0
+                    lg:group-hover:opacity-100
 
                     transition-opacity
                     duration-500

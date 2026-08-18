@@ -196,7 +196,7 @@ export const stylized: PortfolioData = {
           ]
         },
         {
-          "id": "semi-pets",
+          "id": "sty-pets",
           "title": "PETS",
           "artworks": [
             {

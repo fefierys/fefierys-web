@@ -108,9 +108,7 @@ export default function Footer() {
 
       <br/>
 
-      © {new Date().getFullYear()} 
-        <a href = "https://www.instagram.com/fefierys"> Fefierys</a> 
-        . All rights reserved.
+      © {new Date().getFullYear()} Fefierys. All rights reserved.
       <br/>
       Made by Luan
     </footer>
