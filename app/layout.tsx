@@ -6,6 +6,8 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import Background from "@/components/Background";
 
+import { Analytics } from "@vercel/analytics/react";
+
 const lexend = Lexend({
   subsets: ["latin"],
   variable: "--font-lexend",
@@ -34,6 +36,8 @@ export default function RootLayout({
         {children}
 
         <Footer />
+
+        <Analytics />
 
       </body>
     </html>

@@ -12,6 +12,7 @@
     "generate:portfolioChibisEmotes": "tsx scripts/generatePortfolioChibisEmotes.ts"
   },
   "dependencies": {
+    "@vercel/analytics": "^2.0.1",
     "framer-motion": "^12.43.0",
     "image-size": "^2.0.2",
     "next": "16.2.12",

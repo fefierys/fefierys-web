@@ -53,10 +53,24 @@ export async function POST(request: Request) {
     };
 
 
-    await Promise.all([
+    const results = await Promise.allSettled([
       sendOwnerEmail(safeData),
       sendClientConfirmationEmail(safeData),
     ]);
+
+    const ownerEmailResult = results[0];
+    const clientEmailResult = results[1];
+
+    if (clientEmailResult.status === "rejected") {
+      console.error(
+        "Client confirmation email failed:",
+        clientEmailResult.reason
+      );
+    }
+
+    if (ownerEmailResult.status === "rejected") {
+      throw ownerEmailResult.reason;
+    }
 
 
     return NextResponse.json({
@@ -91,9 +105,9 @@ async function sendOwnerEmail(data: {
 
   return resend.emails.send({
 
-    from: "Fefierys <onboarding@resend.dev>",
+    from: "Fefierys <contact@fefierys.com>",
 
-    to: "luanart.2026@gmail.com",
+    to: "fefierys@outlook.com",
 
     replyTo: data.email,
 
@@ -210,11 +224,11 @@ async function sendClientConfirmationEmail(data: {
 
   return resend.emails.send({
 
-    from: "Fefierys <onboarding@resend.dev>",
+    from: "Fefierys <contact@fefierys.com>",
 
     to: data.email,
 
-    replyTo: "luanart.2026@gmail.com",
+    replyTo: "fefierys@outlook.com",
 
     subject: "✨ Your Fefierys commission request has been received",
 
