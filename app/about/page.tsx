@@ -4,15 +4,19 @@ export default function AboutPage() {
   return (
     <main className="min-h-screen px-6 py-32">
       <section className="mx-auto max-w-6xl">
-        <div className="glass-card px-8 py-12 md:px-12 md:py-16">
+        <div className="glass-card-about bg-black px-8 py-12 md:px-12 md:py-16">
           <div className="grid gap-12 md:grid-cols-[320px_1fr] md:items-center">
             {/* Foto */}
             <div className="flex justify-center md:justify-start">
               <div className="relative h-64 w-64 overflow-hidden rounded-full border-white/15 md:h-80 md:w-80">
                 <Image
-                  src="/images/about/fefi-profile.png"
+                  src="/images/about/fefi-profile.webp"
                   alt="Fefierys portrait"
                   fill
+                  sizes="(max-width: 767px) 256px, 320px"
+                  quality={60}
+                  fetchPriority="high"
+                  loading='eager'
                   className="object-cover"
                 />
               </div>
@@ -24,7 +28,7 @@ export default function AboutPage() {
                 About Fefierys
               </h1>
 
-              <div className="space-y-6 text-[1.05rem] leading-8 text-white/80 text-justify">
+              <div className="space-y-6 text-[1.05rem] leading-8 text-white text-justify">
                 <p>
                   I’m <strong className="text-white font-medium">Josefa Santis</strong>,
                   better known as <strong className="text-white font-medium">Fefi / Fefierys</strong>.
@@ -62,11 +66,15 @@ export default function AboutPage() {
                   href="/portfolio/semi-realism"
                   className="
                     inline-flex items-center gap-2
-                    rounded-full border border-white/20
-                    bg-white/10 px-6 py-3
+                    rounded-full
+                    border border-white/30
+                    bg-[#2f3558]/20
+                    px-6 py-3
                     text-sm uppercase tracking-[0.16em]
-                    text-white transition duration-300
-                    hover:bg-white hover:text-[#2f3558]
+                    text-white
+                    transition duration-300
+                    hover:bg-white
+                    hover:text-[#2f3558]
                   "
                 >
                   Start a commission

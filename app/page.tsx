@@ -17,10 +17,17 @@ export default function Home() {
           z-10
           bg-[#55609b]/90
           rounded-[2rem]
+
           -mt-10
+          landscape:-mt-10
+
           md:-mt-20
-          pt-2
+
+          desktop-landscape:-mt-10
+
+          pt-4
           md:pt-6
+
           shadow-[0_-30px_80px_rgba(70,70,120,0.25)]
         "
       >

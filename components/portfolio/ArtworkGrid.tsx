@@ -3,9 +3,13 @@
 import Image from 'next/image';
 import { useMemo, useState } from 'react';
 import { Artwork } from '@/data/portfolio/types';
-import ArtworkLightbox from './ArtworkLightbox';
+import dynamic from 'next/dynamic';
 import { motion } from 'framer-motion';
 import { buildPortfolioPages } from '@/lib/portfolio/layoutEngine';
+
+const ArtworkLightbox = dynamic(
+  () => import('./ArtworkLightbox')
+);
 
 interface ArtworkGridProps {
   artworks: Artwork[];
@@ -47,10 +51,8 @@ export default function ArtworkGrid({
    * ============================================================
    * PÁGINAS
    * ============================================================
-   *
-   * El layoutEngine organiza automáticamente las obras
-   * según su orientación y configuración.
    */
+
   const pages = useMemo(() => {
     return buildPortfolioPages(artworks);
   }, [artworks]);
@@ -59,13 +61,8 @@ export default function ArtworkGrid({
    * ============================================================
    * ORDEN VISUAL REAL
    * ============================================================
-   *
-   * Este es el orden que realmente ve el usuario.
-   *
-   * Es importante utilizarlo también en el Lightbox para que
-   * Previous / Next y el contador sigan exactamente el orden
-   * visual de la galería.
    */
+
   const orderedArtworks = useMemo(() => {
     return pages.flat();
   }, [pages]);
@@ -77,15 +74,47 @@ export default function ArtworkGrid({
 
   const pageArtworks = pages[safeCurrentPage] ?? [];
 
+  const visiblePages = useMemo(() => {
+    const totalPages = pages.length;
+
+    if (totalPages <= 5) {
+      return Array.from({ length: totalPages }, (_, i) => i);
+    }
+
+    const current = safeCurrentPage;
+
+    if (current <= 2) {
+      return [0, 1, 2, 3, -1, totalPages - 1];
+    }
+
+    if (current >= totalPages - 3) {
+      return [
+        0,
+        -1,
+        totalPages - 4,
+        totalPages - 3,
+        totalPages - 2,
+        totalPages - 1,
+      ];
+    }
+
+    return [
+      0,
+      -1,
+      current - 1,
+      current,
+      current + 1,
+      -1,
+      totalPages - 1,
+    ];
+  }, [pages.length, safeCurrentPage]);
+
   /*
    * ============================================================
    * ÍNDICE GLOBAL
    * ============================================================
-   *
-   * selectedIndex es local a la página actual.
-   *
-   * globalIndex es el índice dentro de orderedArtworks.
    */
+
   const globalIndex =
     selectedIndex !== null
       ? orderedArtworks.findIndex(
@@ -107,14 +136,8 @@ export default function ArtworkGrid({
    * ============================================================
    * CAMBIAR DE PÁGINA
    * ============================================================
-   *
-   * Cambiamos la página y llevamos al usuario nuevamente
-   * hacia el botón "Commission this style".
-   *
-   * No utilizamos useEffect para esto, evitando el error:
-   *
-   * "Calling setState synchronously within an effect"
    */
+
   const changePage = (newPage: number) => {
     if (newPage < 0 || newPage >= pages.length) {
       return;
@@ -122,10 +145,6 @@ export default function ArtworkGrid({
 
     setCurrentPage(newPage);
 
-    /*
-     * Esperamos al siguiente frame para que el layout pueda
-     * actualizarse antes de realizar el scroll.
-     */
     if (scrollTargetRef) {
       requestAnimationFrame(() => {
         scrollTargetRef();
@@ -137,18 +156,8 @@ export default function ArtworkGrid({
    * ============================================================
    * ABRIR LIGHTBOX
    * ============================================================
-   *
-   * Desktop:
-   *   click → abre Lightbox
-   *
-   * Tablet:
-   *   tap → abre Lightbox
-   *
-   * Móvil:
-   *   tap → abre Lightbox
-   *
-   * Ya no existe el sistema de doble tap.
    */
+
   const handleArtworkClick = (index: number) => {
     setSelectedIndex(index);
   };
@@ -157,11 +166,8 @@ export default function ArtworkGrid({
    * ============================================================
    * CAMBIAR OBRA DESDE EL LIGHTBOX
    * ============================================================
-   *
-   * Busca la nueva obra dentro del orden visual real,
-   * encuentra la página correspondiente y actualiza ambos
-   * índices.
    */
+
   const goToArtwork = (newIndex: number) => {
     if (orderedArtworks.length === 0) {
       return;
@@ -221,9 +227,17 @@ export default function ArtworkGrid({
           "
         >
           {pageArtworks.map((artwork, index) => {
+
+            const isLcpCandidate =
+              safeCurrentPage === 0 && index === 0;
+            
+            <div className="absolute top-2 left-2 z-50 bg-red-500 text-white p-2">
+              {index}
+            </div>
+
             return (
               <motion.div
-                variants={itemVariants}
+                variants={isLcpCandidate ? undefined : itemVariants}
                 key={artwork.id}
                 onClick={() => handleArtworkClick(index)}
                 className={`
@@ -235,8 +249,8 @@ export default function ArtworkGrid({
 
                   ${
                     artwork.orientation === 'landscape'
-                      ? 'md:col-span-3 h-130'
-                      : 'h-130'
+                      ? 'md:col-span-3 h-110 md:h-130'
+                      : 'h-110 md:h-130'
                   }
 
                   ${
@@ -254,11 +268,25 @@ export default function ArtworkGrid({
                   src={artwork.src}
                   alt={artwork.alt}
                   fill
-                  sizes="
-                    (max-width: 767px) 90vw,
-                    (max-width: 1023px) 43vw,
-                    30vw
-                  "
+                  quality={60}
+
+                  fetchPriority={
+                    isLcpCandidate
+                      ? 'high'
+                      : undefined
+                  }
+
+                  loading={
+                    isLcpCandidate
+                      ? 'eager'
+                      : undefined
+                  }
+
+                  sizes={
+                    artwork.orientation === "landscape"
+                      ? "(max-width: 767px) calc(100vw - 48px), (max-width: 1280px) 900px, 1000px"
+                      : "(max-width: 767px) calc(100vw - 48px), 30vw"
+                  }
                   className="
                     object-cover
                     rounded-2xl
@@ -272,7 +300,7 @@ export default function ArtworkGrid({
 
                 {/* ==================================================
                     OVERLAY DEL TÍTULO
-                   
+
                     MÓVIL / TABLET:
                     siempre visible.
 
@@ -345,46 +373,67 @@ export default function ArtworkGrid({
               border-white/10
               bg-white/6
 
-              px-4
-              py-2
+              h-10
+              min-w-10
+              px-3
 
               text-sm
               text-white/80
 
               transition
-              hover:bg-white/10
+              hover:bg-white/20
 
               disabled:opacity-30
             "
           >
-            Previous
+            <span className="hidden sm:inline">Previous</span>
+            <span className="sm:hidden">&lt;</span>
           </button>
 
           {/* NÚMEROS */}
 
-          {pages.map((_, index) => (
-            <button
-              type="button"
-              key={index}
-              onClick={() => changePage(index)}
-              className={`
-                h-10
-                w-10
-                rounded-full
-                border
-                text-sm
-                transition
+          {visiblePages.map((page, index) => {
+            if (page === -1) {
+              return (
+                <span
+                  key={`ellipsis-${index}`}
+                  className="
+                    flex
+                    h-10
+                    w-10
+                    items-center
+                    justify-center
+                    text-white/60
+                  "
+                >
+                  ...
+                </span>
+              );
+            }
 
-                ${
-                  safeCurrentPage === index
-                    ? 'border-white/30 bg-white/15 text-white'
-                    : 'border-white/10 bg-white/6 text-white/70 hover:bg-white/10'
-                }
-              `}
-            >
-              {index + 1}
-            </button>
-          ))}
+            return (
+              <button
+                type="button"
+                key={page}
+                onClick={() => changePage(page)}
+                className={`
+                  h-10
+                  w-10
+                  rounded-full
+                  border
+                  text-sm
+                  transition
+                  ${
+                    safeCurrentPage === page
+                      ? 'border-white/30 bg-white/35 text-white'
+                      : 'border-white/10 bg-white/6 text-white/70 hover:bg-white/20'
+                  }
+                `}
+              >
+                {page + 1}
+              </button>
+            );
+          })}
 
           {/* NEXT */}
 
@@ -407,19 +456,21 @@ export default function ArtworkGrid({
               border-white/10
               bg-white/6
 
-              px-4
-              py-2
+              h-10
+              min-w-10
+              px-3
 
               text-sm
               text-white/80
 
               transition
-              hover:bg-white/10
+              hover:bg-white/20
 
               disabled:opacity-30
             "
           >
-            Next
+            <span className="hidden sm:inline">Next</span>
+            <span className="sm:hidden">&gt;</span>
           </button>
         </div>
       )}
@@ -434,23 +485,14 @@ export default function ArtworkGrid({
           currentIndex={globalIndex}
           total={orderedArtworks.length}
 
-          /*
-           * OBRA ANTERIOR
-           */
           previous={() => {
             goToArtwork(globalIndex - 1);
           }}
 
-          /*
-           * SIGUIENTE OBRA
-           */
           next={() => {
             goToArtwork(globalIndex + 1);
           }}
 
-          /*
-           * CERRAR
-           */
           close={() => {
             setSelectedIndex(null);
           }}

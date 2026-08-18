@@ -32,6 +32,14 @@ body {
          shadow-[0_10px_40px_rgba(0,0,0,0.15)];
 }
 
+.glass-card-about {
+  @apply rounded-3xl
+         border border-white/10
+         bg-[#5966A5]/55
+         backdrop-blur-xl
+         shadow-[0_10px_40px_rgba(0,0,0,0.15)];
+}
+
 /* Fefierys scrollbar */
 ::-webkit-scrollbar {
   width: 10px;
@@ -58,3 +66,5 @@ body {
   scrollbar-width: thin;
   scrollbar-color: rgba(170, 185, 255, 0.35) rgba(255, 255, 255, 0.04);
 }
+
+@custom-variant desktop-landscape (@media (min-width: 768px) and (orientation: landscape));

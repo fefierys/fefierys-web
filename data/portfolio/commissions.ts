@@ -605,7 +605,7 @@ export const commissions: Record<string, CommissionData> = {
   },
   "sty-pets": {
     id: "sty-pets",
-    title: "Pets",
+    title: "Stylized Pets",
     subtitle:
       "Portrait in my stylized art style of your pet, with a blurred or simple background. \nYou can choose between a smooth or textured finish.",
     heroImage: "/images/commissions/stylized/general/pets/pets.webp",

@@ -12,7 +12,7 @@ export default function Footer() {
           rel="noopener noreferrer"
           aria-label="Behance"
           className="
-            text-white/50
+            text-white
             transition-all
             duration-300
             hover:text-white
@@ -31,7 +31,7 @@ export default function Footer() {
           rel="noopener noreferrer"
           aria-label="Instagram"
           className="
-            text-white/50
+            text-white
             transition-all
             duration-300
             hover:text-white
@@ -58,7 +58,7 @@ export default function Footer() {
           rel="noopener noreferrer"
           aria-label="TikTok"
           className="
-            text-white/50
+            text-white
             transition-all
             duration-300
             hover:text-white
@@ -95,7 +95,6 @@ export default function Footer() {
               h-5.5
               w-5.5
               object-contain
-              opacity-40
               transition-all
               duration-300
               hover:scale-100

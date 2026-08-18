@@ -101,10 +101,11 @@ export default function Navbar() {
           "
         >
           <Image
-            src="/images/navbar/logo.png"
+            src="/images/navbar/logo.webp"
             alt="Fefierys"
-            width={140}
-            height={48}
+            width={360}
+            height={97}
+            sizes="(max-width: 767px) 120px, 180px"
             className="
               h-auto
               w-[120px]

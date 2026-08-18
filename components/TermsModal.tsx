@@ -32,7 +32,7 @@ export default function TermsModal({
               relative
               w-full
               max-w-3xl
-              max-h-[85vh]
+              max-h-[92vh]
 
               rounded-4xl
               border
@@ -90,6 +90,10 @@ export default function TermsModal({
                 flex
                 h-11
                 w-11
+
+                md:h-10
+                md:w-10
+
                 items-center
                 justify-center
 
@@ -126,9 +130,8 @@ export default function TermsModal({
               className="
                 p-8
                 pb-4
-
-                md:p-10
-                md:pb-6
+                md:p-5
+                md:pb-2
               "
             >
               <h2 className="mb-2 text-3xl font-light">
@@ -356,7 +359,7 @@ export default function TermsModal({
                 FOOTER
             ================================================== */}
 
-            <div className="bg-transparent p-6">
+            <div className="bg-transparent p-4 sm:p-2">
               <button
                 type="button"
                 onClick={onClose}

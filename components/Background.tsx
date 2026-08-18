@@ -13,7 +13,7 @@ export default function Background() {
           scale-105
         "
         style={{
-          backgroundImage: "url('/images/background/fondo-card.png')",
+          backgroundImage: "url('/images/background/fondo-card.webp')",
           filter: "blur(16px)",
         }}
       />

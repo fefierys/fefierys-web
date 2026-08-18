@@ -1,11 +1,15 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
+import { useEffect, useRef, useState } from 'react';
 import { PortfolioData } from '@/data/portfolio/types';
 import ArtworkGrid from './ArtworkGrid';
-import { AnimatePresence, motion } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { commissions } from '@/data/portfolio/commissions';
-import CommissionModal from './CommissionModal';
+
+const CommissionModal = dynamic(
+  () => import('./CommissionModal')
+);
 
 interface PortfolioCategoryProps {
   data: PortfolioData;
@@ -25,6 +29,18 @@ export default function PortfolioCategory({
 
   // Estado del modal de comisión
   const [commissionOpen, setCommissionOpen] = useState(false);
+
+  useEffect(() => {
+    if (commissionOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [commissionOpen]);
 
   // Comisión asociada a la subcategoría actual
   const commission = commissions[selectedSubcategory.id];
@@ -249,23 +265,12 @@ export default function PortfolioCategory({
           )}
 
           {/* GALERÍA */}
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={selectedSubcategory.id}
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 16 }}
-              transition={{
-                duration: 0.28,
-                ease: [0.22, 1, 0.36, 1],
-              }}
-            >
-              <ArtworkGrid
+          <div key={selectedSubcategory.id}>
+            <ArtworkGrid
                 artworks={selectedSubcategory.artworks}
                 scrollTargetRef={scrollToCommission}
               />
-            </motion.div>
-          </AnimatePresence>
+          </div>
         </div>
       </section>
 

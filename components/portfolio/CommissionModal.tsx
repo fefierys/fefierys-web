@@ -95,7 +95,7 @@ export default function CommissionModal({
           <motion.div
             className="
               relative
-              w-full max-w-4xl max-h-[91vh]
+              w-full max-w-4xl max-h-[92vh]
               rounded-[2rem] border border-white/10
               bg-[#5966A5]/55 backdrop-blur-2xl
               text-white
@@ -155,12 +155,19 @@ export default function CommissionModal({
             </button>
 
             {/* HEADER */}
-            <div className="px-6 pt-8 pb-6 sm:px-8 md:px-10 md:pt-10">
-              <h2 className="mb-3 text-3xl font-light tracking-tight text-white sm:text-4xl pr-10">
+            <div className="px-6 pt-6 pb-4 sm:px-8 md:px-10 md:pt-8">
+              <h2 className="
+                mb-2 
+                text-2xl
+                font-light 
+                tracking-tight
+                text-white 
+                sm:text-3xl 
+                pr-10">
                 {commission.title}
               </h2>
 
-              <p className="whitespace-pre-line leading-relaxed text-white/80">
+              <p className="text-sm whitespace-pre-line leading-relaxed text-white/80">
                 {commission.subtitle}
               </p>
             </div>
@@ -180,7 +187,7 @@ export default function CommissionModal({
               "
             >
               {/* HERO IMAGE */}
-              <div className="mb-6">
+              <div className="mb-4">
                 <div className="relative aspect-[16/6] w-full overflow-hidden rounded-[1.5rem] border border-white/10">
                   <Image
                     src={commission.heroImage}
@@ -205,7 +212,7 @@ export default function CommissionModal({
                       className={`
                         rounded-2xl
                         border
-                        p-5
+                        p-4
                         sm:p-6
                         text-left
                         transition
@@ -336,13 +343,14 @@ export default function CommissionModal({
                   alt="Fefierys chibi"
                   width={200}
                   height={120}
+                  unoptimized
                   className="ml-40 mt-4 drop-shadow-2xl"
                 />
               </div>
             )}
 
             {/* FOOTER FIJO */}
-            <div className="bg-transparent p-4 sm:p-6">
+            <div className="bg-transparent p-4 sm:p-2">
               <button
                 className="
                   w-full
@@ -381,87 +389,124 @@ export default function CommissionModal({
 
           {/* CHIBI + BURBUJA MOBILE / TABLET */}
           {showIndieBubble && (
-            <div
-              className="
-                fixed
-                bottom-4
-                right-4
-                z-60
-                w-56
-                pointer-events-auto
-                xl:hidden
-              "
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="relative rounded-2xl border border-white/10 bg-[#5966A5]/80 p-3 shadow-2xl backdrop-blur-xl">
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowIndieBubble(false);
-                  }}
-                  className="
-                    absolute
-                    -top-2
-                    -right-2
-                    flex
-                    h-6
-                    w-6
-                    items-center
-                    justify-center
-                    rounded-full
-                    border
-                    border-white/20
-                    bg-white/10
-                    text-white/80
-                    transition
-
-                    hover:bg-white
-                    hover:text-[#2f3558]
-                  "
-                  aria-label="Close indie author message"
-                >
-                  ×
-                </button>
-
+            <>
+              {/* BURBUJA / MENSAJE */}
+              <div
+                className="
+                  fixed
+                  bottom-28
+                  right-4
+                  z-60
+                  w-56
+                  xl:hidden
+                  pointer-events-auto
+                "
+                onClick={(e) => e.stopPropagation()}
+              >
                 <div
                   className="
-                    absolute
-                    right-8
-                    top-full
-                    h-3
-                    w-3
-                    -translate-y-1.5
-                    rotate-45
-                    border-r
-                    border-b
-                    border-white/10
+                    relative
+                    rounded-2xl
+                    border border-white/10
                     bg-[#5966A5]/80
+                    p-3
+                    shadow-2xl
+                    backdrop-blur-xl
                   "
-                />
+                >
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowIndieBubble(false);
+                    }}
+                    className="
+                      absolute
+                      -top-2
+                      -right-2
+                      flex
+                      h-6
+                      w-6
+                      items-center
+                      justify-center
+                      rounded-full
+                      border
+                      border-white/20
+                      bg-white/10
+                      text-white/80
+                      transition
 
-                <p className="text-[11px] leading-relaxed text-white/90">
-                  If you’re an indie author with a special or tight budget,
-                  please don’t hesitate to{' '}
-                  <Link
-                    href="/contact"
-                    className="underline underline-offset-2 decoration-white/60 transition hover:decoration-white"
-                    onClick={(e) => e.stopPropagation()}
+                      hover:bg-white
+                      hover:text-[#2f3558]
+                    "
+                    aria-label="Close indie author message"
                   >
-                    contact me
-                  </Link>{' '}
-                  directly so we can work out a special agreement!
-                </p>
+                    ×
+                  </button>
+
+                  <div
+                    className="
+                      absolute
+                      right-8
+                      top-full
+                      h-3
+                      w-3
+                      -translate-y-1.5
+                      rotate-45
+                      border-r
+                      border-b
+                      border-white/10
+                      bg-[#5966A5]/80
+                    "
+                  />
+
+                  <p className="text-[11px] leading-relaxed text-white/90">
+                    If you’re an indie author with a special or tight budget,
+                    please don’t hesitate to{' '}
+                    <Link
+                      href="/contact"
+                      className="
+                        underline
+                        underline-offset-2
+                        decoration-white/60
+                        transition
+                        hover:decoration-white
+                        inline-block
+                        py-1
+                      "
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      contact me
+                    </Link>{' '}
+                    directly so we can work out a special agreement!
+                  </p>
+                </div>
               </div>
 
-              <Image
-                src="/images/commissions/indie-autor/fefi-love.gif"
-                alt="Fefierys chibi"
-                width={84}
-                height={84}
-                className="ml-auto mt-2 drop-shadow-2xl"
-              />
-            </div>
+
+              {/* CHIBI DECORATIVO */}
+              <div
+                className="
+                  fixed
+                  bottom-4
+                  right-4
+                  z-60
+                  xl:hidden
+                  pointer-events-none
+                "
+              >
+                <Image
+                  src="/images/commissions/indie-autor/fefi-love.gif"
+                  alt="Fefierys chibi"
+                  width={84}
+                  height={84}
+                  unoptimized
+                  className="
+                    drop-shadow-2xl
+                  "
+                />
+              </div>
+            </>
           )}
         </motion.div>
       )}

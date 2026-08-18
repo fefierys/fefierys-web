@@ -93,7 +93,7 @@ export default function TestimonialsSection() {
             Testimonials
           </h2>
 
-          <p className="mx-auto max-w-2xl text-white/70">
+          <p className="mx-auto max-w-2xl text-white">
             A few words from people I’ve had the pleasure of working with.
           </p>
         </div>
@@ -278,9 +278,15 @@ export default function TestimonialsSection() {
                         shrink-0
                       "
                     >
-                      <p className="font-medium text-white">
-                        {testimonial.name}
-                      </p>
+                      <a
+                          href={testimonial.socialUrl}
+                          target="_blank"
+                          rel="noreferrer noopener"
+                        >
+                        <p className="font-medium text-white">
+                          {testimonial.name}
+                        </p>
+                      </a>
 
                       <p className="text-sm text-white/60">
                         {testimonial.role}
@@ -298,8 +304,6 @@ export default function TestimonialsSection() {
                           className="
                             text-sm
                             text-white/70
-                            underline
-                            underline-offset-2
                             decoration-white/30
                             transition
 
