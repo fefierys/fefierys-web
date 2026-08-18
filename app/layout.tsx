@@ -16,7 +16,7 @@ const lexend = Lexend({
 
 export const metadata: Metadata = {
   title: "Fefierys Art",
-  description: "Digital artist portfolio",
+  description: "Fantasy Illustrator Artist Portfolio",
 };
 
 
