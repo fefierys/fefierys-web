@@ -16,8 +16,9 @@ const lexend = Lexend({
 
 
 export const metadata: Metadata = {
-  title: "Fefierys Art",
-  description: "Fantasy Illustrator Artist Portfolio",
+  title: "Fefierys | Fantasy Illustrator & Digital Artist",
+  description:
+    "Official portfolio of Fefierys, showcasing fantasy illustrations, semi-realistic artwork, book covers, and commissioned art.",
 };
 
 
@@ -29,19 +30,12 @@ export default function RootLayout({
   return (
     <html lang="en" data-scroll-behavior="smooth">
       <body className={`${lexend.variable} font-lexend`}>
-
         <Background />
-
         <Navbar />
-
         {children}
-
-        <Footer />
-
         <Analytics />
-
         <SpeedInsights />
-
+        <Footer />
       </body>
     </html>
   );
