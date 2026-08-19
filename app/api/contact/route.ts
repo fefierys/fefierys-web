@@ -317,7 +317,7 @@ async function sendClientConfirmationEmail(data: {
 
 
           <p style="margin-top:32px; color:#6b7280;">
-            Thank you for trusting Fefierys with your idea.
+            Thank you for trusting me with your idea!.
           </p>
 
 
