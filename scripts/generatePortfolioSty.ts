@@ -24,7 +24,9 @@ const ALLOWED_EXTENSIONS = new Set([
   '.webp',
 ]);
 
-//------------------
+// ------------------
+// TITLES
+// ------------------
 
 const TITLE_MAP: Record<string, string> = {
   texturedlineart: 'Lineart - Textured Finish',
@@ -58,31 +60,39 @@ const TITLE_MAP: Record<string, string> = {
   duo: 'Duo/Couple',
 };
 
+// ------------------
+// ALT
+// ------------------
+
 const ALT_MAP: Record<string, string> = {
   frontcover: 'front cover',
   backcover: 'back cover',
   fullwrap: 'full wrap',
   fullpage: 'full page',
   fullbody: 'full body',
+
   texturedlineart: 'lineart textured finish',
   texturedfullrender: 'full render textured finish',
   texturedflat: 'flat textured finish',
   texturedshaded: 'shaded textured finish',
+
   smoothfullrender: 'full render smooth finish',
   smoothlineart: 'lineart smooth finish',
   smoothflat: 'flat smooth finish',
   smoothshaded: 'shaded smooth finish',
+
   fullpack: 'full pack',
   halfbody: 'half body',
   single: 'single character',
   duo: 'couple',
   circular: 'circular frame',
-  flat: 'Flat background',
+  flat: 'flat background',
   bustup: 'bust up',
 };
 
-
-//------------------
+// ------------------
+// WORD NORMALIZATION
+// ------------------
 
 const WORD_MAP: Record<string, string> = {
   dnd: 'D&D',
@@ -91,55 +101,128 @@ const WORD_MAP: Record<string, string> = {
   mmorpg: 'MMORPG',
   oc: 'Original Character',
   poc: 'POC',
+
   porrtait: 'portrait',
   potrait: 'portrait',
   environmet: 'environment',
 };
 
+// ------------------
+// SLUG NORMALIZATION
+// ------------------
+
+const SLUG_WORD_FIXES: Record<string, string> = {
+  porrtait: 'portrait',
+  potrait: 'portrait',
+  environmet: 'environment',
+  constelation: 'constellation',
+};
+
+const SLUG_COMPOUND_MAP: Record<string, string> = {
+  frontcover: 'front-cover',
+  backcover: 'back-cover',
+  fullwrap: 'full-wrap',
+  fullpage: 'full-page',
+  fullbody: 'full-body',
+  halfbody: 'half-body',
+  bustup: 'bust-up',
+  fullpack: 'full-pack',
+
+  texturedlineart: 'textured-lineart',
+  texturedflat: 'textured-flat',
+  texturedshaded: 'textured-shaded',
+  texturedfullrender: 'textured-full-render',
+
+  smoothlineart: 'smooth-lineart',
+  smoothflat: 'smooth-flat',
+  smoothshaded: 'smooth-shaded',
+  smoothfullrender: 'smooth-full-render',
+};
+
+const SLUG_REMOVE_BY_CATEGORY: Record<string, string[]> = {
+  covers: [
+    'fantasy-book-cover',
+    'book-cover',
+  ],
+
+  interior: [],
+
+  icons: [],
+
+  'character-design': [],
+
+  'character-illustrations': [],
+
+  pets: [],
+};
+
+// ------------------
+// CATEGORY CONFIG
+// ------------------
+
 const CATEGORY_CONFIG = [
   {
     groupId: 'book-art',
+    groupSlug: 'book-art',
     groupTitle: 'BOOK ART',
+
     subcategories: [
       {
         folder: 'book-art/covers',
         id: 'sty-covers',
+        slug: 'covers',
         title: 'COVERS',
       },
+
       {
         folder: 'book-art/interior',
         id: 'sty-interior-illustration',
+        slug: 'interior-illustration',
         title: 'INTERIOR ILLUSTRATION',
       },
     ],
   },
+
   {
     groupId: 'general',
+    groupSlug: 'general',
     groupTitle: 'GENERAL',
+
     subcategories: [
       {
         folder: 'general/icons',
         id: 'sty-icons',
+        slug: 'icons',
         title: 'ICONS',
       },
+
       {
         folder: 'general/character-design',
         id: 'sty-character-design',
+        slug: 'character-design',
         title: 'CHARACTER DESIGN',
       },
+
       {
         folder: 'general/character-illustrations',
         id: 'sty-character-illustrations',
+        slug: 'character-illustrations',
         title: 'CHARACTER ILLUSTRATIONS',
       },
+
       {
         folder: 'general/pets',
-        id: 'semi-pets',
+        id: 'sty-pets',
+        slug: 'pets',
         title: 'PETS',
       },
     ],
   },
 ];
+
+// ------------------
+// ORIENTATION
+// ------------------
 
 function detectOrientation(
   filePath: string
@@ -153,16 +236,22 @@ function detectOrientation(
 
   const { width, height } = dimensions;
 
-  // Si la diferencia es menor o igual al 2%, lo tratamos como cuadrado
   const differenceRatio =
-    Math.abs(width - height) / Math.max(width, height);
+    Math.abs(width - height) /
+    Math.max(width, height);
 
   if (differenceRatio <= 0.02) {
     return 'portrait';
   }
 
-  return width > height ? 'landscape' : 'portrait';
+  return width > height
+    ? 'landscape'
+    : 'portrait';
 }
+
+// ------------------
+// TITLE
+// ------------------
 
 function buildTitle(id: string): string {
   const lower = id.toLowerCase();
@@ -173,34 +262,123 @@ function buildTitle(id: string): string {
   return TITLE_MAP[last] ?? 'Full Render';
 }
 
+// ------------------
+// ALT
+// ------------------
+
 function buildAlt(id: string): string {
   const words = id
     .toLowerCase()
     .split('-')
+
     .map((word) => {
-      // Primero revisamos los casos especiales del ALT.
       if (ALT_MAP[word]) {
         return ALT_MAP[word];
       }
 
-      // Luego aplicamos las palabras especiales generales.
       return WORD_MAP[word] ?? word;
     })
+
     .map((word) => {
-      // Mantener siglas como D&D, RPG, VTM, etc.
       if (/^[A-Z0-9&]+$/.test(word)) {
         return word;
       }
 
-      // Capitalizar la primera letra.
-      return word.charAt(0).toUpperCase() + word.slice(1);
+      return (
+        word.charAt(0).toUpperCase() +
+        word.slice(1)
+      );
     });
 
   return `${words.join(' ')} illustration by Fefierys`;
 }
 
-function generateArtworks(relativeFolder: string) {
-  const absoluteFolder = path.join(ROOT, relativeFolder);
+// ------------------
+// CATEGORY FOLDER
+// ------------------
+
+function getCategoryFolder(
+  relativeFolder: string
+): string {
+  return path
+    .basename(relativeFolder)
+    .toLowerCase();
+}
+
+// ------------------
+// ARTWORK SLUG
+// ------------------
+
+function buildArtworkSlug(
+  id: string,
+  relativeFolder: string
+): string {
+  let slug = id
+    .toLowerCase()
+    .replace(/[\s_]+/g, '-');
+
+  /*
+   * Separar palabras actualmente pegadas
+   * dentro de los filenames.
+   */
+  for (
+    const [from, to]
+    of Object.entries(SLUG_COMPOUND_MAP)
+  ) {
+    slug = slug.replace(
+      new RegExp(
+        `(^|-)${from}(?=-|$)`,
+        'g'
+      ),
+      `$1${to}`
+    );
+  }
+
+  /*
+   * Corregir errores conocidos.
+   */
+  slug = slug
+    .split('-')
+    .map(
+      (word) =>
+        SLUG_WORD_FIXES[word] ?? word
+    )
+    .join('-');
+
+  /*
+   * Eliminar información redundante
+   * según la categoría.
+   */
+  const category =
+    getCategoryFolder(relativeFolder);
+
+  const removeTerms =
+    SLUG_REMOVE_BY_CATEGORY[category] ?? [];
+
+  for (const term of removeTerms) {
+    slug = slug.replace(
+      new RegExp(
+        `(^|-)${term}(?=-|$)`,
+        'g'
+      ),
+      '$1'
+    );
+  }
+
+  return slug
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+// ------------------
+// GENERATE ARTWORKS
+// ------------------
+
+function generateArtworks(
+  relativeFolder: string
+) {
+  const absoluteFolder =
+    path.join(ROOT, relativeFolder);
 
   if (!fs.existsSync(absoluteFolder)) {
     return [];
@@ -208,12 +386,19 @@ function generateArtworks(relativeFolder: string) {
 
   const files = fs
     .readdirSync(absoluteFolder)
+
     .filter((file) =>
       ALLOWED_EXTENSIONS.has(
         path.extname(file).toLowerCase()
       )
     )
-    .sort((a, b) => a.localeCompare(b));
+
+    .sort((a, b) =>
+      a.localeCompare(b)
+    );
+
+  const usedSlugs =
+    new Map<string, number>();
 
   return files.map((file, index) => {
     const id = path.basename(
@@ -226,46 +411,95 @@ function generateArtworks(relativeFolder: string) {
       file
     );
 
-    const orientation = detectOrientation(filePath);
+    const orientation =
+      detectOrientation(filePath);
+
+    const baseSlug =
+      buildArtworkSlug(
+        id,
+        relativeFolder
+      );
+
+    const slugCount =
+      usedSlugs.get(baseSlug) ?? 0;
+
+    const slug =
+      slugCount === 0
+        ? baseSlug
+        : `${baseSlug}-${slugCount + 1}`;
+
+    usedSlugs.set(
+      baseSlug,
+      slugCount + 1
+    );
 
     return {
       id: index + 1,
 
-      src: `/images/portfolio/stylized/${relativeFolder}/${file}`,
+      slug,
 
-      title: buildTitle(id),
+      src:
+        `/images/portfolio/stylized/${relativeFolder}/${file}`,
+
+      title:
+        buildTitle(id),
 
       orientation,
 
-      featured: orientation === 'landscape',
+      featured:
+        orientation === 'landscape',
 
-      alt: buildAlt(id),
+      alt:
+        buildAlt(id),
     };
   });
 }
 
-const groups = CATEGORY_CONFIG.map((group) => ({
-  id: group.groupId,
+// ------------------
+// GROUPS
+// ------------------
 
-  title: group.groupTitle,
+const groups = CATEGORY_CONFIG.map(
+  (group) => ({
+    id:
+      group.groupId,
 
-  subcategories: group.subcategories.map(
-    (subcategory) => ({
-      id: subcategory.id,
+    slug:
+      group.groupSlug,
 
-      title: subcategory.title,
+    title:
+      group.groupTitle,
 
-      artworks: generateArtworks(
-        subcategory.folder
+    subcategories:
+      group.subcategories.map(
+        (subcategory) => ({
+          id:
+            subcategory.id,
+
+          slug:
+            subcategory.slug,
+
+          title:
+            subcategory.title,
+
+          artworks:
+            generateArtworks(
+              subcategory.folder
+            ),
+        })
       ),
-    })
-  ),
-}));
+  })
+);
+
+// ------------------
+// OUTPUT
+// ------------------
 
 const output = `import { PortfolioData } from './types';
 
 export const stylized: PortfolioData = ${JSON.stringify(
   {
+    slug: 'stylized',
     title: 'STYLIZED',
     groups,
   },
@@ -277,7 +511,9 @@ export const stylized: PortfolioData = ${JSON.stringify(
 
 fs.mkdirSync(
   path.dirname(OUTPUT),
-  { recursive: true }
+  {
+    recursive: true,
+  }
 );
 
 fs.writeFileSync(
@@ -285,4 +521,6 @@ fs.writeFileSync(
   output
 );
 
+console.log('');
 console.log(`Generated ${OUTPUT}`);
+console.log('');

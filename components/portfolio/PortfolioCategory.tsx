@@ -2,10 +2,13 @@
 
 import dynamic from 'next/dynamic';
 import { useEffect, useRef, useState } from 'react';
-import { PortfolioData } from '@/data/portfolio/types';
-import ArtworkGrid from './ArtworkGrid';
+import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
+
+import { PortfolioData } from '@/data/portfolio/types';
 import { commissions } from '@/data/portfolio/commissions';
+
+import ArtworkGrid from './ArtworkGrid';
 
 const CommissionModal = dynamic(
   () => import('./CommissionModal')
@@ -13,22 +16,72 @@ const CommissionModal = dynamic(
 
 interface PortfolioCategoryProps {
   data: PortfolioData;
+  slug?: string[];
 }
 
 export default function PortfolioCategory({
   data,
+  slug,
 }: PortfolioCategoryProps) {
-  const [selectedGroupIndex, setSelectedGroupIndex] = useState(0);
-  const selectedGroup = data.groups[selectedGroupIndex];
+  const router = useRouter();
 
-  const [selectedSubcategoryIndex, setSelectedSubcategoryIndex] =
-    useState(0);
+  /*
+   * URL:
+   *
+   * /portfolio/semi-realism/general/ref-sheets
+   *
+   * slug[0] = general
+   * slug[1] = ref-sheets
+   *
+   * Y si hay artwork:
+   *
+   * /portfolio/semi-realism/general/ref-sheets/elf-character-dnd-ref-sheet-essentials
+   *
+   * slug[2] = elf-character-dnd-ref-sheet-essentials
+   */
+  const groupSlug = slug?.[0];
+  const categorySlug = slug?.[1];
+  const artworkSlug = slug?.[2];
+
+  /*
+   * COLLECTION seleccionada
+   */
+  const foundGroupIndex = data.groups.findIndex(
+    (group) => group.slug === groupSlug
+  );
+
+  const selectedGroupIndex =
+    foundGroupIndex === -1
+      ? 0
+      : foundGroupIndex;
+
+  const selectedGroup =
+    data.groups[selectedGroupIndex];
+
+  /*
+   * CATEGORY seleccionada
+   */
+  const foundSubcategoryIndex =
+    selectedGroup.subcategories.findIndex(
+      (subcategory) =>
+        subcategory.slug === categorySlug
+    );
+
+  const selectedSubcategoryIndex =
+    foundSubcategoryIndex === -1
+      ? 0
+      : foundSubcategoryIndex;
 
   const selectedSubcategory =
-    selectedGroup.subcategories[selectedSubcategoryIndex];
+    selectedGroup.subcategories[
+      selectedSubcategoryIndex
+    ];
 
-  // Estado del modal de comisión
-  const [commissionOpen, setCommissionOpen] = useState(false);
+  /*
+   * Estado del modal de comisión
+   */
+  const [commissionOpen, setCommissionOpen] =
+    useState(false);
 
   useEffect(() => {
     if (commissionOpen) {
@@ -42,28 +95,53 @@ export default function PortfolioCategory({
     };
   }, [commissionOpen]);
 
-  // Comisión asociada a la subcategoría actual
-  const commission = commissions[selectedSubcategory.id];
+  /*
+   * Comisión asociada a la categoría actual
+   */
+  const commission =
+    commissions[selectedSubcategory.id];
 
   /*
-   * Punto al que volverá el scroll cuando se cambie
-   * de página dentro de la galería.
+   * Punto al que vuelve el scroll al cambiar
+   * de página dentro de ArtworkGrid.
    */
   const commissionButtonRef =
     useRef<HTMLDivElement | null>(null);
 
+  /*
+   * Cambiar COLLECTION
+   *
+   * Al cambiar de colección entramos a su
+   * primera subcategoría.
+   */
   function changeGroup(index: number) {
-    setSelectedGroupIndex(index);
+    const group = data.groups[index];
 
-    // Cuando cambiamos de grupo volvemos a la primera subcategoría
-    setSelectedSubcategoryIndex(0);
+    if (!group) return;
+
+    const firstSubcategory =
+      group.subcategories[0];
+
+    if (!firstSubcategory) return;
+
+    router.replace(
+      `/portfolio/${data.slug}/${group.slug}/${firstSubcategory.slug}`
+    );
   }
 
   /*
-   * Scroll hacia el botón de comisión.
-   *
-   * No utilizamos useEffect porque el scroll ocurre como
-   * consecuencia directa de una interacción del usuario.
+   * Cambiar CATEGORY
+   */
+  function changeSubcategory(
+    subcategorySlug: string
+  ) {
+    router.replace(
+      `/portfolio/${data.slug}/${selectedGroup.slug}/${subcategorySlug}`
+    );
+  }
+
+  /*
+   * Scroll hacia botón de comisión.
    */
   const scrollToCommission = () => {
     if (!commissionButtonRef.current) return;
@@ -71,7 +149,8 @@ export default function PortfolioCategory({
     const navbarOffset = 100;
 
     const y =
-      commissionButtonRef.current.getBoundingClientRect().top +
+      commissionButtonRef.current
+        .getBoundingClientRect().top +
       window.scrollY -
       navbarOffset;
 
@@ -98,52 +177,58 @@ export default function PortfolioCategory({
             </p>
 
             <div className="flex flex-wrap justify-center gap-6 md:gap-16">
-              {data.groups.map((group, index) => (
-                <button
-                  type="button"
-                  key={group.id}
-                  onClick={() => changeGroup(index)}
-                  className="
-                    relative
-                    pb-2
-                    text-sm
-                    md:text-lg
-                    uppercase
-                    tracking-[0.16em]
-                    transition-colors
-                    duration-300
-                  "
-                >
-                  <span
-                    className={
-                      selectedGroupIndex === index
-                        ? 'text-white'
-                        : 'text-white/45 hover:text-white'
+              {data.groups.map(
+                (group, index) => (
+                  <button
+                    type="button"
+                    key={group.id}
+                    onClick={() =>
+                      changeGroup(index)
                     }
+                    className="
+                      relative
+                      pb-2
+                      text-sm
+                      uppercase
+                      tracking-[0.16em]
+                      transition-colors
+                      duration-300
+                      md:text-lg
+                    "
                   >
-                    {group.title}
-                  </span>
+                    <span
+                      className={
+                        selectedGroupIndex ===
+                        index
+                          ? 'text-white'
+                          : 'text-white/45 hover:text-white'
+                      }
+                    >
+                      {group.title}
+                    </span>
 
-                  {selectedGroupIndex === index && (
-                    <motion.div
-                      layoutId="group-underline"
-                      className="
-                        absolute
-                        left-0
-                        right-0
-                        -bottom-0.5
-                        h-px
-                        bg-white
-                      "
-                      transition={{
-                        type: 'spring',
-                        stiffness: 500,
-                        damping: 40,
-                      }}
-                    />
-                  )}
-                </button>
-              ))}
+                    {selectedGroupIndex ===
+                      index && (
+                      <motion.div
+                        layoutId="group-underline"
+                        className="
+                          absolute
+                          left-0
+                          right-0
+                          -bottom-0.5
+                          h-px
+                          bg-white
+                        "
+                        transition={{
+                          type: 'spring',
+                          stiffness: 500,
+                          damping: 40,
+                        }}
+                      />
+                    )}
+                  </button>
+                )
+              )}
             </div>
           </div>
 
@@ -168,22 +253,25 @@ export default function PortfolioCategory({
                     type="button"
                     key={subcategory.id}
                     onClick={() =>
-                      setSelectedSubcategoryIndex(index)
+                      changeSubcategory(
+                        subcategory.slug
+                      )
                     }
                     className="
                       relative
                       pb-2
                       text-[11px]
-                      md:text-sm
-                      tracking-[0.15em]
                       uppercase
+                      tracking-[0.15em]
                       transition-colors
                       duration-300
+                      md:text-sm
                     "
                   >
                     <span
                       className={
-                        selectedSubcategoryIndex === index
+                        selectedSubcategoryIndex ===
+                        index
                           ? 'text-white'
                           : 'text-white/50 hover:text-white'
                       }
@@ -191,7 +279,8 @@ export default function PortfolioCategory({
                       {subcategory.title}
                     </span>
 
-                    {selectedSubcategoryIndex === index && (
+                    {selectedSubcategoryIndex ===
+                      index && (
                       <motion.div
                         layoutId="subcategory-underline"
                         className="
@@ -223,13 +312,14 @@ export default function PortfolioCategory({
             >
               <button
                 type="button"
-                onClick={() => setCommissionOpen(true)}
+                onClick={() =>
+                  setCommissionOpen(true)
+                }
                 className="
                   group
                   inline-flex
                   w-full
                   max-w-sm
-                  md:w-auto
                   items-center
                   justify-center
                   gap-2
@@ -247,6 +337,7 @@ export default function PortfolioCategory({
                   duration-300
                   hover:bg-white
                   hover:text-[#2f3558]
+                  md:w-auto
                 "
               >
                 <svg
@@ -267,9 +358,25 @@ export default function PortfolioCategory({
           {/* GALERÍA */}
           <div key={selectedSubcategory.id}>
             <ArtworkGrid
-                artworks={selectedSubcategory.artworks}
-                scrollTargetRef={scrollToCommission}
-              />
+              artworks={
+                selectedSubcategory.artworks
+              }
+              scrollTargetRef={
+                scrollToCommission
+              }
+              initialArtworkSlug={
+                artworkSlug
+              }
+              portfolioSlug={
+                data.slug
+              }
+              groupSlug={
+                selectedGroup.slug
+              }
+              categorySlug={
+                selectedSubcategory.slug
+              }
+            />
           </div>
         </div>
       </section>
@@ -279,11 +386,17 @@ export default function PortfolioCategory({
         <CommissionModal
           key={commission.id}
           open={commissionOpen}
-          onClose={() => setCommissionOpen(false)}
+          onClose={() =>
+            setCommissionOpen(false)
+          }
           commission={commission}
           styleTitle={data.title}
-          collectionTitle={selectedGroup.title}
-          categoryTitle={selectedSubcategory.title}
+          collectionTitle={
+            selectedGroup.title
+          }
+          categoryTitle={
+            selectedSubcategory.title
+          }
         />
       )}
     </>

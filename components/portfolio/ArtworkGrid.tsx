@@ -1,10 +1,15 @@
 'use client';
 
 import Image from 'next/image';
-import { useMemo, useState } from 'react';
-import { Artwork } from '@/data/portfolio/types';
 import dynamic from 'next/dynamic';
+import {
+  useMemo,
+  useState,
+} from 'react';
+import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
+
+import { Artwork } from '@/data/portfolio/types';
 import { buildPortfolioPages } from '@/lib/portfolio/layoutEngine';
 
 const ArtworkLightbox = dynamic(
@@ -14,17 +19,30 @@ const ArtworkLightbox = dynamic(
 interface ArtworkGridProps {
   artworks: Artwork[];
   scrollTargetRef?: () => void;
+
+  initialArtworkSlug?: string;
+
+  portfolioSlug: string;
+  groupSlug: string;
+  categorySlug: string;
 }
 
 export default function ArtworkGrid({
   artworks,
   scrollTargetRef,
+  initialArtworkSlug,
+  portfolioSlug,
+  groupSlug,
+  categorySlug,
 }: ArtworkGridProps) {
-  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
-  const [currentPage, setCurrentPage] = useState(0);
+  const router = useRouter();
+
+  const [currentPage, setCurrentPage] =
+    useState(0);
 
   const containerVariants = {
     hidden: {},
+
     show: {
       transition: {
         staggerChildren: 0.05,
@@ -37,9 +55,11 @@ export default function ArtworkGrid({
       opacity: 0,
       y: 18,
     },
+
     show: {
       opacity: 1,
       y: 0,
+
       transition: {
         duration: 0.45,
         ease: [0.22, 1, 0.36, 1] as const,
@@ -67,27 +87,124 @@ export default function ArtworkGrid({
     return pages.flat();
   }, [pages]);
 
+  /*
+   * ============================================================
+   * ARTWORK SELECCIONADO DESDE LA URL
+   * ============================================================
+   */
+
+  const selectedGlobalIndex = useMemo(() => {
+    if (!initialArtworkSlug) {
+      return null;
+    }
+
+    const index =
+      orderedArtworks.findIndex(
+        (artwork) =>
+          artwork.slug ===
+          initialArtworkSlug
+      );
+
+    return index === -1
+      ? null
+      : index;
+  }, [
+    initialArtworkSlug,
+    orderedArtworks,
+  ]);
+
+  const selectedArtwork =
+    selectedGlobalIndex !== null
+      ? orderedArtworks[
+          selectedGlobalIndex
+        ]
+      : null;
+
+  /*
+   * ============================================================
+   * PÁGINA DEL ARTWORK ABIERTO
+   * ============================================================
+   */
+
+  const selectedArtworkPage = useMemo(() => {
+    if (!selectedArtwork) {
+      return null;
+    }
+
+    const pageIndex =
+      pages.findIndex((page) =>
+        page.some(
+          (artwork) =>
+            artwork.slug ===
+            selectedArtwork.slug
+        )
+      );
+
+    return pageIndex === -1
+      ? null
+      : pageIndex;
+  }, [
+    pages,
+    selectedArtwork,
+  ]);
+
+  /*
+   * Si hay un artwork abierto desde URL,
+   * mostramos automáticamente su página.
+   *
+   * Si no, usamos la página elegida normalmente
+   * con la paginación.
+   */
   const safeCurrentPage = Math.min(
-    currentPage,
-    Math.max(pages.length - 1, 0)
+    selectedArtworkPage ??
+      currentPage,
+    Math.max(
+      pages.length - 1,
+      0
+    )
   );
 
-  const pageArtworks = pages[safeCurrentPage] ?? [];
+  const pageArtworks =
+    pages[safeCurrentPage] ?? [];
+
+  /*
+   * ============================================================
+   * PAGINACIÓN VISIBLE
+   * ============================================================
+   */
 
   const visiblePages = useMemo(() => {
-    const totalPages = pages.length;
+    const totalPages =
+      pages.length;
 
     if (totalPages <= 5) {
-      return Array.from({ length: totalPages }, (_, i) => i);
+      return Array.from(
+        {
+          length:
+            totalPages,
+        },
+        (_, i) => i
+      );
     }
 
-    const current = safeCurrentPage;
+    const current =
+      safeCurrentPage;
 
     if (current <= 2) {
-      return [0, 1, 2, 3, -1, totalPages - 1];
+      return [
+        0,
+        1,
+        2,
+        3,
+        -1,
+        totalPages - 1,
+      ];
     }
 
-    if (current >= totalPages - 3) {
+    if (
+      current >=
+      totalPages - 3
+    ) {
       return [
         0,
         -1,
@@ -107,30 +224,19 @@ export default function ArtworkGrid({
       -1,
       totalPages - 1,
     ];
-  }, [pages.length, safeCurrentPage]);
+  }, [
+    pages.length,
+    safeCurrentPage,
+  ]);
 
   /*
    * ============================================================
-   * ÍNDICE GLOBAL
+   * URL BASE DE LA CATEGORÍA
    * ============================================================
    */
 
-  const globalIndex =
-    selectedIndex !== null
-      ? orderedArtworks.findIndex(
-          (artwork) =>
-            artwork.id === pageArtworks[selectedIndex]?.id
-        )
-      : null;
-
-  const selectedArtwork =
-    globalIndex !== null && globalIndex >= 0
-      ? orderedArtworks[globalIndex]
-      : null;
-
-  if (artworks.length === 0) {
-    return null;
-  }
+  const categoryUrl =
+    `/portfolio/${portfolioSlug}/${groupSlug}/${categorySlug}`;
 
   /*
    * ============================================================
@@ -138,17 +244,29 @@ export default function ArtworkGrid({
    * ============================================================
    */
 
-  const changePage = (newPage: number) => {
-    if (newPage < 0 || newPage >= pages.length) {
+  const changePage = (
+    newPage: number
+  ) => {
+    if (
+      newPage < 0 ||
+      newPage >=
+        pages.length
+    ) {
       return;
     }
 
-    setCurrentPage(newPage);
+    setCurrentPage(
+      newPage
+    );
 
-    if (scrollTargetRef) {
-      requestAnimationFrame(() => {
-        scrollTargetRef();
-      });
+    if (
+      scrollTargetRef
+    ) {
+      requestAnimationFrame(
+        () => {
+          scrollTargetRef();
+        }
+      );
     }
   };
 
@@ -156,10 +274,34 @@ export default function ArtworkGrid({
    * ============================================================
    * ABRIR LIGHTBOX
    * ============================================================
+   *
+   * La URL cambia inmediatamente.
+   *
+   * Ej:
+   *
+   * /pets
+   *
+   * ↓
+   *
+   * /pets/family-pet-portrait-bunny-dogs-full-body
    */
 
-  const handleArtworkClick = (index: number) => {
-    setSelectedIndex(index);
+  const handleArtworkClick = (
+    index: number
+  ) => {
+    const artwork =
+      pageArtworks[index];
+
+    if (!artwork) {
+      return;
+    }
+
+    router.replace(
+      `${categoryUrl}/${artwork.slug}`,
+      {
+        scroll: false,
+      }
+    );
   };
 
   /*
@@ -168,38 +310,93 @@ export default function ArtworkGrid({
    * ============================================================
    */
 
-  const goToArtwork = (newIndex: number) => {
-    if (orderedArtworks.length === 0) {
+  const goToArtwork = (
+    newIndex: number
+  ) => {
+    if (
+      orderedArtworks.length ===
+      0
+    ) {
       return;
     }
 
     const normalizedIndex =
-      (newIndex + orderedArtworks.length) %
+      (
+        newIndex +
+        orderedArtworks.length
+      ) %
       orderedArtworks.length;
 
-    const newArtwork = orderedArtworks[normalizedIndex];
+    const newArtwork =
+      orderedArtworks[
+        normalizedIndex
+      ];
 
-    const newPage = pages.findIndex((page) =>
-      page.some(
-        (item) => item.id === newArtwork.id
-      )
-    );
+    const newPage =
+      pages.findIndex(
+        (page) =>
+          page.some(
+            (item) =>
+              item.slug ===
+              newArtwork.slug
+          )
+      );
 
-    if (newPage === -1) {
+    if (
+      newPage === -1
+    ) {
       return;
     }
 
-    const newLocalIndex = pages[newPage].findIndex(
-      (item) => item.id === newArtwork.id
+    setCurrentPage(
+      newPage
     );
 
-    if (newLocalIndex === -1) {
-      return;
-    }
-
-    setCurrentPage(newPage);
-    setSelectedIndex(newLocalIndex);
+    router.replace(
+      `${categoryUrl}/${newArtwork.slug}`,
+      {
+        scroll: false,
+      }
+    );
   };
+
+  /*
+   * ============================================================
+   * CERRAR LIGHTBOX
+   * ============================================================
+   */
+
+  const closeLightbox =
+    () => {
+
+      /*
+       * Si abrimos una imagen que estaba
+       * en otra página, dejamos el grid
+       * en esa misma página al cerrar.
+       */
+      if (
+        selectedArtworkPage !==
+        null
+      ) {
+        setCurrentPage(
+          selectedArtworkPage
+        );
+      }
+
+      router.replace(
+        categoryUrl,
+        {
+          scroll: false,
+        }
+      );
+    };
+
+  if (
+    artworks.length ===
+    0
+  ) {
+    return null;
+  }
 
   return (
     <>
@@ -209,8 +406,12 @@ export default function ArtworkGrid({
 
       <div>
         <motion.div
-          key={safeCurrentPage}
-          variants={containerVariants}
+          key={
+            safeCurrentPage
+          }
+          variants={
+            containerVariants
+          }
           initial="hidden"
           animate="show"
           className="
@@ -226,128 +427,138 @@ export default function ArtworkGrid({
             auto-rows-130
           "
         >
-          {pageArtworks.map((artwork, index) => {
+          {pageArtworks.map(
+            (
+              artwork,
+              index
+            ) => {
 
-            const isLcpCandidate =
-              safeCurrentPage === 0 && index === 0;
-            
-            <div className="absolute top-2 left-2 z-50 bg-red-500 text-white p-2">
-              {index}
-            </div>
+              const isLcpCandidate =
+                safeCurrentPage ===
+                  0 &&
+                index === 0;
 
-            return (
-              <motion.div
-                variants={isLcpCandidate ? undefined : itemVariants}
-                key={artwork.id}
-                onClick={() => handleArtworkClick(index)}
-                className={`
-                  group
-                  relative
-                  overflow-hidden
-                  rounded-2xl
-                  cursor-pointer
-
-                  ${
-                    artwork.orientation === 'landscape'
-                      ? 'md:col-span-3 h-110 md:h-130'
-                      : 'h-110 md:h-130'
-                  }
-
-                  ${
-                    artwork.featured
-                      ? 'ring-1 ring-white/10 shadow-2xl'
-                      : ''
-                  }
-                `}
-              >
-                {/* ==================================================
-                    IMAGEN
-                ================================================== */}
-
-                <Image
-                  src={artwork.src}
-                  alt={artwork.alt}
-                  fill
-                  quality={60}
-
-                  fetchPriority={
+              return (
+                <motion.div
+                  variants={
                     isLcpCandidate
-                      ? 'high'
-                      : undefined
+                      ? undefined
+                      : itemVariants
                   }
-
-                  loading={
-                    isLcpCandidate
-                      ? 'eager'
-                      : undefined
+                  key={
+                    artwork.id
                   }
-
-                  sizes={
-                    artwork.orientation === "landscape"
-                      ? "(max-width: 767px) calc(100vw - 48px), (max-width: 1280px) 900px, 1000px"
-                      : "(max-width: 767px) calc(100vw - 48px), 30vw"
+                  onClick={() =>
+                    handleArtworkClick(
+                      index
+                    )
                   }
-                  className="
-                    object-cover
+                  className={`
+                    group
+                    relative
+                    overflow-hidden
                     rounded-2xl
+                    cursor-pointer
 
-                    transition-transform
-                    duration-700
+                    ${
+                      artwork.orientation ===
+                      'landscape'
+                        ? 'md:col-span-3 h-110 md:h-130'
+                        : 'h-110 md:h-130'
+                    }
 
-                    group-hover:scale-105
-                  "
-                />
-
-                {/* ==================================================
-                    OVERLAY DEL TÍTULO
-
-                    MÓVIL / TABLET:
-                    siempre visible.
-
-                    DESKTOP:
-                    aparece únicamente con hover.
-                ================================================== */}
-
-                <div
-                  className="
-                    absolute
-                    inset-0
-
-                    flex
-                    items-end
-
-                    p-5
-
-                    bg-gradient-to-t
-                    from-black/65
-                    via-black/15
-                    to-transparent
-
-                    opacity-100
-
-                    lg:opacity-0
-                    lg:group-hover:opacity-100
-
-                    transition-opacity
-                    duration-500
-                    ease-out
-                  "
+                    ${
+                      artwork.featured
+                        ? 'ring-1 ring-white/10 shadow-2xl'
+                        : ''
+                    }
+                  `}
                 >
-                  <span
+                  {/* IMAGE */}
+
+                  <Image
+                    src={
+                      artwork.src
+                    }
+                    alt={
+                      artwork.alt
+                    }
+                    fill
+                    quality={
+                      60
+                    }
+                    fetchPriority={
+                      isLcpCandidate
+                        ? 'high'
+                        : undefined
+                    }
+                    loading={
+                      isLcpCandidate
+                        ? 'eager'
+                        : undefined
+                    }
+                    sizes={
+                      artwork.orientation ===
+                      'landscape'
+                        ? '(max-width: 767px) calc(100vw - 48px), (max-width: 1280px) 900px, 1000px'
+                        : '(max-width: 767px) calc(100vw - 48px), 30vw'
+                    }
                     className="
-                      text-sm
-                      tracking-[0.12em]
-                      uppercase
-                      text-white
-                      drop-shadow-md
+                      object-cover
+                      rounded-2xl
+
+                      transition-transform
+                      duration-700
+
+                      group-hover:scale-105
+                    "
+                  />
+
+                  {/* OVERLAY */}
+
+                  <div
+                    className="
+                      absolute
+                      inset-0
+
+                      flex
+                      items-end
+
+                      p-5
+
+                      bg-gradient-to-t
+                      from-black/65
+                      via-black/15
+                      to-transparent
+
+                      opacity-100
+
+                      pointer-fine:opacity-0
+                      pointer-fine:group-hover:opacity-100
+
+                      transition-opacity
+                      duration-500
+                      ease-out
                     "
                   >
-                    {artwork.title}
-                  </span>
-                </div>
-              </motion.div>
-            );
-          })}
+                    <span
+                      className="
+                        text-sm
+                        tracking-[0.12em]
+                        uppercase
+                        text-white
+                        drop-shadow-md
+                      "
+                    >
+                      {
+                        artwork.title
+                      }
+                    </span>
+                  </div>
+                </motion.div>
+              );
+            }
+          )}
         </motion.div>
       </div>
 
@@ -355,18 +566,27 @@ export default function ArtworkGrid({
           PAGINACIÓN
       ====================================================== */}
 
-      {pages.length > 1 && (
+      {pages.length >
+        1 && (
         <div className="mt-12 flex items-center justify-center gap-3">
+
           {/* PREVIOUS */}
 
           <button
             type="button"
             onClick={() =>
               changePage(
-                Math.max(safeCurrentPage - 1, 0)
+                Math.max(
+                  safeCurrentPage -
+                    1,
+                  0
+                )
               )
             }
-            disabled={safeCurrentPage === 0}
+            disabled={
+              safeCurrentPage ===
+              0
+            }
             className="
               rounded-full
               border
@@ -386,54 +606,75 @@ export default function ArtworkGrid({
               disabled:opacity-30
             "
           >
-            <span className="hidden sm:inline">Previous</span>
-            <span className="sm:hidden">&lt;</span>
+            <span className="hidden sm:inline">
+              Previous
+            </span>
+
+            <span className="sm:hidden">
+              &lt;
+            </span>
           </button>
 
           {/* NÚMEROS */}
 
-          {visiblePages.map((page, index) => {
-            if (page === -1) {
+          {visiblePages.map(
+            (
+              page,
+              index
+            ) => {
+
+              if (
+                page === -1
+              ) {
+                return (
+                  <span
+                    key={`ellipsis-${index}`}
+                    className="
+                      flex
+                      h-10
+                      w-10
+                      items-center
+                      justify-center
+                      text-white/60
+                    "
+                  >
+                    ...
+                  </span>
+                );
+              }
+
               return (
-                <span
-                  key={`ellipsis-${index}`}
-                  className="
-                    flex
+                <button
+                  type="button"
+                  key={
+                    page
+                  }
+                  onClick={() =>
+                    changePage(
+                      page
+                    )
+                  }
+                  className={`
                     h-10
                     w-10
-                    items-center
-                    justify-center
-                    text-white/60
-                  "
+                    rounded-full
+                    border
+                    text-sm
+                    transition
+
+                    ${
+                      safeCurrentPage ===
+                      page
+                        ? 'border-white/30 bg-white/35 text-white'
+                        : 'border-white/10 bg-white/6 text-white/70 hover:bg-white/20'
+                    }
+                  `}
                 >
-                  ...
-                </span>
+                  {page + 1}
+                </button>
               );
             }
-
-            return (
-              <button
-                type="button"
-                key={page}
-                onClick={() => changePage(page)}
-                className={`
-                  h-10
-                  w-10
-                  rounded-full
-                  border
-                  text-sm
-                  transition
-                  ${
-                    safeCurrentPage === page
-                      ? 'border-white/30 bg-white/35 text-white'
-                      : 'border-white/10 bg-white/6 text-white/70 hover:bg-white/20'
-                  }
-                `}
-              >
-                {page + 1}
-              </button>
-            );
-          })}
+          )}
 
           {/* NEXT */}
 
@@ -442,13 +683,17 @@ export default function ArtworkGrid({
             onClick={() =>
               changePage(
                 Math.min(
-                  safeCurrentPage + 1,
-                  pages.length - 1
+                  safeCurrentPage +
+                    1,
+                  pages.length -
+                    1
                 )
               )
             }
             disabled={
-              safeCurrentPage === pages.length - 1
+              safeCurrentPage ===
+              pages.length -
+                1
             }
             className="
               rounded-full
@@ -469,8 +714,13 @@ export default function ArtworkGrid({
               disabled:opacity-30
             "
           >
-            <span className="hidden sm:inline">Next</span>
-            <span className="sm:hidden">&gt;</span>
+            <span className="hidden sm:inline">
+              Next
+            </span>
+
+            <span className="sm:hidden">
+              &gt;
+            </span>
           </button>
         </div>
       )}
@@ -479,25 +729,36 @@ export default function ArtworkGrid({
           LIGHTBOX
       ====================================================== */}
 
-      {selectedArtwork && globalIndex !== null && (
-        <ArtworkLightbox
-          artwork={selectedArtwork}
-          currentIndex={globalIndex}
-          total={orderedArtworks.length}
-
-          previous={() => {
-            goToArtwork(globalIndex - 1);
-          }}
-
-          next={() => {
-            goToArtwork(globalIndex + 1);
-          }}
-
-          close={() => {
-            setSelectedIndex(null);
-          }}
-        />
-      )}
+      {selectedArtwork &&
+        selectedGlobalIndex !==
+          null && (
+          <ArtworkLightbox
+            artwork={
+              selectedArtwork
+            }
+            currentIndex={
+              selectedGlobalIndex
+            }
+            total={
+              orderedArtworks.length
+            }
+            previous={() => {
+              goToArtwork(
+                selectedGlobalIndex -
+                  1
+              );
+            }}
+            next={() => {
+              goToArtwork(
+                selectedGlobalIndex +
+                  1
+              );
+            }}
+            close={
+              closeLightbox
+            }
+          />
+        )}
     </>
   );
 }

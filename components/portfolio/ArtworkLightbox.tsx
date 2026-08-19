@@ -1,14 +1,23 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  useEffect,
+  useState,
+} from 'react';
+
 import Image from 'next/image';
+import {
+  AnimatePresence,
+  motion,
+} from 'framer-motion';
+
 import { Artwork } from '@/data/portfolio/types';
-import { AnimatePresence, motion } from 'framer-motion';
 
 interface ArtworkLightboxProps {
   artwork: Artwork;
   currentIndex: number;
   total: number;
+
   previous: () => void;
   next: () => void;
   close: () => void;
@@ -22,153 +31,103 @@ export default function ArtworkLightbox({
   next,
   close,
 }: ArtworkLightboxProps) {
-  /*
-   * ============================================================
-   * HISTORIAL
-   * ============================================================
-   */
-
-  const historyEntryAddedRef = useRef(false);
-  const closingRef = useRef(false);
 
   /*
    * ============================================================
    * CARGA DE IMAGEN
    * ============================================================
-   */
-
-  const [imageLoaded, setImageLoaded] = useState(false);
-
-  /*
-   * ============================================================
-   * CERRAR LIGHTBOX
-   * ============================================================
    *
-   * Esta función se declara antes de los effects porque
-   * el listener de teclado necesita acceder a ella.
+   * Guardamos qué src terminó de cargar.
+   *
+   * Así, cuando cambiamos de artwork:
+   *
+   * loadedSrc !== artwork.src
+   *
+   * y automáticamente vuelve a aparecer
+   * el loader sin necesitar un useEffect
+   * con setState.
    */
 
-  const handleClose = useCallback(() => {
-    if (closingRef.current) return;
+  const [
+    loadedSrc,
+    setLoadedSrc,
+  ] = useState<string | null>(
+    null
+  );
 
-    closingRef.current = true;
-
-    /*
-     * Si añadimos una entrada al historial al abrir el lightbox,
-     * retrocedemos una sola vez.
-     *
-     * El evento popstate será el encargado de ejecutar close().
-     */
-
-    if (historyEntryAddedRef.current) {
-      window.history.back();
-      return;
-    }
-
-    /*
-     * Fallback de seguridad.
-     */
-    close();
-  }, [close]);
+  const imageLoaded =
+    loadedSrc === artwork.src;
 
   /*
    * ============================================================
-   * HISTORIAL + TECLADO
+   * TECLADO + BLOQUEO DE SCROLL
    * ============================================================
    */
 
   useEffect(() => {
-    /*
-     * Creamos una entrada adicional en el historial.
-     *
-     * La URL permanece exactamente igual.
-     *
-     * Esto permite que:
-     *
-     * Portfolio
-     *     ↓
-     * Lightbox
-     *     ↓
-     * Atrás
-     *
-     * cierre primero el Lightbox.
-     */
 
-    window.history.pushState(
-      { lightbox: true },
-      '',
-      window.location.href
-    );
+    const handleKeyDown = (
+      event: KeyboardEvent
+    ) => {
 
-    historyEntryAddedRef.current = true;
-
-    /*
-     * ==========================================================
-     * BOTÓN / GESTO "ATRÁS"
-     * ==========================================================
-     */
-
-    const handlePopState = () => {
       /*
-       * El navegador ya hizo el back.
-       *
-       * No hacemos history.back() nuevamente.
+       * ESC
        */
-
-      historyEntryAddedRef.current = false;
-      closingRef.current = true;
-
-      close();
-    };
-
-    /*
-     * ==========================================================
-     * TECLADO
-     * ==========================================================
-     */
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        handleClose();
+      if (
+        event.key === 'Escape'
+      ) {
+        close();
         return;
       }
 
-      if (e.key === 'ArrowLeft') {
+      /*
+       * FLECHA IZQUIERDA
+       */
+      if (
+        event.key === 'ArrowLeft'
+      ) {
         previous();
         return;
       }
 
-      if (e.key === 'ArrowRight') {
+      /*
+       * FLECHA DERECHA
+       */
+      if (
+        event.key === 'ArrowRight'
+      ) {
         next();
       }
     };
 
-    window.addEventListener('popstate', handlePopState);
-    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener(
+      'keydown',
+      handleKeyDown
+    );
 
     /*
-     * Bloqueamos el scroll mientras el Lightbox está abierto.
+     * Bloqueamos scroll mientras
+     * el Lightbox está abierto.
      */
+    const previousOverflow =
+      document.body.style.overflow;
 
-    const previousOverflow = document.body.style.overflow;
-
-    document.body.style.overflow = 'hidden';
-
-    /*
-     * ==========================================================
-     * CLEANUP
-     * ==========================================================
-     */
+    document.body.style.overflow =
+      'hidden';
 
     return () => {
-      window.removeEventListener('popstate', handlePopState);
-      window.removeEventListener('keydown', handleKeyDown);
 
-      document.body.style.overflow = previousOverflow;
+      window.removeEventListener(
+        'keydown',
+        handleKeyDown
+      );
+
+      document.body.style.overflow =
+        previousOverflow;
     };
+
   }, [
     close,
-    handleClose,
     previous,
     next,
   ]);
@@ -181,6 +140,8 @@ export default function ArtworkLightbox({
 
   return (
     <AnimatePresence>
+
+      {/* BACKDROP */}
       <motion.div
         className="
           fixed
@@ -197,10 +158,24 @@ export default function ArtworkLightbox({
           p-6
           md:p-10
         "
-        onClick={handleClose}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
+
+        /*
+         * Click en cualquier zona vacía
+         * del backdrop = cerrar.
+         */
+        onClick={close}
+
+        initial={{
+          opacity: 0,
+        }}
+
+        animate={{
+          opacity: 1,
+        }}
+
+        exit={{
+          opacity: 0,
+        }}
       >
 
         {/* ==================================================
@@ -209,10 +184,12 @@ export default function ArtworkLightbox({
 
         <button
           type="button"
-          onClick={(e) => {
-            e.stopPropagation();
+
+          onClick={(event) => {
+            event.stopPropagation();
             previous();
           }}
+
           className="
             absolute
 
@@ -254,6 +231,7 @@ export default function ArtworkLightbox({
             focus-visible:ring-2
             focus-visible:ring-white/40
           "
+
           aria-label="Previous image"
         >
           <svg
@@ -277,7 +255,8 @@ export default function ArtworkLightbox({
         ================================================== */}
 
         <motion.div
-          key={artwork.id}
+          key={artwork.slug}
+
           className="
             relative
             z-10
@@ -285,41 +264,72 @@ export default function ArtworkLightbox({
             max-w-6xl
             max-h-full
           "
-          onClick={(e) => e.stopPropagation()}
+
+          /*
+           * Evita que hacer click sobre
+           * la propia imagen cierre el modal.
+           */
+          onClick={(event) =>
+            event.stopPropagation()
+          }
+
           initial={{
             opacity: 0,
             scale: 0.97,
           }}
+
           animate={{
-            opacity: imageLoaded ? 1 : 0,
-            scale: imageLoaded ? 1 : 0.97,
+            opacity:
+              imageLoaded
+                ? 1
+                : 0,
+
+            scale:
+              imageLoaded
+                ? 1
+                : 0.97,
           }}
+
           transition={{
             duration: 0.22,
             ease: 'easeOut',
           }}
         >
+
           <Image
             src={artwork.src}
-            alt={artwork.title}
+            alt={artwork.alt}
+
             width={2400}
             height={2400}
+
             className="
               max-h-[90vh]
               w-auto
+
               rounded-2xl
               shadow-2xl
+
               object-contain
             "
+
             priority
-            onLoad={() => setImageLoaded(true)}
+
+            onLoad={() => {
+              setLoadedSrc(
+                artwork.src
+              );
+            }}
           />
+
+          {/* LOADER */}
 
           {!imageLoaded && (
             <div
               className="
                 absolute
                 inset-0
+
                 flex
                 items-center
                 justify-center
@@ -329,8 +339,11 @@ export default function ArtworkLightbox({
                 className="
                   h-7
                   w-7
+
                   animate-spin
+
                   rounded-full
+
                   border-2
                   border-white/20
                   border-t-white/80
@@ -338,6 +351,7 @@ export default function ArtworkLightbox({
               />
             </div>
           )}
+
         </motion.div>
 
         {/* ==================================================
@@ -346,10 +360,12 @@ export default function ArtworkLightbox({
 
         <button
           type="button"
-          onClick={(e) => {
-            e.stopPropagation();
+
+          onClick={(event) => {
+            event.stopPropagation();
             next();
           }}
+
           className="
             absolute
 
@@ -391,6 +407,7 @@ export default function ArtworkLightbox({
             focus-visible:ring-2
             focus-visible:ring-white/40
           "
+
           aria-label="Next image"
         >
           <svg
@@ -445,10 +462,12 @@ export default function ArtworkLightbox({
 
         <button
           type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            handleClose();
+
+          onClick={(event) => {
+            event.stopPropagation();
+            close();
           }}
+
           className="
             absolute
 
@@ -490,12 +509,14 @@ export default function ArtworkLightbox({
             focus-visible:ring-2
             focus-visible:ring-white/40
           "
+
           aria-label="Close image"
         >
           ×
         </button>
 
       </motion.div>
+
     </AnimatePresence>
   );
 }

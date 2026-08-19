@@ -1,18 +1,22 @@
 import { PortfolioData } from './types';
 
 export const stylized: PortfolioData = {
+  "slug": "stylized",
   "title": "STYLIZED",
   "groups": [
     {
       "id": "book-art",
+      "slug": "book-art",
       "title": "BOOK ART",
       "subcategories": [
         {
           "id": "sty-covers",
+          "slug": "covers",
           "title": "COVERS",
           "artworks": [
             {
               "id": 1,
+              "slug": "child-elf-baby-wolf-front-cover",
               "src": "/images/portfolio/stylized/book-art/covers/child-elf-baby-wolf-fantasy-book-cover-frontcover.webp",
               "title": "Front Cover",
               "orientation": "portrait",
@@ -21,6 +25,7 @@ export const stylized: PortfolioData = {
             },
             {
               "id": 2,
+              "slug": "child-elf-baby-wolf-full-wrap",
               "src": "/images/portfolio/stylized/book-art/covers/child-elf-baby-wolf-fantasy-book-cover-fullwrap.webp",
               "title": "Full Wrap Cover",
               "orientation": "landscape",
@@ -31,10 +36,12 @@ export const stylized: PortfolioData = {
         },
         {
           "id": "sty-interior-illustration",
+          "slug": "interior-illustration",
           "title": "INTERIOR ILLUSTRATION",
           "artworks": [
             {
               "id": 1,
+              "slug": "child-baby-crib-fantasy-book-full-page",
               "src": "/images/portfolio/stylized/book-art/interior/child-baby-crib-fantasy-book-fullpage.webp",
               "title": "Full Page",
               "orientation": "portrait",
@@ -43,6 +50,7 @@ export const stylized: PortfolioData = {
             },
             {
               "id": 2,
+              "slug": "child-water-reflexion-fantasy-character-dnd-book-full-page",
               "src": "/images/portfolio/stylized/book-art/interior/child-water-reflexion-fantasy-character-dnd-book-fullpage.webp",
               "title": "Full Page",
               "orientation": "portrait",
@@ -51,6 +59,7 @@ export const stylized: PortfolioData = {
             },
             {
               "id": 3,
+              "slug": "elf-child-baby-wolf-forest-fantasy-book-full-page",
               "src": "/images/portfolio/stylized/book-art/interior/elf-child-baby-wolf-forest-fantasy-book-fullpage.webp",
               "title": "Full Page",
               "orientation": "portrait",
@@ -59,6 +68,7 @@ export const stylized: PortfolioData = {
             },
             {
               "id": 4,
+              "slug": "house-child-wolf-fantasy-book-spread",
               "src": "/images/portfolio/stylized/book-art/interior/house-child-wolf-fantasy-book-spread.webp",
               "title": "Spread",
               "orientation": "landscape",
@@ -71,14 +81,17 @@ export const stylized: PortfolioData = {
     },
     {
       "id": "general",
+      "slug": "general",
       "title": "GENERAL",
       "subcategories": [
         {
           "id": "sty-icons",
+          "slug": "icons",
           "title": "ICONS",
           "artworks": [
             {
               "id": 1,
+              "slug": "aurora-singer-fanart-icon-circular",
               "src": "/images/portfolio/stylized/general/icons/aurora-singer-fanart-icon-circular.webp",
               "title": "Circular Frame",
               "orientation": "portrait",
@@ -87,6 +100,7 @@ export const stylized: PortfolioData = {
             },
             {
               "id": 2,
+              "slug": "penelope-bridgerton-fanart-icon-flat",
               "src": "/images/portfolio/stylized/general/icons/penelope-bridgerton-fanart-icon-flat.webp",
               "title": "Flat Background",
               "orientation": "portrait",
@@ -95,6 +109,7 @@ export const stylized: PortfolioData = {
             },
             {
               "id": 3,
+              "slug": "poc-girl-afro-cute-icon-circular",
               "src": "/images/portfolio/stylized/general/icons/poc-girl-afro-cute-icon-circular.webp",
               "title": "Circular Frame",
               "orientation": "portrait",
@@ -103,6 +118,7 @@ export const stylized: PortfolioData = {
             },
             {
               "id": 4,
+              "slug": "tiefling-blue-skin-dnd-icon-circular",
               "src": "/images/portfolio/stylized/general/icons/tiefling-blue-skin-dnd-icon-circular.webp",
               "title": "Circular Frame",
               "orientation": "portrait",
@@ -113,10 +129,12 @@ export const stylized: PortfolioData = {
         },
         {
           "id": "sty-character-design",
+          "slug": "character-design",
           "title": "CHARACTER DESIGN",
           "artworks": [
             {
               "id": 1,
+              "slug": "aurora-singer-fanart-full-body",
               "src": "/images/portfolio/stylized/general/character-design/aurora-singer-fanart-fullbody.webp",
               "title": "Full Body",
               "orientation": "portrait",
@@ -125,6 +143,7 @@ export const stylized: PortfolioData = {
             },
             {
               "id": 2,
+              "slug": "penelope-bridgerton-half-body",
               "src": "/images/portfolio/stylized/general/character-design/penelope-bridgerton-halfbody.webp",
               "title": "Half Body",
               "orientation": "portrait",
@@ -133,6 +152,7 @@ export const stylized: PortfolioData = {
             },
             {
               "id": 3,
+              "slug": "sorcerer-dnd-character-full-body",
               "src": "/images/portfolio/stylized/general/character-design/sorcerer-dnd-character-fullbody.webp",
               "title": "Full Body",
               "orientation": "portrait",
@@ -141,6 +161,7 @@ export const stylized: PortfolioData = {
             },
             {
               "id": 4,
+              "slug": "thief-dnd-character-hafling-full-body",
               "src": "/images/portfolio/stylized/general/character-design/thief-dnd-character-hafling-fullbody.webp",
               "title": "Full Body",
               "orientation": "portrait",
@@ -149,6 +170,7 @@ export const stylized: PortfolioData = {
             },
             {
               "id": 5,
+              "slug": "warrior-dnd-character-half-body",
               "src": "/images/portfolio/stylized/general/character-design/warrior-dnd-character-halfbody.webp",
               "title": "Half Body",
               "orientation": "portrait",
@@ -159,10 +181,12 @@ export const stylized: PortfolioData = {
         },
         {
           "id": "sty-character-illustrations",
+          "slug": "character-illustrations",
           "title": "CHARACTER ILLUSTRATIONS",
           "artworks": [
             {
               "id": 1,
+              "slug": "baby-child-fantasy-dnd-character-duo",
               "src": "/images/portfolio/stylized/general/character-illustrations/baby-child-fantasy-dnd-character-duo.webp",
               "title": "Duo/Couple",
               "orientation": "portrait",
@@ -171,6 +195,7 @@ export const stylized: PortfolioData = {
             },
             {
               "id": 2,
+              "slug": "child-water-reflexion-fantasy-character-dnd-book-single",
               "src": "/images/portfolio/stylized/general/character-illustrations/child-water-reflexion-fantasy-character-dnd-book-single.webp",
               "title": "Single Character",
               "orientation": "portrait",
@@ -179,6 +204,7 @@ export const stylized: PortfolioData = {
             },
             {
               "id": 3,
+              "slug": "child-wolf-forest-characters-dnd-fantasy-duo",
               "src": "/images/portfolio/stylized/general/character-illustrations/child-wolf-forest-characters-dnd-fantasy-duo.webp",
               "title": "Duo/Couple",
               "orientation": "portrait",
@@ -187,6 +213,7 @@ export const stylized: PortfolioData = {
             },
             {
               "id": 4,
+              "slug": "house-wolf-child-character-fantasy-duo",
               "src": "/images/portfolio/stylized/general/character-illustrations/house-wolf-child-character-fantasy-duo.webp",
               "title": "Duo/Couple",
               "orientation": "landscape",
@@ -197,10 +224,12 @@ export const stylized: PortfolioData = {
         },
         {
           "id": "sty-pets",
+          "slug": "pets",
           "title": "PETS",
           "artworks": [
             {
               "id": 1,
+              "slug": "cat-kitten-cute-stylized-full-body",
               "src": "/images/portfolio/stylized/general/pets/cat-kitten-cute-stylized-fullbody.webp",
               "title": "Full Body",
               "orientation": "portrait",
@@ -209,6 +238,7 @@ export const stylized: PortfolioData = {
             },
             {
               "id": 2,
+              "slug": "dog-grayhound-stylized-bust-up",
               "src": "/images/portfolio/stylized/general/pets/dog-grayhound-stylized-bustup.webp",
               "title": "Bust Up",
               "orientation": "portrait",
@@ -217,6 +247,7 @@ export const stylized: PortfolioData = {
             },
             {
               "id": 3,
+              "slug": "raccoon-chihuahua-dog-stylized-full-body",
               "src": "/images/portfolio/stylized/general/pets/raccoon-chihuahua-dog-stylized-fullbody.webp",
               "title": "Full Body",
               "orientation": "portrait",

@@ -340,7 +340,8 @@ export default function TermsModal({
                   Base prices apply to standard designs. Highly
                   detailed or complex requests may be subject to an
                   additional complexity fee.
-
+                  <br/>
+                  The illustrations may have style updates on my portfolio over time. You can check if yours has been updated! 💜
                   <br />
 
                   <strong>
