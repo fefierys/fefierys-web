@@ -18,7 +18,7 @@ export const portfolioSections = [
 
   {
     title: "Chibis - Emotes",
-    slug: "chibis",
+    slug: "chibis-emotes",
     data: chibis,
   },
 ];
