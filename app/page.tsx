@@ -2,6 +2,28 @@ import Hero from '@/components/Hero';
 import ImageTextSection from '@/components/ImageTextSection';
 import TestimonialsSection from '@/components/TestimonialsSection';
 
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Fantasy Illustrator & Digital Artist",
+
+  description:
+    "Explore the official portfolio of Fefierys, featuring fantasy illustration, semi-realistic and stylized artwork, book art, character design, chibis, emotes, and custom commissions.",
+
+  alternates: {
+    canonical: "/",
+  },
+
+  openGraph: {
+    title: "Fefierys | Fantasy Illustrator & Digital Artist",
+
+    description:
+      "Explore fantasy illustration, semi-realistic and stylized artwork, book art, character design, chibis, emotes, and custom commissions by Fefierys.",
+
+    url: "/",
+  },
+};
+
 export default function Home() {
   return (
     <main className="relative">

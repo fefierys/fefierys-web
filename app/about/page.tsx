@@ -1,4 +1,27 @@
+import type { Metadata } from "next";
 import Image from 'next/image';
+import Link from 'next/link';
+
+export const metadata: Metadata = {
+  title: "About",
+
+  description:
+    "Meet Fefierys, a fantasy illustrator with 8 years of experience creating characters, magical worlds, book art, and illustrations for indie authors.",
+
+  alternates: {
+    canonical: "/about",
+  },
+
+  openGraph: {
+    title: "About Fefierys",
+
+    description:
+      "Learn more about Fefierys, a fantasy illustrator creating characters, magical worlds, book art, and illustrations for indie authors.",
+
+    url: "/about",
+  },
+};
+
 
 export default function AboutPage() {
   return (
@@ -62,7 +85,7 @@ export default function AboutPage() {
               </div>
 
               <div className="mt-10">
-                <a
+                <Link
                   href="/portfolio/semi-realism"
                   className="
                     inline-flex items-center gap-2
@@ -78,7 +101,7 @@ export default function AboutPage() {
                   "
                 >
                   Start a commission
-                </a>
+                </Link>
               </div>
             </div>
           </div>

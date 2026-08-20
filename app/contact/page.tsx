@@ -1,4 +1,25 @@
+import type { Metadata } from "next";
 import ContactForm from '@/components/contact/ContactForm';
+
+export const metadata: Metadata = {
+  title: "Fantasy Art Commissions",
+
+  description:
+    "Contact Fefierys to request a custom fantasy illustration, character artwork, book art, chibi, emote, or other digital art commission.",
+
+  alternates: {
+    canonical: "/contact",
+  },
+
+  openGraph: {
+    title: "Fantasy Art Commissions | Fefierys",
+
+    description:
+      "Request a custom fantasy illustration, character artwork, book art, chibi, emote, or digital art commission from Fefierys.",
+
+    url: "/contact",
+  },
+};
 
 interface ContactPageProps {
   searchParams: Promise<{
