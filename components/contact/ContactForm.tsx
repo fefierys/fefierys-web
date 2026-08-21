@@ -25,6 +25,15 @@ export default function ContactForm({
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [message, setMessage] = useState(initialMessage);
+
+  /*
+   * Honeypot.
+   *
+   * Los usuarios reales no ven ni rellenan este campo.
+   * Muchos bots intentan completar todos los inputs.
+   */
+  const [website, setWebsite] = useState('');
+
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
 
@@ -47,40 +56,82 @@ export default function ContactForm({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-
     const nameRegex = /^[a-zA-ZÀ-ÿ\s'-]{2,}$/;
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+    const normalizedName = name.trim();
+    const normalizedEmail = email.trim();
+    const normalizedMessage = message.trim();
 
-    if (!name.trim()) {
+
+    /*
+     * ============================================================
+     * NAME
+     * ============================================================
+     */
+
+    if (!normalizedName) {
       setError('Please enter your name.');
       return;
     }
 
+    if (normalizedName.length > 100) {
+      setError('Your name is too long.');
+      return;
+    }
 
-    if (!nameRegex.test(name.trim())) {
+    if (!nameRegex.test(normalizedName)) {
       setError('Please enter a valid name.');
       return;
     }
 
 
-    if (!email.trim()) {
+    /*
+     * ============================================================
+     * EMAIL
+     * ============================================================
+     */
+
+    if (!normalizedEmail) {
       setError('Please enter your email.');
       return;
     }
 
+    if (normalizedEmail.length > 254) {
+      setError('Your email address is too long.');
+      return;
+    }
 
-    if (!emailRegex.test(email.trim())) {
+    if (!emailRegex.test(normalizedEmail)) {
       setError('Please enter a valid email address.');
       return;
     }
 
 
-    if (!message.trim()) {
+    /*
+     * ============================================================
+     * MESSAGE
+     * ============================================================
+     */
+
+    if (!normalizedMessage) {
       setError('Please tell me about your project.');
       return;
     }
 
+    if (normalizedMessage.length > 5000) {
+      setError(
+        'Your project message is too long. Please keep it under 5000 characters.'
+      );
+      return;
+    }
+
+
+    /*
+     * ============================================================
+     * TERMS
+     * ============================================================
+     */
 
     if (!termsAccepted) {
       setError(
@@ -97,17 +148,25 @@ export default function ContactForm({
     try {
       const response = await fetch('/api/contact', {
         method: 'POST',
+
         headers: {
           'Content-Type': 'application/json',
         },
+
         body: JSON.stringify({
-          name,
-          email,
-          message,
+          name: normalizedName,
+          email: normalizedEmail,
+          message: normalizedMessage,
+
           style,
           collection,
           category,
           option,
+
+          /*
+           * Honeypot.
+           */
+          website,
         }),
       });
 
@@ -139,15 +198,60 @@ export default function ContactForm({
 
   return (
     <>
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form
+        onSubmit={handleSubmit}
+        noValidate
+        className="space-y-5"
+      >
+
+        {/* ======================================================
+            HONEYPOT
+        ====================================================== */}
+
+        <div
+          aria-hidden="true"
+          className="
+            absolute
+            -left-[9999px]
+            top-auto
+            h-px
+            w-px
+            overflow-hidden
+          "
+        >
+          <label htmlFor="website">
+            Website
+          </label>
+
+          <input
+            id="website"
+            name="website"
+            type="text"
+            value={website}
+            tabIndex={-1}
+            autoComplete="off"
+            onChange={(e) =>
+              setWebsite(e.target.value)
+            }
+          />
+        </div>
+
+
+        {/* ======================================================
+            NAME
+        ====================================================== */}
 
         <input
           type="text"
           placeholder="Your name"
           value={name}
           required
+          maxLength={100}
           autoComplete="name"
-          onChange={(e) => setName(e.target.value)}
+          onChange={(e) => {
+            setName(e.target.value);
+            setError('');
+          }}
           className="
             w-full rounded-2xl border border-white/10 bg-[#5966A5]/55
             px-5 py-4 text-white placeholder:text-white/50
@@ -155,14 +259,22 @@ export default function ContactForm({
           "
         />
 
+
+        {/* ======================================================
+            EMAIL
+        ====================================================== */}
 
         <input
           type="email"
           placeholder="Your email"
           value={email}
           required
+          maxLength={254}
           autoComplete="email"
-          onChange={(e) => setEmail(e.target.value)}
+          onChange={(e) => {
+            setEmail(e.target.value);
+            setError('');
+          }}
           className="
             w-full rounded-2xl border border-white/10 bg-[#5966A5]/55
             px-5 py-4 text-white placeholder:text-white/50
@@ -171,11 +283,19 @@ export default function ContactForm({
         />
 
 
+        {/* ======================================================
+            MESSAGE
+        ====================================================== */}
+
         <textarea
           rows={8}
           value={message}
           required
-          onChange={(e) => setMessage(e.target.value)}
+          maxLength={5000}
+          onChange={(e) => {
+            setMessage(e.target.value);
+            setError('');
+          }}
           placeholder="Tell me about your project..."
           className="
             w-full rounded-2xl border border-white/10 bg-[#5966A5]/55
@@ -185,13 +305,21 @@ export default function ContactForm({
         />
 
 
-        {/* Terms & Conditions */}
+        {/* ======================================================
+            TERMS & CONDITIONS
+        ====================================================== */}
+
         <label className="flex items-start gap-3 text-sm text-white">
 
           <input
             type="checkbox"
             checked={termsAccepted}
-            onChange={(e) => setTermsAccepted(e.target.checked)}
+            onChange={(e) => {
+              setTermsAccepted(
+                e.target.checked
+              );
+              setError('');
+            }}
             className="
               mt-1
               h-4
@@ -209,7 +337,9 @@ export default function ContactForm({
 
             <button
               type="button"
-              onClick={() => setTermsOpen(true)}
+              onClick={() =>
+                setTermsOpen(true)
+              }
               className="
                 underline
                 decoration-white/40
@@ -227,11 +357,18 @@ export default function ContactForm({
         </label>
 
 
+        {/* ======================================================
+            SUBMIT
+        ====================================================== */}
+
         <div className="flex justify-center md:justify-start">
 
           <button
             type="submit"
-            disabled={sending || !termsAccepted}
+            disabled={
+              sending ||
+              !termsAccepted
+            }
             className="
               rounded-full
               border
@@ -256,12 +393,17 @@ export default function ContactForm({
               disabled:cursor-not-allowed
             "
           >
-            {sending ? 'Sending...' : 'Send inquiry'}
-
+            {sending
+              ? 'Sending...'
+              : 'Send inquiry'}
           </button>
 
         </div>
 
+
+        {/* ======================================================
+            ERROR
+        ====================================================== */}
 
         {error && (
           <p className="text-sm text-red-300">
@@ -272,10 +414,16 @@ export default function ContactForm({
       </form>
 
 
+      {/* ========================================================
+          TERMS MODAL
+      ======================================================== */}
+
       {termsOpen && (
         <TermsModal
           open={termsOpen}
-          onClose={() => setTermsOpen(false)}
+          onClose={() =>
+            setTermsOpen(false)
+          }
         />
       )}
 
