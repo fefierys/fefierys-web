@@ -14,6 +14,8 @@ const lexend = Lexend({
   variable: "--font-lexend",
 });
 
+const isQa = process.env.NEXT_PUBLIC_APP_ENV === "qa";
+
 export const metadata: Metadata = {
   metadataBase: new URL("https://fefierys.com"),
 
@@ -51,18 +53,28 @@ export const metadata: Metadata = {
     images: ["/og-image.jpg"],
   },
 
-  robots: {
-    index: true,
-    follow: true,
+  robots: isQa
+    ? {
+        index: false,
+        follow: false,
 
-    googleBot: {
-      index: true,
-      follow: true,
-      "max-image-preview": "large",
-      "max-snippet": -1,
-      "max-video-preview": -1,
-    },
-  },
+        googleBot: {
+          index: false,
+          follow: false,
+        },
+      }
+    : {
+        index: true,
+        follow: true,
+
+        googleBot: {
+          index: true,
+          follow: true,
+          "max-image-preview": "large",
+          "max-snippet": -1,
+          "max-video-preview": -1,
+        },
+      },
 };
 
 export default function RootLayout({
@@ -74,6 +86,21 @@ export default function RootLayout({
     <html lang="en" data-scroll-behavior="smooth">
       <body className={`${lexend.variable} font-lexend`}>
         <Background />
+
+        {isQa && (
+          <div
+            className="
+              pointer-events-none fixed left-1/2 top-2 z-[9999]
+              -translate-x-1/2 rounded-full
+              border border-amber-300/40 bg-black/80
+              px-4 py-1.5 text-xs font-semibold
+              tracking-[0.18em] text-amber-200
+              shadow-lg backdrop-blur-md
+            "
+          >
+            QA ENVIRONMENT
+          </div>
+        )}
 
         <Navbar />
 
