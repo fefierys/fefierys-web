@@ -1,12 +1,28 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { motion } from 'framer-motion';
 
-import { PortfolioData } from '@/data/portfolio/types';
-import { commissions } from '@/data/portfolio/commissions';
+import {
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
+
+import {
+  useRouter,
+} from 'next/navigation';
+
+import {
+  motion,
+} from 'framer-motion';
+
+import type {
+  PortfolioData,
+} from '@/data/portfolio/types';
+
+import {
+  commissions,
+} from '@/data/portfolio/commissions';
 
 import ArtworkGrid from './ArtworkGrid';
 
@@ -17,112 +33,254 @@ const CommissionModal = dynamic(
 interface PortfolioCategoryProps {
   data: PortfolioData;
   slug?: string[];
+
+  /*
+   * Transitional option.
+   *
+   * true:
+   * Collection only opens its Categories.
+   * URL/content do not change until a
+   * Category is selected.
+   *
+   * false:
+   * Preserve the previous behaviour used
+   * temporarily by portfolio sections that
+   * have not migrated to Overview yet.
+   */
+  exploreCollectionsLocally?: boolean;
 }
 
 export default function PortfolioCategory({
   data,
   slug,
+  exploreCollectionsLocally = false,
 }: PortfolioCategoryProps) {
   const router = useRouter();
 
   /*
-   * URL:
+   * ============================================================
+   * URL
+   * ============================================================
    *
    * /portfolio/semi-realism/general/ref-sheets
    *
    * slug[0] = general
    * slug[1] = ref-sheets
    *
-   * Y si hay artwork:
+   * Artwork:
    *
-   * /portfolio/semi-realism/general/ref-sheets/elf-character-dnd-ref-sheet-essentials
+   * /portfolio/semi-realism/general/ref-sheets/artwork-slug
    *
-   * slug[2] = elf-character-dnd-ref-sheet-essentials
+   * slug[2] = artwork-slug
    */
-  const groupSlug = slug?.[0];
-  const categorySlug = slug?.[1];
-  const artworkSlug = slug?.[2];
+
+  const groupSlug =
+    slug?.[0];
+
+  const categorySlug =
+    slug?.[1];
+
+  const artworkSlug =
+    slug?.[2];
 
   /*
-   * COLLECTION seleccionada
+   * ============================================================
+   * ACTIVE GROUP
+   * ============================================================
+   *
+   * Este es el Group del contenido REAL
+   * representado por la URL.
+   *
+   * El fallback al índice 0 se conserva
+   * temporalmente porque Stylized/Chibis
+   * todavía pueden usar PortfolioCategory
+   * directamente en sus páginas raíz.
    */
-  const foundGroupIndex = data.groups.findIndex(
-    (group) => group.slug === groupSlug
-  );
 
-  const selectedGroupIndex =
+  const foundGroupIndex =
+    data.groups.findIndex(
+      (group) =>
+        group.slug ===
+        groupSlug
+    );
+
+  const activeGroupIndex =
     foundGroupIndex === -1
       ? 0
       : foundGroupIndex;
 
-  const selectedGroup =
-    data.groups[selectedGroupIndex];
+  const activeGroup =
+    data.groups[
+      activeGroupIndex
+    ];
 
   /*
-   * CATEGORY seleccionada
+   * ============================================================
+   * ACTIVE CATEGORY
+   * ============================================================
+   *
+   * Esta es la Category del contenido REAL
+   * representado por la URL.
    */
+
   const foundSubcategoryIndex =
-    selectedGroup.subcategories.findIndex(
+    activeGroup.subcategories.findIndex(
       (subcategory) =>
-        subcategory.slug === categorySlug
+        subcategory.slug ===
+        categorySlug
     );
 
-  const selectedSubcategoryIndex =
+  const activeSubcategoryIndex =
     foundSubcategoryIndex === -1
       ? 0
       : foundSubcategoryIndex;
 
-  const selectedSubcategory =
-    selectedGroup.subcategories[
-      selectedSubcategoryIndex
+  const activeSubcategory =
+    activeGroup.subcategories[
+      activeSubcategoryIndex
     ];
 
   /*
-   * Estado del modal de comisión
+   * ============================================================
+   * OPEN GROUP
+   * ============================================================
+   *
+   * Este estado NO representa el contenido.
+   *
+   * Solo representa qué Collection está
+   * explorando actualmente el usuario.
+   *
+   * Ej:
+   *
+   * URL:
+   * /book-art/covers
+   *
+   * activeGroup = book-art
+   *
+   * click GENERAL:
+   *
+   * openGroup = general
+   * activeGroup = book-art
+   *
+   * Covers continúa siendo el contenido real.
    */
-  const [commissionOpen, setCommissionOpen] =
-    useState(false);
+
+  const [
+    openGroupSlug,
+    setOpenGroupSlug,
+  ] = useState(
+    activeGroup.slug
+  );
+
+  const openGroup =
+    data.groups.find(
+      (group) =>
+        group.slug ===
+        openGroupSlug
+    ) ?? activeGroup;
+
+  /*
+   * ============================================================
+   * COMMISSION MODAL
+   * ============================================================
+   */
+
+  const [
+    commissionOpen,
+    setCommissionOpen,
+  ] = useState(false);
 
   useEffect(() => {
     if (commissionOpen) {
-      document.body.style.overflow = 'hidden';
+      document.body.style.overflow =
+        'hidden';
     } else {
-      document.body.style.overflow = '';
+      document.body.style.overflow =
+        '';
     }
 
     return () => {
-      document.body.style.overflow = '';
+      document.body.style.overflow =
+        '';
     };
   }, [commissionOpen]);
 
   /*
-   * Comisión asociada a la categoría actual
-   */
-  const commission =
-    commissions[selectedSubcategory.id];
-
-  /*
-   * Punto al que vuelve el scroll al cambiar
-   * de página dentro de ArtworkGrid.
-   */
-  const commissionButtonRef =
-    useRef<HTMLDivElement | null>(null);
-
-  /*
-   * Cambiar COLLECTION
+   * ============================================================
+   * ACTIVE COMMISSION
+   * ============================================================
    *
-   * Al cambiar de colección entramos a su
-   * primera subcategoría.
+   * Siempre pertenece al contenido REAL,
+   * no a la Collection que el usuario
+   * esté explorando temporalmente.
    */
-  function changeGroup(index: number) {
-    const group = data.groups[index];
 
-    if (!group) return;
+  const commission =
+    commissions[
+      activeSubcategory.id
+    ];
+
+  /*
+   * ============================================================
+   * PAGINATION SCROLL TARGET
+   * ============================================================
+   */
+
+  const commissionButtonRef =
+    useRef<HTMLDivElement | null>(
+      null
+    );
+
+  /*
+   * ============================================================
+   * CHANGE COLLECTION
+   * ============================================================
+   */
+
+  function changeGroup(
+    index: number
+  ) {
+    const group =
+      data.groups[index];
+
+    if (!group) {
+      return;
+    }
+
+    /*
+     * NEW BEHAVIOUR:
+     *
+     * Solo abrimos las Categories.
+     *
+     * No URL.
+     * No gallery change.
+     * No automatic Category.
+     */
+
+    if (
+      exploreCollectionsLocally
+    ) {
+      setOpenGroupSlug(
+        group.slug
+      );
+
+      return;
+    }
+
+    /*
+     * LEGACY BEHAVIOUR:
+     *
+     * Se mantiene temporalmente para
+     * las secciones que todavía no han
+     * migrado al nuevo Overview.
+     */
 
     const firstSubcategory =
       group.subcategories[0];
 
-    if (!firstSubcategory) return;
+    if (!firstSubcategory) {
+      return;
+    }
 
     router.replace(
       `/portfolio/${data.slug}/${group.slug}/${firstSubcategory.slug}`
@@ -130,47 +288,74 @@ export default function PortfolioCategory({
   }
 
   /*
-   * Cambiar CATEGORY
+   * ============================================================
+   * CHANGE CATEGORY
+   * ============================================================
+   *
+   * Aquí SÍ cambia:
+   *
+   * - URL
+   * - gallery
+   * - active Collection
+   * - active Category
+   * - Commission
    */
+
   function changeSubcategory(
     subcategorySlug: string
   ) {
     router.replace(
-      `/portfolio/${data.slug}/${selectedGroup.slug}/${subcategorySlug}`
+      `/portfolio/${data.slug}/${openGroup.slug}/${subcategorySlug}`
     );
   }
 
   /*
-   * Scroll hacia botón de comisión.
+   * ============================================================
+   * SCROLL TO COMMISSION
+   * ============================================================
    */
-  const scrollToCommission = () => {
-    if (!commissionButtonRef.current) return;
 
-    const navbarOffset = 100;
+  const scrollToCommission =
+    () => {
+      if (
+        !commissionButtonRef.current
+      ) {
+        return;
+      }
 
-    const y =
-      commissionButtonRef.current
-        .getBoundingClientRect().top +
-      window.scrollY -
-      navbarOffset;
+      const navbarOffset =
+        100;
 
-    window.scrollTo({
-      top: y,
-      behavior: 'smooth',
-    });
-  };
+      const y =
+        commissionButtonRef.current
+          .getBoundingClientRect()
+          .top +
+        window.scrollY -
+        navbarOffset;
+
+      window.scrollTo({
+        top: y,
+        behavior: 'smooth',
+      });
+    };
 
   return (
     <>
       <section className="min-h-screen px-6 py-24 md:py-32">
         <div className="mx-auto max-w-6xl text-white">
 
-          {/* TÍTULO */}
+          {/* ==================================================
+              TITLE
+          ================================================== */}
+
           <h1 className="mb-12 text-center text-3xl font-light md:mb-16 md:text-5xl">
             {data.title}
           </h1>
 
-          {/* COLLECTION */}
+          {/* ==================================================
+              COLLECTION
+          ================================================== */}
+
           <div className="mb-8 flex flex-col items-center">
             <p className="mb-3 text-[11px] uppercase tracking-[0.22em] text-white/45">
               Collection
@@ -178,61 +363,94 @@ export default function PortfolioCategory({
 
             <div className="flex flex-wrap justify-center gap-6 md:gap-16">
               {data.groups.map(
-                (group, index) => (
-                  <button
-                    type="button"
-                    key={group.id}
-                    onClick={() =>
-                      changeGroup(index)
-                    }
-                    className="
-                      relative
-                      pb-2
-                      text-sm
-                      uppercase
-                      tracking-[0.16em]
-                      transition-colors
-                      duration-300
-                      md:text-lg
-                    "
-                  >
-                    <span
-                      className={
-                        selectedGroupIndex ===
-                        index
-                          ? 'text-white'
-                          : 'text-white/45 hover:text-white'
-                      }
-                    >
-                      {group.title}
-                    </span>
+                (
+                  group,
+                  index
+                ) => {
+                  /*
+                   * En el nuevo modo mostramos
+                   * como abierta la Collection que
+                   * el usuario está explorando.
+                   *
+                   * En el modo anterior mostramos
+                   * la Collection real de la URL.
+                   */
 
-                    {selectedGroupIndex ===
-                      index && (
-                      <motion.div
-                        layoutId="group-underline"
-                        className="
-                          absolute
-                          left-0
-                          right-0
-                          -bottom-0.5
-                          h-px
-                          bg-white
-                        "
-                        transition={{
-                          type: 'spring',
-                          stiffness: 500,
-                          damping: 40,
-                        }}
-                      />
-                    )}
-                  </button>
-                )
+                  const isOpen =
+                    exploreCollectionsLocally
+                      ? openGroup.slug ===
+                        group.slug
+                      : activeGroupIndex ===
+                        index;
+
+                  return (
+                    <button
+                      type="button"
+                      key={
+                        group.id
+                      }
+                      onClick={() =>
+                        changeGroup(
+                          index
+                        )
+                      }
+                      className="
+                        relative
+                        pb-2
+
+                        text-sm
+                        uppercase
+                        tracking-[0.16em]
+
+                        transition-colors
+                        duration-300
+
+                        md:text-lg
+                      "
+                    >
+                      <span
+                        className={
+                          isOpen
+                            ? 'text-white'
+                            : 'text-white/45 hover:text-white'
+                        }
+                      >
+                        {
+                          group.title
+                        }
+                      </span>
+
+                      {isOpen && (
+                        <motion.div
+                          layoutId="group-underline"
+                          className="
+                            absolute
+                            left-0
+                            right-0
+                            -bottom-0.5
+                            h-px
+                            bg-white
+                          "
+                          transition={{
+                            type: 'spring',
+                            stiffness:
+                              500,
+                            damping:
+                              40,
+                          }}
+                        />
+                      )}
+                    </button>
+                  );
+                }
               )}
             </div>
           </div>
 
-          {/* CATEGORY */}
+          {/* ==================================================
+              CATEGORY
+          ================================================== */}
+
           <div className="mb-14 flex flex-col items-center md:mb-20">
             <p className="mb-3 text-[11px] uppercase tracking-[0.22em] text-white/45">
               Category
@@ -247,96 +465,150 @@ export default function PortfolioCategory({
                 md:gap-8
               "
             >
-              {selectedGroup.subcategories.map(
-                (subcategory, index) => (
-                  <button
-                    type="button"
-                    key={subcategory.id}
-                    onClick={() =>
-                      changeSubcategory(
-                        subcategory.slug
-                      )
-                    }
-                    className="
-                      relative
-                      pb-2
-                      text-[11px]
-                      uppercase
-                      tracking-[0.15em]
-                      transition-colors
-                      duration-300
-                      md:text-sm
-                    "
-                  >
-                    <span
-                      className={
-                        selectedSubcategoryIndex ===
-                        index
-                          ? 'text-white'
-                          : 'text-white/50 hover:text-white'
-                      }
-                    >
-                      {subcategory.title}
-                    </span>
+              {openGroup
+                .subcategories
+                .map(
+                  (
+                    subcategory
+                  ) => {
+                    /*
+                     * Solo marcamos una Category
+                     * cuando la Collection abierta
+                     * es también la Collection REAL
+                     * del contenido.
+                     *
+                     * Ej:
+                     *
+                     * Estamos en BOOK ART / COVERS
+                     * y abrimos GENERAL:
+                     *
+                     * ninguna Category de GENERAL
+                     * queda marcada.
+                     */
 
-                    {selectedSubcategoryIndex ===
-                      index && (
-                      <motion.div
-                        layoutId="subcategory-underline"
+                    const isActive =
+                      openGroup.slug ===
+                        activeGroup.slug &&
+                      subcategory.slug ===
+                        activeSubcategory.slug;
+
+                    return (
+                      <button
+                        type="button"
+                        key={
+                          subcategory.id
+                        }
+                        onClick={() =>
+                          changeSubcategory(
+                            subcategory.slug
+                          )
+                        }
                         className="
-                          absolute
-                          left-0
-                          right-0
-                          -bottom-0.5
-                          h-px
-                          bg-white
+                          relative
+                          pb-2
+
+                          text-[11px]
+                          uppercase
+                          tracking-[0.15em]
+
+                          transition-colors
+                          duration-300
+
+                          md:text-sm
                         "
-                        transition={{
-                          type: 'spring',
-                          stiffness: 500,
-                          damping: 40,
-                        }}
-                      />
-                    )}
-                  </button>
-                )
-              )}
+                      >
+                        <span
+                          className={
+                            isActive
+                              ? 'text-white'
+                              : 'text-white/50 hover:text-white'
+                          }
+                        >
+                          {
+                            subcategory.title
+                          }
+                        </span>
+
+                        {isActive && (
+                          <motion.div
+                            layoutId="subcategory-underline"
+                            className="
+                              absolute
+                              left-0
+                              right-0
+                              -bottom-0.5
+                              h-px
+                              bg-white
+                            "
+                            transition={{
+                              type:
+                                'spring',
+                              stiffness:
+                                500,
+                              damping:
+                                40,
+                            }}
+                          />
+                        )}
+                      </button>
+                    );
+                  }
+                )}
             </div>
           </div>
 
-          {/* BOTÓN DE COMISIÓN */}
+          {/* ==================================================
+              COMMISSION BUTTON
+
+              Sigue perteneciendo a la Category
+              REAL actualmente cargada.
+          ================================================== */}
+
           {commission && (
             <div
-              ref={commissionButtonRef}
+              ref={
+                commissionButtonRef
+              }
               className="mb-10 flex justify-center md:mb-12 md:justify-end"
             >
               <button
                 type="button"
                 onClick={() =>
-                  setCommissionOpen(true)
+                  setCommissionOpen(
+                    true
+                  )
                 }
                 className="
                   group
                   inline-flex
                   w-full
                   max-w-sm
+
                   items-center
                   justify-center
                   gap-2
+
                   rounded-full
+
                   border
                   border-white/20
+
                   bg-white/10
+
                   px-5
                   py-3
+
                   text-xs
                   uppercase
                   tracking-[0.18em]
                   text-white
+
                   transition
                   duration-300
+
                   hover:bg-white
                   hover:text-[#2f3558]
+
                   md:w-auto
                 "
               >
@@ -355,11 +627,22 @@ export default function PortfolioCategory({
             </div>
           )}
 
-          {/* GALERÍA */}
-          <div key={selectedSubcategory.id}>
+          {/* ==================================================
+              GALLERY
+
+              Siempre utiliza la Category REAL,
+              independientemente de qué Collection
+              esté abierta en el menú.
+          ================================================== */}
+
+          <div
+            key={
+              activeSubcategory.id
+            }
+          >
             <ArtworkGrid
               artworks={
-                selectedSubcategory.artworks
+                activeSubcategory.artworks
               }
               scrollTargetRef={
                 scrollToCommission
@@ -371,31 +654,45 @@ export default function PortfolioCategory({
                 data.slug
               }
               groupSlug={
-                selectedGroup.slug
+                activeGroup.slug
               }
               categorySlug={
-                selectedSubcategory.slug
+                activeSubcategory.slug
               }
             />
           </div>
+
         </div>
       </section>
 
-      {/* MODAL DE COMISIÓN */}
+      {/* ====================================================
+          COMMISSION MODAL
+      ==================================================== */}
+
       {commission && (
         <CommissionModal
-          key={commission.id}
-          open={commissionOpen}
-          onClose={() =>
-            setCommissionOpen(false)
+          key={
+            commission.id
           }
-          commission={commission}
-          styleTitle={data.title}
+          open={
+            commissionOpen
+          }
+          onClose={() =>
+            setCommissionOpen(
+              false
+            )
+          }
+          commission={
+            commission
+          }
+          styleTitle={
+            data.title
+          }
           collectionTitle={
-            selectedGroup.title
+            activeGroup.title
           }
           categoryTitle={
-            selectedSubcategory.title
+            activeSubcategory.title
           }
         />
       )}

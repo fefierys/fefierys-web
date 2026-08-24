@@ -1,14 +1,21 @@
-import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import type {
+  Metadata,
+} from "next";
+
+import {
+  notFound,
+} from "next/navigation";
 
 import PortfolioCategory from "@/components/portfolio/PortfolioCategory";
-import { semiRealism } from "@/data/portfolio/semiRealism";
 
 import {
   generatePortfolioMetadata,
   resolvePortfolioRoute,
 } from "@/lib/seo/portfolioMetadata";
 
+import {
+  getPortfolioSectionBySlug,
+} from "@/lib/repositories/portfolioRepository";
 
 interface SemiRealismSlugPageProps {
   params: Promise<{
@@ -16,15 +23,43 @@ interface SemiRealismSlugPageProps {
   }>;
 }
 
+/*
+ * ============================================================
+ * PORTFOLIO DATA
+ * ============================================================
+ */
+
+async function getSemiRealismPortfolio() {
+  const data =
+    await getPortfolioSectionBySlug(
+      "semi-realism"
+    );
+
+  if (!data) {
+    notFound();
+  }
+
+  return data;
+}
+
+/*
+ * ============================================================
+ * METADATA
+ * ============================================================
+ */
 
 export async function generateMetadata({
   params,
 }: SemiRealismSlugPageProps): Promise<Metadata> {
+  const {
+    slug,
+  } = await params;
 
-  const { slug } = await params;
+  const data =
+    await getSemiRealismPortfolio();
 
   return generatePortfolioMetadata(
-    semiRealism,
+    data,
     slug,
     {
       portfolioLabel:
@@ -50,29 +85,65 @@ export async function generateMetadata({
   );
 }
 
+/*
+ * ============================================================
+ * PAGE
+ * ============================================================
+ */
 
 export default async function SemiRealismSlugPage({
   params,
 }: SemiRealismSlugPageProps) {
+  const {
+    slug,
+  } = await params;
 
-  const { slug } = await params;
+  const data =
+    await getSemiRealismPortfolio();
 
   const resolved =
     resolvePortfolioRoute(
-      semiRealism,
+      data,
       slug
     );
 
   if (
-    resolved.type === "invalid"
+    resolved.type ===
+    "invalid"
   ) {
     notFound();
   }
 
+  /*
+   * Important:
+   *
+   * The key only contains:
+   *
+   * group/category
+   *
+   * NOT artwork.
+   *
+   * This resets the locally opened Collection
+   * when the actual Category changes while
+   * preserving ArtworkGrid/Lightbox behaviour
+   * inside the same Category.
+   */
+
+  const categoryKey =
+    `${slug[0] ?? ""}/${slug[1] ?? ""}`;
+
   return (
     <PortfolioCategory
-      data={semiRealism}
-      slug={slug}
+      key={
+        categoryKey
+      }
+      data={
+        data
+      }
+      slug={
+        slug
+      }
+      exploreCollectionsLocally
     />
   );
 }

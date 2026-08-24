@@ -23,8 +23,12 @@ interface ArtworkGridProps {
   initialArtworkSlug?: string;
 
   portfolioSlug: string;
-  groupSlug: string;
-  categorySlug: string;
+  groupSlug?: string;
+  categorySlug?: string;
+
+  getArtworkHref?: (
+    artwork: Artwork
+  ) => string | null;
 }
 
 export default function ArtworkGrid({
@@ -34,6 +38,7 @@ export default function ArtworkGrid({
   portfolioSlug,
   groupSlug,
   categorySlug,
+  getArtworkHref,
 }: ArtworkGridProps) {
   const router = useRouter();
 
@@ -236,7 +241,9 @@ export default function ArtworkGrid({
    */
 
   const categoryUrl =
-    `/portfolio/${portfolioSlug}/${groupSlug}/${categorySlug}`;
+    groupSlug && categorySlug
+      ? `/portfolio/${portfolioSlug}/${groupSlug}/${categorySlug}`
+      : null;
 
   /*
    * ============================================================
@@ -296,6 +303,33 @@ export default function ArtworkGrid({
       return;
     }
 
+    /*
+    * Overview:
+    *
+    * Cada artwork puede pertenecer
+    * a una categoría distinta.
+    *
+    * Entramos directamente en su URL real.
+    */
+    const directHref =
+      getArtworkHref?.(artwork);
+
+    if (directHref) {
+      router.push(directHref);
+
+      return;
+    }
+
+    /*
+    * Category:
+    *
+    * Conservamos el comportamiento
+    * actual del lightbox.
+    */
+    if (!categoryUrl) {
+      return;
+    }
+
     router.replace(
       `${categoryUrl}/${artwork.slug}`,
       {
@@ -352,6 +386,10 @@ export default function ArtworkGrid({
       newPage
     );
 
+    if (!categoryUrl) {
+      return;
+    }
+
     router.replace(
       `${categoryUrl}/${newArtwork.slug}`,
       {
@@ -381,6 +419,10 @@ export default function ArtworkGrid({
         setCurrentPage(
           selectedArtworkPage
         );
+      }
+
+      if (!categoryUrl) {
+        return;
       }
 
       router.replace(
@@ -446,7 +488,8 @@ export default function ArtworkGrid({
                       : itemVariants
                   }
                   key={
-                    artwork.id
+                    getArtworkHref?.(artwork) ??
+                    artwork.slug
                   }
                   onClick={() =>
                     handleArtworkClick(
