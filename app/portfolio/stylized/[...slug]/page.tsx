@@ -1,14 +1,21 @@
-import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import type {
+  Metadata,
+} from "next";
+
+import {
+  notFound,
+} from "next/navigation";
 
 import PortfolioCategory from "@/components/portfolio/PortfolioCategory";
-import { stylized } from "@/data/portfolio/stylized";
 
 import {
   generatePortfolioMetadata,
   resolvePortfolioRoute,
 } from "@/lib/seo/portfolioMetadata";
 
+import {
+  getPortfolioSectionBySlug,
+} from "@/lib/repositories/portfolioRepository";
 
 interface StylizedSlugPageProps {
   params: Promise<{
@@ -16,15 +23,43 @@ interface StylizedSlugPageProps {
   }>;
 }
 
+/*
+ * ============================================================
+ * PORTFOLIO DATA
+ * ============================================================
+ */
+
+async function getStylizedPortfolio() {
+  const data =
+    await getPortfolioSectionBySlug(
+      "stylized"
+    );
+
+  if (!data) {
+    notFound();
+  }
+
+  return data;
+}
+
+/*
+ * ============================================================
+ * METADATA
+ * ============================================================
+ */
 
 export async function generateMetadata({
   params,
 }: StylizedSlugPageProps): Promise<Metadata> {
+  const {
+    slug,
+  } = await params;
 
-  const { slug } = await params;
+  const data =
+    await getStylizedPortfolio();
 
   return generatePortfolioMetadata(
-    stylized,
+    data,
     slug,
     {
       portfolioLabel:
@@ -50,29 +85,58 @@ export async function generateMetadata({
   );
 }
 
+/*
+ * ============================================================
+ * PAGE
+ * ============================================================
+ */
 
 export default async function StylizedSlugPage({
   params,
 }: StylizedSlugPageProps) {
+  const {
+    slug,
+  } = await params;
 
-  const { slug } = await params;
+  const data =
+    await getStylizedPortfolio();
 
   const resolved =
     resolvePortfolioRoute(
-      stylized,
+      data,
       slug
     );
 
   if (
-    resolved.type === "invalid"
+    resolved.type ===
+    "invalid"
   ) {
     notFound();
   }
 
+  /*
+   * Only Group + Category.
+   *
+   * Artwork is intentionally excluded so
+   * opening/changing the Lightbox does not
+   * remount the whole category.
+   */
+
+  const categoryKey =
+    `${slug[0] ?? ""}/${slug[1] ?? ""}`;
+
   return (
     <PortfolioCategory
-      data={stylized}
-      slug={slug}
+      key={
+        categoryKey
+      }
+      data={
+        data
+      }
+      slug={
+        slug
+      }
+      exploreCollectionsLocally
     />
   );
 }

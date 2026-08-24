@@ -1,14 +1,21 @@
-import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import type {
+  Metadata,
+} from "next";
+
+import {
+  notFound,
+} from "next/navigation";
 
 import PortfolioCategory from "@/components/portfolio/PortfolioCategory";
-import { chibis } from "@/data/portfolio/chibis";
 
 import {
   generatePortfolioMetadata,
   resolvePortfolioRoute,
 } from "@/lib/seo/portfolioMetadata";
 
+import {
+  getPortfolioSectionBySlug,
+} from "@/lib/repositories/portfolioRepository";
 
 interface ChibisSlugPageProps {
   params: Promise<{
@@ -16,15 +23,43 @@ interface ChibisSlugPageProps {
   }>;
 }
 
+/*
+ * ============================================================
+ * PORTFOLIO DATA
+ * ============================================================
+ */
+
+async function getChibisPortfolio() {
+  const data =
+    await getPortfolioSectionBySlug(
+      "chibis-emotes"
+    );
+
+  if (!data) {
+    notFound();
+  }
+
+  return data;
+}
+
+/*
+ * ============================================================
+ * METADATA
+ * ============================================================
+ */
 
 export async function generateMetadata({
   params,
 }: ChibisSlugPageProps): Promise<Metadata> {
+  const {
+    slug,
+  } = await params;
 
-  const { slug } = await params;
+  const data =
+    await getChibisPortfolio();
 
   return generatePortfolioMetadata(
-    chibis,
+    data,
     slug,
     {
       portfolioLabel:
@@ -50,29 +85,58 @@ export async function generateMetadata({
   );
 }
 
+/*
+ * ============================================================
+ * PAGE
+ * ============================================================
+ */
 
 export default async function ChibisSlugPage({
   params,
 }: ChibisSlugPageProps) {
+  const {
+    slug,
+  } = await params;
 
-  const { slug } = await params;
+  const data =
+    await getChibisPortfolio();
 
   const resolved =
     resolvePortfolioRoute(
-      chibis,
+      data,
       slug
     );
 
   if (
-    resolved.type === "invalid"
+    resolved.type ===
+    "invalid"
   ) {
     notFound();
   }
 
+  /*
+   * Only Group + Category.
+   *
+   * Artwork is intentionally excluded so
+   * opening/changing the Lightbox does not
+   * remount the whole category.
+   */
+
+  const categoryKey =
+    `${slug[0] ?? ""}/${slug[1] ?? ""}`;
+
   return (
     <PortfolioCategory
-      data={chibis}
-      slug={slug}
+      key={
+        categoryKey
+      }
+      data={
+        data
+      }
+      slug={
+        slug
+      }
+      exploreCollectionsLocally
     />
   );
 }

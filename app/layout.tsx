@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Lexend } from "next/font/google";
 
-import Navbar from "@/components/Navbar";
+import NavbarServer from '@/components/NavbarServer';
 import Footer from "@/components/Footer";
 import Background from "@/components/Background";
 
@@ -102,7 +102,7 @@ export default function RootLayout({
           </div>
         )}
 
-        <Navbar />
+        <NavbarServer />
 
         {children}
 
