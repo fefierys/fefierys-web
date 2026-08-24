@@ -8,9 +8,49 @@ import {
   portfolioSections as staticPortfolioSections,
 } from "../data/portfolio";
 
+import type {
+  PortfolioData,
+} from "../data/portfolio/types";
+
 config({
   path: ".env.local",
 });
+
+function normalizeStaticPortfolio(
+  data: PortfolioData
+): PortfolioData {
+  return {
+    ...data,
+
+    groups: data.groups.map(
+      (group) => ({
+        ...group,
+
+        subcategories:
+          group.subcategories.map(
+            (category) => ({
+              ...category,
+
+              artworks:
+                category.artworks.map(
+                  (artwork) => ({
+                    ...artwork,
+
+                    thumbnailFocusX:
+                      artwork.thumbnailFocusX ??
+                      50,
+
+                    thumbnailFocusY:
+                      artwork.thumbnailFocusY ??
+                      50,
+                  })
+                ),
+            })
+          ),
+      })
+    ),
+  };
+}
 
 async function main() {
   /*
@@ -47,9 +87,14 @@ async function main() {
       `Repository did not return "${staticSection.slug}"`
     );
 
+    const expectedData =
+      normalizeStaticPortfolio(
+        staticSection.data
+      );
+
     deepStrictEqual(
       repositoryData,
-      staticSection.data
+      expectedData
     );
 
     console.log(

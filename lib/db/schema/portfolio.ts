@@ -1,8 +1,12 @@
+import { sql } from "drizzle-orm";
+
 import {
   boolean,
+  check,
   integer,
   pgEnum,
   pgTable,
+  real,
   text,
   timestamp,
   uniqueIndex,
@@ -294,6 +298,29 @@ export const artworks = pgTable(
       .notNull()
       .default(false),
 
+    /*
+    * Thumbnail focal point.
+    *
+    * Values range from 0 to 100.
+    *
+    * 0   = left / top
+    * 50  = center
+    * 100 = right / bottom
+    *
+    * Existing and new artworks default to center.
+    */
+    thumbnailFocusX: real(
+      "thumbnail_focus_x"
+    )
+      .notNull()
+      .default(50),
+
+    thumbnailFocusY: real(
+      "thumbnail_focus_y"
+    )
+      .notNull()
+      .default(50),
+
     sortOrder: integer("sort_order")
       .notNull()
       .default(0),
@@ -331,8 +358,18 @@ export const artworks = pgTable(
     uniqueIndex(
       "artworks_category_legacy_id_unique"
     ).on(
-        table.categoryId,
-        table.legacyId
+      table.categoryId,
+      table.legacyId
+    ),
+
+    check(
+      "artworks_thumbnail_focus_x_check",
+      sql`${table.thumbnailFocusX} >= 0 AND ${table.thumbnailFocusX} <= 100`
+    ),
+
+    check(
+      "artworks_thumbnail_focus_y_check",
+      sql`${table.thumbnailFocusY} >= 0 AND ${table.thumbnailFocusY} <= 100`
     ),
   ]
 );

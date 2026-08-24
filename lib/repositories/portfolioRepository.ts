@@ -118,6 +118,12 @@ async function queryPortfolioSectionBySlug(
           featured:
             artworks.featured,
 
+          thumbnailFocusX:
+            artworks.thumbnailFocusX,
+
+          thumbnailFocusY:
+            artworks.thumbnailFocusY,
+
           sortOrder:
             artworks.sortOrder,
         },
@@ -393,6 +399,12 @@ async function queryPortfolioSectionBySlug(
 
       featured:
         row.artwork.featured,
+
+      thumbnailFocusX:
+        row.artwork.thumbnailFocusX,
+
+      thumbnailFocusY:
+        row.artwork.thumbnailFocusY,
 
       alt:
         row.artwork.alt,

@@ -176,6 +176,38 @@ function validatePortfolioSource() {
               `Invalid orientation "${artwork.orientation}" in artwork "${artwork.slug}"`
             );
           }
+
+          /*
+          * ============================================================
+          * THUMBNAIL FOCAL POINT
+          * ============================================================
+          */
+
+          const thumbnailFocusX =
+            artwork.thumbnailFocusX ??
+            50;
+
+          const thumbnailFocusY =
+            artwork.thumbnailFocusY ??
+            50;
+
+          if (
+            thumbnailFocusX < 0 ||
+            thumbnailFocusX > 100
+          ) {
+            throw new Error(
+              `Invalid thumbnailFocusX "${thumbnailFocusX}" in artwork "${artwork.slug}"`
+            );
+          }
+
+          if (
+            thumbnailFocusY < 0 ||
+            thumbnailFocusY > 100
+          ) {
+            throw new Error(
+              `Invalid thumbnailFocusY "${thumbnailFocusY}" in artwork "${artwork.slug}"`
+            );
+          }
         }
       }
     }
@@ -468,6 +500,14 @@ async function main() {
               featured:
                 artwork.featured ??
                 false,
+
+              thumbnailFocusX:
+                artwork.thumbnailFocusX ??
+                50,
+
+              thumbnailFocusY:
+                artwork.thumbnailFocusY ??
+                50,
 
               sortOrder:
                 artworkIndex,

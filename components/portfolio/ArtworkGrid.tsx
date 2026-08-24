@@ -2,15 +2,27 @@
 
 import Image from 'next/image';
 import dynamic from 'next/dynamic';
+
 import {
   useMemo,
   useState,
 } from 'react';
-import { useRouter } from 'next/navigation';
-import { motion } from 'framer-motion';
 
-import { Artwork } from '@/data/portfolio/types';
-import { buildPortfolioPages } from '@/lib/portfolio/layoutEngine';
+import {
+  useRouter,
+} from 'next/navigation';
+
+import {
+  motion,
+} from 'framer-motion';
+
+import type {
+  Artwork,
+} from '@/data/portfolio/types';
+
+import {
+  buildPortfolioPages,
+} from '@/lib/portfolio/layoutEngine';
 
 const ArtworkLightbox = dynamic(
   () => import('./ArtworkLightbox')
@@ -18,14 +30,24 @@ const ArtworkLightbox = dynamic(
 
 interface ArtworkGridProps {
   artworks: Artwork[];
+
   scrollTargetRef?: () => void;
 
   initialArtworkSlug?: string;
 
   portfolioSlug: string;
+
   groupSlug?: string;
+
   categorySlug?: string;
 
+  /*
+   * Used by PortfolioOverview.
+   *
+   * Overview artworks can belong to
+   * different Groups/Categories, so each
+   * artwork may need its own destination.
+   */
   getArtworkHref?: (
     artwork: Artwork
   ) => string | null;
@@ -40,17 +62,27 @@ export default function ArtworkGrid({
   categorySlug,
   getArtworkHref,
 }: ArtworkGridProps) {
-  const router = useRouter();
+  const router =
+    useRouter();
 
-  const [currentPage, setCurrentPage] =
-    useState(0);
+  const [
+    currentPage,
+    setCurrentPage,
+  ] = useState(0);
+
+  /*
+   * ============================================================
+   * ANIMATION
+   * ============================================================
+   */
 
   const containerVariants = {
     hidden: {},
 
     show: {
       transition: {
-        staggerChildren: 0.05,
+        staggerChildren:
+          0.05,
       },
     },
   };
@@ -66,60 +98,92 @@ export default function ArtworkGrid({
       y: 0,
 
       transition: {
-        duration: 0.45,
-        ease: [0.22, 1, 0.36, 1] as const,
+        duration:
+          0.45,
+
+        ease:
+          [
+            0.22,
+            1,
+            0.36,
+            1,
+          ] as const,
       },
     },
   };
 
   /*
    * ============================================================
-   * PÁGINAS
+   * PAGES
    * ============================================================
+   *
+   * Each artwork now has exactly the same
+   * visual weight inside the grid.
+   *
+   * No orientation-based layout is needed.
    */
 
-  const pages = useMemo(() => {
-    return buildPortfolioPages(artworks);
-  }, [artworks]);
+  const pages =
+    useMemo(
+      () =>
+        buildPortfolioPages(
+          artworks
+        ),
+      [artworks]
+    );
 
   /*
    * ============================================================
-   * ORDEN VISUAL REAL
+   * REAL ARTWORK ORDER
    * ============================================================
+   *
+   * Because pagination no longer reorganizes
+   * artworks, this is effectively the same
+   * order received from the repository.
+   *
+   * We still derive it from pages so Lightbox
+   * navigation and pagination stay connected.
    */
 
-  const orderedArtworks = useMemo(() => {
-    return pages.flat();
-  }, [pages]);
+  const orderedArtworks =
+    useMemo(
+      () =>
+        pages.flat(),
+      [pages]
+    );
 
   /*
    * ============================================================
-   * ARTWORK SELECCIONADO DESDE LA URL
+   * ARTWORK SELECTED FROM URL
    * ============================================================
    */
 
-  const selectedGlobalIndex = useMemo(() => {
-    if (!initialArtworkSlug) {
-      return null;
-    }
+  const selectedGlobalIndex =
+    useMemo(() => {
+      if (
+        !initialArtworkSlug
+      ) {
+        return null;
+      }
 
-    const index =
-      orderedArtworks.findIndex(
-        (artwork) =>
-          artwork.slug ===
-          initialArtworkSlug
-      );
+      const index =
+        orderedArtworks.findIndex(
+          (artwork) =>
+            artwork.slug ===
+            initialArtworkSlug
+        );
 
-    return index === -1
-      ? null
-      : index;
-  }, [
-    initialArtworkSlug,
-    orderedArtworks,
-  ]);
+      return index === -1
+        ? null
+        : index;
+    }, [
+      initialArtworkSlug,
+      orderedArtworks,
+    ]);
 
   const selectedArtwork =
-    selectedGlobalIndex !== null
+    selectedGlobalIndex !==
+    null
       ? orderedArtworks[
           selectedGlobalIndex
         ]
@@ -127,127 +191,145 @@ export default function ArtworkGrid({
 
   /*
    * ============================================================
-   * PÁGINA DEL ARTWORK ABIERTO
+   * PAGE CONTAINING THE OPEN ARTWORK
    * ============================================================
    */
 
-  const selectedArtworkPage = useMemo(() => {
-    if (!selectedArtwork) {
-      return null;
-    }
+  const selectedArtworkPage =
+    useMemo(() => {
+      if (
+        !selectedArtwork
+      ) {
+        return null;
+      }
 
-    const pageIndex =
-      pages.findIndex((page) =>
-        page.some(
-          (artwork) =>
-            artwork.slug ===
-            selectedArtwork.slug
-        )
-      );
+      const pageIndex =
+        pages.findIndex(
+          (page) =>
+            page.some(
+              (artwork) =>
+                artwork.slug ===
+                selectedArtwork.slug
+            )
+        );
 
-    return pageIndex === -1
-      ? null
-      : pageIndex;
-  }, [
-    pages,
-    selectedArtwork,
-  ]);
+      return pageIndex === -1
+        ? null
+        : pageIndex;
+    }, [
+      pages,
+      selectedArtwork,
+    ]);
 
   /*
-   * Si hay un artwork abierto desde URL,
-   * mostramos automáticamente su página.
-   *
-   * Si no, usamos la página elegida normalmente
-   * con la paginación.
+   * If an artwork URL points to an artwork
+   * located on another page, that page becomes
+   * the visible page automatically.
    */
-  const safeCurrentPage = Math.min(
-    selectedArtworkPage ??
-      currentPage,
-    Math.max(
-      pages.length - 1,
-      0
-    )
-  );
+
+  const safeCurrentPage =
+    Math.min(
+      selectedArtworkPage ??
+        currentPage,
+
+      Math.max(
+        pages.length - 1,
+        0
+      )
+    );
 
   const pageArtworks =
-    pages[safeCurrentPage] ?? [];
+    pages[
+      safeCurrentPage
+    ] ?? [];
 
   /*
    * ============================================================
-   * PAGINACIÓN VISIBLE
+   * VISIBLE PAGINATION
    * ============================================================
    */
 
-  const visiblePages = useMemo(() => {
-    const totalPages =
-      pages.length;
+  const visiblePages =
+    useMemo(() => {
+      const totalPages =
+        pages.length;
 
-    if (totalPages <= 5) {
-      return Array.from(
-        {
-          length:
-            totalPages,
-        },
-        (_, i) => i
-      );
-    }
+      if (
+        totalPages <= 5
+      ) {
+        return Array.from(
+          {
+            length:
+              totalPages,
+          },
+          (_, index) =>
+            index
+        );
+      }
 
-    const current =
-      safeCurrentPage;
+      const current =
+        safeCurrentPage;
 
-    if (current <= 2) {
+      if (
+        current <= 2
+      ) {
+        return [
+          0,
+          1,
+          2,
+          3,
+          -1,
+          totalPages - 1,
+        ];
+      }
+
+      if (
+        current >=
+        totalPages - 3
+      ) {
+        return [
+          0,
+          -1,
+          totalPages - 4,
+          totalPages - 3,
+          totalPages - 2,
+          totalPages - 1,
+        ];
+      }
+
       return [
         0,
-        1,
-        2,
-        3,
+        -1,
+        current - 1,
+        current,
+        current + 1,
         -1,
         totalPages - 1,
       ];
-    }
-
-    if (
-      current >=
-      totalPages - 3
-    ) {
-      return [
-        0,
-        -1,
-        totalPages - 4,
-        totalPages - 3,
-        totalPages - 2,
-        totalPages - 1,
-      ];
-    }
-
-    return [
-      0,
-      -1,
-      current - 1,
-      current,
-      current + 1,
-      -1,
-      totalPages - 1,
-    ];
-  }, [
-    pages.length,
-    safeCurrentPage,
-  ]);
+    }, [
+      pages.length,
+      safeCurrentPage,
+    ]);
 
   /*
    * ============================================================
-   * URL BASE DE LA CATEGORÍA
+   * CATEGORY URL
    * ============================================================
+   *
+   * In PortfolioOverview there is no single
+   * Category URL because artworks can belong
+   * to different Categories.
    */
 
   const categoryUrl =
-    groupSlug && categorySlug
+    groupSlug &&
+    categorySlug
       ? `/portfolio/${portfolioSlug}/${groupSlug}/${categorySlug}`
       : null;
 
   /*
    * ============================================================
-   * CAMBIAR DE PÁGINA
+   * CHANGE PAGE
    * ============================================================
    */
 
@@ -279,54 +361,52 @@ export default function ArtworkGrid({
 
   /*
    * ============================================================
-   * ABRIR LIGHTBOX
+   * OPEN ARTWORK
    * ============================================================
-   *
-   * La URL cambia inmediatamente.
-   *
-   * Ej:
-   *
-   * /pets
-   *
-   * ↓
-   *
-   * /pets/family-pet-portrait-bunny-dogs-full-body
    */
 
   const handleArtworkClick = (
     index: number
   ) => {
     const artwork =
-      pageArtworks[index];
+      pageArtworks[
+        index
+      ];
 
     if (!artwork) {
       return;
     }
 
     /*
-    * Overview:
-    *
-    * Cada artwork puede pertenecer
-    * a una categoría distinta.
-    *
-    * Entramos directamente en su URL real.
-    */
+     * PortfolioOverview
+     *
+     * Each artwork already knows its
+     * complete destination.
+     */
+
     const directHref =
-      getArtworkHref?.(artwork);
+      getArtworkHref?.(
+        artwork
+      );
 
     if (directHref) {
-      router.push(directHref);
+      router.push(
+        directHref
+      );
 
       return;
     }
 
     /*
-    * Category:
-    *
-    * Conservamos el comportamiento
-    * actual del lightbox.
-    */
-    if (!categoryUrl) {
+     * Category gallery
+     *
+     * Opening an artwork changes only
+     * the artwork slug and opens Lightbox.
+     */
+
+    if (
+      !categoryUrl
+    ) {
       return;
     }
 
@@ -340,7 +420,7 @@ export default function ArtworkGrid({
 
   /*
    * ============================================================
-   * CAMBIAR OBRA DESDE EL LIGHTBOX
+   * LIGHTBOX NAVIGATION
    * ============================================================
    */
 
@@ -386,7 +466,9 @@ export default function ArtworkGrid({
       newPage
     );
 
-    if (!categoryUrl) {
+    if (
+      !categoryUrl
+    ) {
       return;
     }
 
@@ -400,18 +482,18 @@ export default function ArtworkGrid({
 
   /*
    * ============================================================
-   * CERRAR LIGHTBOX
+   * CLOSE LIGHTBOX
    * ============================================================
    */
 
   const closeLightbox =
     () => {
-
       /*
-       * Si abrimos una imagen que estaba
-       * en otra página, dejamos el grid
-       * en esa misma página al cerrar.
+       * If the opened artwork belongs to
+       * another page, keep that page visible
+       * after closing the Lightbox.
        */
+
       if (
         selectedArtworkPage !==
         null
@@ -421,7 +503,9 @@ export default function ArtworkGrid({
         );
       }
 
-      if (!categoryUrl) {
+      if (
+        !categoryUrl
+      ) {
         return;
       }
 
@@ -433,6 +517,12 @@ export default function ArtworkGrid({
       );
     };
 
+  /*
+   * ============================================================
+   * EMPTY CATEGORY
+   * ============================================================
+   */
+
   if (
     artworks.length ===
     0
@@ -443,7 +533,7 @@ export default function ArtworkGrid({
   return (
     <>
       {/* ======================================================
-          GALERÍA
+          GALLERY
       ====================================================== */}
 
       <div>
@@ -458,15 +548,15 @@ export default function ArtworkGrid({
           animate="show"
           className="
             mx-auto
-            w-full
-            max-w-7xl
-
             grid
+            w-full
+            max-w-6xl
+
             grid-cols-1
-            md:grid-cols-3
+            sm:grid-cols-2
+            lg:grid-cols-3
 
             gap-8
-            auto-rows-130
           "
         >
           {pageArtworks.map(
@@ -474,50 +564,59 @@ export default function ArtworkGrid({
               artwork,
               index
             ) => {
+              /*
+               * The first visible thumbnail
+               * is our image LCP candidate.
+               *
+               * Unlike the previous layout,
+               * it now occupies only one
+               * uniform card instead of a
+               * possible full-width landscape.
+               */
 
               const isLcpCandidate =
-                safeCurrentPage ===
-                  0 &&
                 index === 0;
+
+              const thumbnailFocusX =
+                artwork.thumbnailFocusX ??
+                50;
+
+              const thumbnailFocusY =
+                artwork.thumbnailFocusY ??
+                50;
 
               return (
                 <motion.div
+                  key={
+                    getArtworkHref?.(
+                      artwork
+                    ) ??
+                    artwork.slug
+                  }
                   variants={
                     isLcpCandidate
                       ? undefined
                       : itemVariants
-                  }
-                  key={
-                    getArtworkHref?.(artwork) ??
-                    artwork.slug
                   }
                   onClick={() =>
                     handleArtworkClick(
                       index
                     )
                   }
-                  className={`
+                  className="
                     group
                     relative
+
+                    aspect-[4/5]
+
+                    cursor-pointer
                     overflow-hidden
                     rounded-2xl
-                    cursor-pointer
-
-                    ${
-                      artwork.orientation ===
-                      'landscape'
-                        ? 'md:col-span-3 h-110 md:h-130'
-                        : 'h-110 md:h-130'
-                    }
-
-                    ${
-                      artwork.featured
-                        ? 'ring-1 ring-white/10 shadow-2xl'
-                        : ''
-                    }
-                  `}
+                  "
                 >
-                  {/* IMAGE */}
+                  {/* ==========================================
+                      THUMBNAIL
+                  ========================================== */}
 
                   <Image
                     src={
@@ -541,14 +640,26 @@ export default function ArtworkGrid({
                         : undefined
                     }
                     sizes={
-                      artwork.orientation ===
-                      'landscape'
-                        ? '(max-width: 767px) calc(100vw - 48px), (max-width: 1280px) 900px, 1000px'
-                        : '(max-width: 767px) calc(100vw - 48px), 30vw'
+                      artwork.orientation === 'landscape'
+                        ? `
+                            (max-width: 639px) 1000px,
+                            (max-width: 1023px) 1400px,
+                            1100px
+                          `
+                        : `
+                            (max-width: 639px) calc(100vw - 48px),
+                            (max-width: 1023px) calc((100vw - 80px) / 2),
+                            (max-width: 1279px) calc((100vw - 112px) / 3),
+                            363px
+                          `
                     }
+                    style={{
+                      objectPosition:
+                        `${thumbnailFocusX}% ${thumbnailFocusY}%`,
+                    }}
+
                     className="
                       object-cover
-                      rounded-2xl
 
                       transition-transform
                       duration-700
@@ -557,7 +668,9 @@ export default function ArtworkGrid({
                     "
                   />
 
-                  {/* OVERLAY */}
+                  {/* ==========================================
+                      OVERLAY
+                  ========================================== */}
 
                   <div
                     className="
@@ -567,28 +680,28 @@ export default function ArtworkGrid({
                       flex
                       items-end
 
-                      p-5
-
                       bg-gradient-to-t
                       from-black/65
                       via-black/15
                       to-transparent
 
-                      opacity-100
+                      p-5
 
-                      pointer-fine:opacity-0
-                      pointer-fine:group-hover:opacity-100
+                      opacity-100
 
                       transition-opacity
                       duration-500
                       ease-out
+
+                      pointer-fine:opacity-0
+                      pointer-fine:group-hover:opacity-100
                     "
                   >
                     <span
                       className="
                         text-sm
-                        tracking-[0.12em]
                         uppercase
+                        tracking-[0.12em]
                         text-white
                         drop-shadow-md
                       "
@@ -606,7 +719,7 @@ export default function ArtworkGrid({
       </div>
 
       {/* ======================================================
-          PAGINACIÓN
+          PAGINATION
       ====================================================== */}
 
       {pages.length >
@@ -631,13 +744,16 @@ export default function ArtworkGrid({
               0
             }
             className="
-              rounded-full
-              border
-              border-white/10
-              bg-white/6
-
               h-10
               min-w-10
+
+              rounded-full
+
+              border
+              border-white/10
+
+              bg-white/6
+
               px-3
 
               text-sm
@@ -658,20 +774,21 @@ export default function ArtworkGrid({
             </span>
           </button>
 
-          {/* NÚMEROS */}
+          {/* PAGE NUMBERS */}
 
           {visiblePages.map(
             (
               page,
               index
             ) => {
-
               if (
                 page === -1
               ) {
                 return (
                   <span
-                    key={`ellipsis-${index}`}
+                    key={
+                      `ellipsis-${index}`
+                    }
                     className="
                       flex
                       h-10
@@ -700,8 +817,11 @@ export default function ArtworkGrid({
                   className={`
                     h-10
                     w-10
+
                     rounded-full
+
                     border
+
                     text-sm
                     transition
 
@@ -728,6 +848,7 @@ export default function ArtworkGrid({
                 Math.min(
                   safeCurrentPage +
                     1,
+
                   pages.length -
                     1
                 )
@@ -739,13 +860,16 @@ export default function ArtworkGrid({
                 1
             }
             className="
-              rounded-full
-              border
-              border-white/10
-              bg-white/6
-
               h-10
               min-w-10
+
+              rounded-full
+
+              border
+              border-white/10
+
+              bg-white/6
+
               px-3
 
               text-sm
