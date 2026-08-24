@@ -1,12 +1,19 @@
 export interface Artwork {
+  id: number;
+  slug: string;
+  src: string;
+  title: string;
 
-  id:number;
-  slug:string;
-  src:string;
-  title:string;
-  orientation?: "portrait" | "landscape";
+  orientation?:
+    | 'portrait'
+    | 'landscape';
+
   featured?: boolean;
+
   alt: string;
+
+  thumbnailFocusX?: number;
+  thumbnailFocusY?: number;
 }
 
 

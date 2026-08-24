@@ -2,12 +2,33 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
-import { portfolioSections } from '@/data/portfolio';
 
-export default function Navbar() {
-  const [scrolled, setScrolled] = useState(false);
-  const [portfolioOpen, setPortfolioOpen] = useState(false);
+import {
+  useEffect,
+  useState,
+} from 'react';
+
+export interface NavbarPortfolioSection {
+  slug: string;
+  label: string;
+}
+
+interface NavbarProps {
+  portfolioSections: NavbarPortfolioSection[];
+}
+
+export default function Navbar({
+  portfolioSections,
+}: NavbarProps) {
+  const [
+    scrolled,
+    setScrolled,
+  ] = useState(false);
+
+  const [
+    portfolioOpen,
+    setPortfolioOpen,
+  ] = useState(false);
 
   /*
    * Desktop:
@@ -16,54 +37,83 @@ export default function Navbar() {
    * Tablet + móvil:
    * <= 1024px → tap / click
    */
-  const DESKTOP_BREAKPOINT = 1024;
+  const DESKTOP_BREAKPOINT =
+    1024;
 
   useEffect(() => {
-    const handleScroll = () => {
-      setScrolled(window.scrollY > 50);
-    };
+    const handleScroll =
+      () => {
+        setScrolled(
+          window.scrollY > 50
+        );
+      };
 
-    window.addEventListener('scroll', handleScroll);
+    window.addEventListener(
+      'scroll',
+      handleScroll
+    );
 
     return () => {
-      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener(
+        'scroll',
+        handleScroll
+      );
     };
   }, []);
 
   /*
    * Cerramos el dropdown si la pantalla cambia
    * desde tablet/móvil hacia desktop.
-   *
-   * No hacemos ningún setState directamente dentro
-   * del efecto: solamente reaccionamos al evento resize.
    */
   useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth > DESKTOP_BREAKPOINT) {
-        setPortfolioOpen(false);
-      }
-    };
+    const handleResize =
+      () => {
+        if (
+          window.innerWidth >
+          DESKTOP_BREAKPOINT
+        ) {
+          setPortfolioOpen(
+            false
+          );
+        }
+      };
 
-    window.addEventListener('resize', handleResize);
+    window.addEventListener(
+      'resize',
+      handleResize
+    );
 
     return () => {
-      window.removeEventListener('resize', handleResize);
+      window.removeEventListener(
+        'resize',
+        handleResize
+      );
     };
   }, []);
 
-  const isDesktop = () => {
-    return window.innerWidth > DESKTOP_BREAKPOINT;
-  };
+  const isDesktop =
+    () => {
+      return (
+        window.innerWidth >
+        DESKTOP_BREAKPOINT
+      );
+    };
 
-  const handlePortfolioClick = () => {
-    if (!isDesktop()) {
-      setPortfolioOpen((prev) => !prev);
-    }
-  };
+  const handlePortfolioClick =
+    () => {
+      if (!isDesktop()) {
+        setPortfolioOpen(
+          (prev) => !prev
+        );
+      }
+    };
 
-  const closePortfolio = () => {
-    setPortfolioOpen(false);
-  };
+  const closePortfolio =
+    () => {
+      setPortfolioOpen(
+        false
+      );
+    };
 
   return (
     <nav
@@ -94,7 +144,9 @@ export default function Navbar() {
 
         <Link
           href="/"
-          onClick={closePortfolio}
+          onClick={
+            closePortfolio
+          }
           className="
             transition
             hover:text-white/70
@@ -144,7 +196,9 @@ export default function Navbar() {
 
           <Link
             href="/"
-            onClick={closePortfolio}
+            onClick={
+              closePortfolio
+            }
             className="
               transition
               hover:text-white/70
@@ -159,31 +213,30 @@ export default function Navbar() {
 
           <div
             className="relative"
-
-            /*
-             * DESKTOP:
-             * El dropdown se controla mediante hover.
-             *
-             * TABLET / MOBILE:
-             * No hacemos nada aquí.
-             * El dropdown se controla mediante tap.
-             */
             onMouseEnter={() => {
-              if (isDesktop()) {
-                setPortfolioOpen(true);
+              if (
+                isDesktop()
+              ) {
+                setPortfolioOpen(
+                  true
+                );
               }
             }}
             onMouseLeave={() => {
-              if (isDesktop()) {
-                setPortfolioOpen(false);
+              if (
+                isDesktop()
+              ) {
+                setPortfolioOpen(
+                  false
+                );
               }
             }}
           >
-            {/* Portfolio button */}
-
             <button
               type="button"
-              onClick={handlePortfolioClick}
+              onClick={
+                handlePortfolioClick
+              }
               className="
                 transition
                 hover:text-white/70
@@ -194,21 +247,6 @@ export default function Navbar() {
 
             {/* ==================================================
                 DROPDOWN INTERACTION AREA
-
-                IMPORTANTE:
-
-                Antes teníamos:
-
-                  mt-4
-
-                Eso generaba un hueco real entre Portfolio
-                y el dropdown.
-
-                Ahora el contenedor ocupa ese espacio mediante
-                padding-top, por lo que el cursor nunca abandona
-                el área del elemento padre.
-
-                Visualmente seguimos teniendo 16px de separación.
             ================================================== */}
 
             <div
@@ -252,33 +290,43 @@ export default function Navbar() {
                   [font-family:var(--font-lexend)]
                 "
               >
-                {portfolioSections.map((section) => (
-                  <Link
-                    key={section.slug}
-                    href={`/portfolio/${section.slug}`}
-                    onClick={closePortfolio}
-                    className="
-                      block
-                      whitespace-nowrap
+                {portfolioSections.map(
+                  (section) => (
+                    <Link
+                      key={
+                        section.slug
+                      }
+                      href={
+                        `/portfolio/${section.slug}`
+                      }
+                      onClick={
+                        closePortfolio
+                      }
+                      className="
+                        block
+                        whitespace-nowrap
 
-                      py-2
+                        py-2
 
-                      text-base
-                      md:text-lg
+                        text-base
+                        md:text-lg
 
-                      font-light
-                      tracking-wide
+                        font-light
+                        tracking-wide
 
-                      text-white
+                        text-white
 
-                      transition
+                        transition
 
-                      hover:text-white/70
-                    "
-                  >
-                    {section.title}
-                  </Link>
-                ))}
+                        hover:text-white/70
+                      "
+                    >
+                      {
+                        section.label
+                      }
+                    </Link>
+                  )
+                )}
               </div>
             </div>
           </div>
@@ -289,7 +337,9 @@ export default function Navbar() {
 
           <Link
             href="/contact"
-            onClick={closePortfolio}
+            onClick={
+              closePortfolio
+            }
             className="
               transition
               hover:text-white/70
@@ -304,7 +354,9 @@ export default function Navbar() {
 
           <Link
             href="/about"
-            onClick={closePortfolio}
+            onClick={
+              closePortfolio
+            }
             className="
               transition
               hover:text-white/70

@@ -39,6 +39,8 @@ export const semiRealism: PortfolioData = {
               "title": "Full Wrap Cover",
               "orientation": "landscape",
               "featured": true,
+              "thumbnailFocusX": 78.5,
+              "thumbnailFocusY": 50,
               "alt": "Elf With Baby Fox Coastal Heath Fantasy Book Cover Full wrap illustration by Fefierys"
             }
           ]
