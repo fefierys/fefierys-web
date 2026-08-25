@@ -12,6 +12,8 @@ export interface Artwork {
 
   alt: string;
 
+  storageKey?: string | null;
+
   thumbnailFocusX?: number;
   thumbnailFocusY?: number;
 }

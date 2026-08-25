@@ -112,6 +112,9 @@ async function queryPortfolioSectionBySlug(
           imageSrc:
             artworks.imageSrc,
 
+          storageKey:
+            artworks.storageKey,
+
           orientation:
             artworks.orientation,
 
@@ -390,6 +393,9 @@ async function queryPortfolioSectionBySlug(
 
       src:
         row.artwork.imageSrc,
+
+      storageKey:
+        row.artwork.storageKey,
 
       title:
         row.artwork.title,
