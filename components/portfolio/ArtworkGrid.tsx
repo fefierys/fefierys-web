@@ -589,15 +589,46 @@ export default function ArtworkGrid({
                 artwork.thumbnailFocusY ??
                 50;
 
-              const thumbnailSrc =
-                getPortfolioThumbnailUrl(
-                  artwork
-                );
-
               const usesR2 =
                 Boolean(
                   artwork.storageKey
                 );
+
+              const thumbnailSrc =
+                getPortfolioThumbnailUrl(
+                  artwork,
+                  800
+                );
+
+              const thumbnailSrcSet =
+                usesR2
+                  ? [
+                      `${getPortfolioThumbnailUrl(
+                        artwork,
+                        400
+                      )} 400w`,
+
+                      `${getPortfolioThumbnailUrl(
+                        artwork,
+                        640
+                      )} 640w`,
+
+                      `${getPortfolioThumbnailUrl(
+                        artwork,
+                        736
+                      )} 736w`,
+
+                      `${getPortfolioThumbnailUrl(
+                        artwork,
+                        800
+                      )} 800w`,
+
+                      `${getPortfolioThumbnailUrl(
+                        artwork,
+                        1200
+                      )} 1200w`,
+                    ].join(", ")
+                  : null;
 
               return (
                 <motion.div
@@ -632,57 +663,110 @@ export default function ArtworkGrid({
                       THUMBNAIL
                   ========================================== */}
 
-                  <Image
-                    src={
-                      thumbnailSrc
-                    }
+                  {usesR2 ? (
+                    <>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={
+                          thumbnailSrc
+                        }
+                        srcSet={
+                          thumbnailSrcSet ??
+                          undefined
+                        }
+                        sizes="
+                          (max-width: 639px)
+                            calc(100vw - 48px),
 
-                    unoptimized={usesR2}
+                          (max-width: 1023px)
+                            calc((100vw - 80px) / 2),
 
-                    alt={
-                      artwork.alt
-                    }
-                    fill
-                    quality={
-                      60
-                    }
-                    fetchPriority={
-                      isLcpCandidate
-                        ? 'high'
-                        : undefined
-                    }
-                    loading={
-                      isLcpCandidate
-                        ? 'eager'
-                        : undefined
-                    }
-                    sizes={
-                      artwork.orientation === 'landscape'
-                        ? `
-                            (max-width: 639px) 1000px,
-                            (max-width: 1023px) 1400px,
-                            1100px
-                          `
-                        : `
-                            (max-width: 639px) calc(100vw - 48px),
-                            (max-width: 1023px) calc((100vw - 80px) / 2),
-                            (max-width: 1279px) calc((100vw - 112px) / 3),
-                            363px
-                          `
-                    }
-                    style={{
-                      objectPosition:
-                        `${thumbnailFocusX}% ${thumbnailFocusY}%`,
-                    }}
-                    className="
-                      object-cover
+                          (max-width: 1279px)
+                            calc((100vw - 112px) / 3),
 
-                      transition-transform
-                      duration-700
+                          363px
+                        "
+                        alt={
+                          artwork.alt
+                        }
+                        loading={
+                          isLcpCandidate
+                            ? "eager"
+                            : "lazy"
+                        }
+                        fetchPriority={
+                          isLcpCandidate
+                            ? "high"
+                            : "auto"
+                        }
+                        decoding="async"
+                        className="
+                          absolute
+                          inset-0
 
-                      group-hover:scale-105
-                    "
-                  />
+                          h-full
+                          w-full
+
+                          object-cover
+
+                          transition-transform
+                          duration-700
+
+                          group-hover:scale-105
+                        "
+                      />
+                    </>
+                  ) : (
+                    <Image
+                      src={
+                        artwork.src
+                      }
+                      alt={
+                        artwork.alt
+                      }
+                      fill
+                      quality={
+                        60
+                      }
+                      fetchPriority={
+                        isLcpCandidate
+                          ? "high"
+                          : undefined
+                      }
+                      loading={
+                        isLcpCandidate
+                          ? "eager"
+                          : undefined
+                      }
+                      sizes={
+                        artwork.orientation ===
+                        "landscape"
+                          ? `
+                              (max-width: 639px) 1000px,
+                              (max-width: 1023px) 1400px,
+                              1100px
+                            `
+                          : `
+                              (max-width: 639px) calc(100vw - 48px),
+                              (max-width: 1023px) calc((100vw - 80px) / 2),
+                              (max-width: 1279px) calc((100vw - 112px) / 3),
+                              363px
+                            `
+                      }
+                      style={{
+                        objectPosition:
+                          `${thumbnailFocusX}% ${thumbnailFocusY}%`,
+                      }}
+                      className="
+                        object-cover
+
+                        transition-transform
+                        duration-700
+
+                        group-hover:scale-105
+                      "
+                    />
+                  )}
 
                   {/* ==========================================
                       OVERLAY

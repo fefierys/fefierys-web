@@ -18,9 +18,23 @@ function getMediaUrl() {
   );
 }
 
+function clampFocus(
+  value:
+    | number
+    | undefined
+) {
+  return Math.min(
+    100,
+    Math.max(
+      0,
+      value ?? 50
+    )
+  );
+}
+
 /*
  * ============================================================
- * ORIGINAL / MASTER
+ * ORIGINAL / WEB MASTER
  * ============================================================
  */
 
@@ -31,7 +45,10 @@ export function getPortfolioMasterUrl(
     return artwork.src;
   }
 
-  return `${getMediaUrl()}/${artwork.storageKey}`;
+  return (
+    `${getMediaUrl()}/` +
+    artwork.storageKey
+  );
 }
 
 /*
@@ -40,31 +57,42 @@ export function getPortfolioMasterUrl(
  * ============================================================
  */
 
+export type PortfolioThumbnailWidth =
+  | 400
+  | 640
+  | 736
+  | 800
+  | 1200;
+
 export function getPortfolioThumbnailUrl(
-  artwork: Artwork
+  artwork: Artwork,
+  width:
+    PortfolioThumbnailWidth =
+      800
 ) {
   if (!artwork.storageKey) {
     return artwork.src;
   }
 
   const focusX =
-    (artwork.thumbnailFocusX ?? 50) /
-    100;
+    clampFocus(
+      artwork.thumbnailFocusX
+    ) / 100;
 
   const focusY =
-    (artwork.thumbnailFocusY ?? 50) /
-    100;
+    clampFocus(
+      artwork.thumbnailFocusY
+    ) / 100;
 
   return (
     `${getMediaUrl()}` +
-    `/cdn-cgi/image/` +
-    `width=800,` +
-    `height=1000,` +
-    `fit=cover,` +
-    `gravity=${focusX}x${focusY},` +
-    `format=auto/` +
-    artwork.storageKey
-  );
+    `/thumb/` +
+    artwork.storageKey +
+    `?w=${width}` +
+    `&x=${focusX}` +
+    `&y=${focusY}` +
+    `&v=2`
+    );
 }
 
 /*
@@ -82,10 +110,7 @@ export function getPortfolioDisplayUrl(
 
   return (
     `${getMediaUrl()}` +
-    `/cdn-cgi/image/` +
-    `width=1800,` +
-    `fit=scale-down,` +
-    `format=auto/` +
+    `/display/` +
     artwork.storageKey
   );
 }
