@@ -24,6 +24,10 @@ import {
   buildPortfolioPages,
 } from '@/lib/portfolio/layoutEngine';
 
+import {
+  getPortfolioThumbnailUrl,
+} from '@/lib/media/portfolioImageUrl';
+
 const ArtworkLightbox = dynamic(
   () => import('./ArtworkLightbox')
 );
@@ -585,6 +589,16 @@ export default function ArtworkGrid({
                 artwork.thumbnailFocusY ??
                 50;
 
+              const thumbnailSrc =
+                getPortfolioThumbnailUrl(
+                  artwork
+                );
+
+              const usesR2 =
+                Boolean(
+                  artwork.storageKey
+                );
+
               return (
                 <motion.div
                   key={
@@ -620,8 +634,11 @@ export default function ArtworkGrid({
 
                   <Image
                     src={
-                      artwork.src
+                      thumbnailSrc
                     }
+
+                    unoptimized={usesR2}
+
                     alt={
                       artwork.alt
                     }
@@ -657,7 +674,6 @@ export default function ArtworkGrid({
                       objectPosition:
                         `${thumbnailFocusX}% ${thumbnailFocusY}%`,
                     }}
-
                     className="
                       object-cover
 

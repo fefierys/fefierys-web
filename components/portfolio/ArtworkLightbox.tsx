@@ -13,6 +13,10 @@ import {
 
 import { Artwork } from '@/data/portfolio/types';
 
+import {
+  getPortfolioDisplayUrl,
+} from '@/lib/media/portfolioImageUrl';
+
 interface ArtworkLightboxProps {
   artwork: Artwork;
   currentIndex: number;
@@ -55,8 +59,18 @@ export default function ArtworkLightbox({
     null
   );
 
+  const displaySrc =
+    getPortfolioDisplayUrl(
+      artwork
+    );
+
+  const usesR2 =
+    Boolean(
+      artwork.storageKey
+    );
+
   const imageLoaded =
-    loadedSrc === artwork.src;
+    loadedSrc === displaySrc;
 
   /*
    * ============================================================
@@ -297,8 +311,10 @@ export default function ArtworkLightbox({
         >
 
           <Image
-            src={artwork.src}
+            src={displaySrc}
             alt={artwork.alt}
+
+            unoptimized={usesR2}
 
             width={2400}
             height={2400}
@@ -317,7 +333,7 @@ export default function ArtworkLightbox({
 
             onLoad={() => {
               setLoadedSrc(
-                artwork.src
+                displaySrc
               );
             }}
           />
