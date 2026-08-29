@@ -7,16 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "generate:portfolioSemi": "tsx scripts/generatePortfolioSemi.ts",
-    "generate:portfolioSty": "tsx scripts/generatePortfolioSty.ts",
-    "generate:portfolioChibisEmotes": "tsx scripts/generatePortfolioChibisEmotes.ts",
     "db:test": "tsx scripts/testDb.ts",
     "db:generate": "drizzle-kit generate --config=drizzle.config.ts",
     "db:migrate": "drizzle-kit migrate --config=drizzle.config.ts",
-    "db:seed:portfolio-pilot": "tsx scripts/seedPortfolioPilot.ts",
-    "db:verify:portfolio-pilot": "tsx scripts/verifyPortfolioPilot.ts",
     "db:seed:portfolio": "tsx scripts/seedPortfolio.ts",
-    "db:verify:portfolio": "tsx scripts/verifyPortfolio.ts",
     "db:verify:portfolio-repository": "tsx scripts/verifyPortfolioRepository.ts"
   },
   "dependencies": {
@@ -41,7 +35,6 @@
     "drizzle-kit": "^0.31.10",
     "eslint": "^9",
     "eslint-config-next": "16.2.12",
-    "image-size": "^2.0.2",
     "tailwindcss": "^4",
     "tsx": "^4.23.12",
     "typescript": "^5"

@@ -16,39 +16,95 @@ config({
   path: ".env.local",
 });
 
-function normalizeStaticPortfolio(
+/*
+ * ============================================================
+ * PORTFOLIO COMPARISON NORMALIZATION
+ * ============================================================
+ *
+ * The static portfolio files are historical migration fixtures.
+ *
+ * Their Artwork.id values are legacy numeric IDs, while the
+ * runtime repository now exposes the PostgreSQL UUID.
+ *
+ * storageKey is also runtime/storage infrastructure data that
+ * does not belong to the original static fixtures.
+ *
+ * Therefore migration parity compares public portfolio content,
+ * structure, order, and presentation fields while intentionally
+ * ignoring:
+ *
+ * - Artwork.id
+ * - Artwork.storageKey
+ */
+
+function normalizePortfolioForComparison(
   data: PortfolioData
-): PortfolioData {
+) {
   return {
-    ...data,
+    slug:
+      data.slug,
 
-    groups: data.groups.map(
-      (group) => ({
-        ...group,
+    title:
+      data.title,
 
-        subcategories:
-          group.subcategories.map(
-            (category) => ({
-              ...category,
+    groups:
+      data.groups.map(
+        (group) => ({
+          id:
+            group.id,
 
-              artworks:
-                category.artworks.map(
-                  (artwork) => ({
-                    ...artwork,
+          slug:
+            group.slug,
 
-                    thumbnailFocusX:
-                      artwork.thumbnailFocusX ??
-                      50,
+          title:
+            group.title,
 
-                    thumbnailFocusY:
-                      artwork.thumbnailFocusY ??
-                      50,
-                  })
-                ),
-            })
-          ),
-      })
-    ),
+          subcategories:
+            group.subcategories.map(
+              (category) => ({
+                id:
+                  category.id,
+
+                slug:
+                  category.slug,
+
+                title:
+                  category.title,
+
+                artworks:
+                  category.artworks.map(
+                    (artwork) => ({
+                      slug:
+                        artwork.slug,
+
+                      src:
+                        artwork.src,
+
+                      title:
+                        artwork.title,
+
+                      orientation:
+                        artwork.orientation,
+
+                      featured:
+                        artwork.featured,
+
+                      alt:
+                        artwork.alt,
+
+                      thumbnailFocusX:
+                        artwork.thumbnailFocusX ??
+                        50,
+
+                      thumbnailFocusY:
+                        artwork.thumbnailFocusY ??
+                        50,
+                    })
+                  ),
+              })
+            ),
+        })
+      ),
   };
 }
 
@@ -118,17 +174,17 @@ async function main() {
     );
 
     const expectedData =
-      normalizeStaticPortfolio(
+      normalizePortfolioForComparison(
         staticSection.data
       );
 
-    const comparableRepositoryData =
-      normalizeRepositoryPortfolio(
+    const actualData =
+      normalizePortfolioForComparison(
         repositoryData
       );
 
     deepStrictEqual(
-      comparableRepositoryData,
+      actualData,
       expectedData
     );
 
