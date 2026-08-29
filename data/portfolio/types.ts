@@ -1,5 +1,8 @@
+export type ArtworkId =
+  | string
+  | number;
 export interface Artwork {
-  id: number;
+  id: ArtworkId;
   slug: string;
   src: string;
   title: string;
