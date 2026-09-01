@@ -9,6 +9,8 @@ import { db } from "../db";
 import { commissions, commissionStatusHistory } from "../db/schema/commissions";
 import type { CommissionStatus } from "./commissionAdminRepository";
 
+import { randomUUID } from "node:crypto";
+
 type StatusHistoryEntry = typeof commissionStatusHistory.$inferSelect;
 
 type InvalidTransitionValidation = Extract<
@@ -69,6 +71,9 @@ export async function transitionCommissionStatus(
   }
 
   const changedAt = new Date();
+
+  const statusHistoryId = randomUUID();
+
   const isTerminal = ["completed", "cancelled", "declined", "expired"].includes(
     input.toStatus,
   );
@@ -131,49 +136,82 @@ export async function transitionCommissionStatus(
       }),
   );
 
-  const transitionRows = await db
-    .with(updatedCommission)
-    .insert(commissionStatusHistory)
-    .select(
-      db
-        .select({
-          id: sql<string>`
-                gen_random_uuid()
+  let transitionRows: StatusHistoryEntry[];
+
+  try {
+    transitionRows = await db
+      .with(updatedCommission)
+      .insert(commissionStatusHistory)
+      .select(
+        db
+          .select({
+            id: sql<string>`
+                ${statusHistoryId}::uuid
                 `.as("id"),
 
-          commissionId: updatedCommission.id,
+            commissionId: updatedCommission.id,
 
-          fromStatus: sql<CommissionStatus>`
-                    ${input.fromStatus}::commission_status
-                `.as("from_status"),
+            fromStatus: sql<CommissionStatus>`
+                        ${input.fromStatus}::commission_status
+                    `.as("from_status"),
 
-          toStatus: sql<CommissionStatus>`
-                    ${input.toStatus}::commission_status
-                `.as("to_status"),
+            toStatus: sql<CommissionStatus>`
+                        ${input.toStatus}::commission_status
+                    `.as("to_status"),
 
-          initiatedBy: sql<StatusHistoryEntry["initiatedBy"]>`
-                    ${input.initiatedBy}::commission_actor
-                `.as("initiated_by"),
+            initiatedBy: sql<StatusHistoryEntry["initiatedBy"]>`
+                        ${input.initiatedBy}::commission_actor
+                    `.as("initiated_by"),
 
-          reason: sql<string | null>`
-                    ${historyReason}
-                `.as("reason"),
+            reason: sql<string | null>`
+                        ${historyReason}
+                    `.as("reason"),
 
-          note: sql<string | null>`
-                    ${historyNote}
-                `.as("note"),
+            note: sql<string | null>`
+                        ${historyNote}
+                    `.as("note"),
 
-          changedByAdminUserId: sql<string>`
-                    ${changedByAdminUserId}
-                `.as("changed_by_admin_user_id"),
+            changedByAdminUserId: sql<string>`
+                        ${changedByAdminUserId}
+                    `.as("changed_by_admin_user_id"),
 
-          createdAt: sql<Date>`
-                    ${changedAt}
-                `.as("created_at"),
-        })
-        .from(updatedCommission),
-    )
-    .returning();
+            createdAt: sql<Date>`
+                        ${changedAt}
+                    `.as("created_at"),
+          })
+          .from(updatedCommission),
+      )
+      .returning();
+  } catch (error) {
+    /*
+     * Neon may commit the statement but lose the HTTP response.
+     * The pre-generated history ID lets us verify that exact write
+     * without repeating the transition.
+     */
+    try {
+      const committedRows = await db
+        .select()
+        .from(commissionStatusHistory)
+        .where(eq(commissionStatusHistory.id, statusHistoryId))
+        .limit(1);
+
+      const committedTransition = committedRows[0];
+
+      if (committedTransition) {
+        return {
+          outcome: "updated",
+          transition: committedTransition,
+        };
+      }
+    } catch {
+      /*
+       * Preserve the original write error when reconciliation
+       * cannot reach Neon either.
+       */
+    }
+
+    throw error;
+  }
 
   const transition = transitionRows[0];
 

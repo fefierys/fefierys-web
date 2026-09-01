@@ -9,6 +9,34 @@ export type CommissionActor = (typeof commissionActorEnum.enumValues)[number];
 export type CommissionCloseReason =
   (typeof commissionCloseReasonEnum.enumValues)[number];
 
+export const COMMISSION_ACTORS = [
+  "client",
+  "artist",
+  "system",
+] as const satisfies readonly CommissionActor[];
+
+export const COMMISSION_CLOSE_REASONS = [
+  "client_cancelled",
+  "artist_cancelled",
+  "mutual_cancellation",
+  "artist_declined_request",
+  "client_declined_quote",
+  "quote_expired",
+  "client_details_timeout",
+  "payment_timeout",
+  "other",
+] as const satisfies readonly CommissionCloseReason[];
+
+export function isCommissionActor(value: string): value is CommissionActor {
+  return (COMMISSION_ACTORS as readonly string[]).includes(value);
+}
+
+export function isCommissionCloseReason(
+  value: string,
+): value is CommissionCloseReason {
+  return (COMMISSION_CLOSE_REASONS as readonly string[]).includes(value);
+}
+
 export const TERMINAL_COMMISSION_STATUSES = [
   "completed",
   "cancelled",
@@ -142,6 +170,39 @@ export function getAllowedCommissionTransitions(
   return COMMISSION_STATUS_TRANSITIONS[status];
 }
 
+export function getAllowedCommissionCloseReasons(
+  fromStatus: CommissionStatus,
+  toStatus: CommissionStatus,
+): readonly CommissionCloseReason[] {
+  if (
+    toStatus !== "cancelled" &&
+    toStatus !== "declined" &&
+    toStatus !== "expired"
+  ) {
+    return [];
+  }
+
+  if (toStatus === "cancelled") {
+    return CLOSE_REASONS_BY_STATUS.cancelled;
+  }
+
+  if (toStatus === "declined") {
+    return fromStatus === "awaiting_quote_response"
+      ? CLOSE_REASONS_BY_STATUS.declined
+      : ["artist_declined_request", "other"];
+  }
+
+  const expectedReason = EXPIRATION_REASON_BY_SOURCE[fromStatus];
+
+  return expectedReason ? [expectedReason, "other"] : [];
+}
+
+export function getAllowedCommissionActors(
+  closeReason: CommissionCloseReason | null,
+): readonly CommissionActor[] {
+  return closeReason ? ACTOR_BY_CLOSE_REASON[closeReason] : COMMISSION_ACTORS;
+}
+
 export function validateCommissionTransition(
   input: CommissionTransitionInput,
 ): CommissionTransitionValidation {
@@ -201,39 +262,13 @@ export function validateCommissionTransition(
     };
   }
 
-  const allowedReasons = CLOSE_REASONS_BY_STATUS[
-    toStatus
-  ] as readonly CommissionCloseReason[];
+  const allowedReasons = getAllowedCommissionCloseReasons(fromStatus, toStatus);
 
   if (!allowedReasons.includes(closeReason)) {
     return {
       valid: false,
       code: "close_reason_not_allowed",
       message: `Close reason ${closeReason} is not valid for status ${toStatus}.`,
-    };
-  }
-
-  if (toStatus === "expired" && closeReason !== "other") {
-    const expectedReason = EXPIRATION_REASON_BY_SOURCE[fromStatus];
-
-    if (closeReason !== expectedReason) {
-      return {
-        valid: false,
-        code: "close_reason_not_allowed",
-        message: `Close reason ${closeReason} is not valid when expiring from ${fromStatus}.`,
-      };
-    }
-  }
-
-  if (
-    closeReason === "client_declined_quote" &&
-    fromStatus !== "awaiting_quote_response"
-  ) {
-    return {
-      valid: false,
-      code: "close_reason_not_allowed",
-      message:
-        "A client can decline a quote only while the commission is awaiting a quote response.",
     };
   }
 
