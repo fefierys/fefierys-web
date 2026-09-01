@@ -263,6 +263,23 @@ export const commissions = pgTable(
       .defaultRandom()
       .primaryKey(),
 
+
+    /*
+     * Client-generated idempotency key.
+     *
+     * The same submission ID must be reused when the browser
+     * retries an inquiry after an uncertain network result.
+     *
+     * The database default keeps manually-created and migrated
+     * commissions valid when no external key is supplied.
+     */
+    submissionId: uuid(
+      "submission_id"
+    )
+      .defaultRandom()
+      .notNull(),
+
+
     /*
      * Human-readable reference.
      *
@@ -473,6 +490,12 @@ export const commissions = pgTable(
       "commissions_reference_unique"
     ).on(
       table.reference
+    ),
+
+    uniqueIndex(
+      "commissions_submission_id_unique"
+    ).on(
+      table.submissionId
     ),
 
     index(

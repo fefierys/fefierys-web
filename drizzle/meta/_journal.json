@@ -29,6 +29,13 @@
       "when": 1788205885005,
       "tag": "0003_grey_la_nuit",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1788234320835,
+      "tag": "0004_wealthy_william_stryker",
+      "breakpoints": true
     }
   ]
 }

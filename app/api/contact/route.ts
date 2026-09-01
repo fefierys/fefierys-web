@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
 
+import { CURRENT_COMMISSION_TERMS_VERSION } from "../../../lib/legal/commissionTerms";
+import { createCommission } from "../../../lib/repositories/commissionRepository";
+
 
 /*
  * ============================================================
@@ -58,6 +61,9 @@ const MAX_OPTION_LENGTH = 150;
  */
 
 interface ContactBody {
+  submissionId?: unknown;
+  termsAccepted?: unknown;
+
   name?: unknown;
   email?: unknown;
   message?: unknown;
@@ -231,6 +237,10 @@ export async function POST(
      */
 
     if (
+      typeof body.submissionId !==
+        "string" ||
+      body.termsAccepted !==
+        true ||
       typeof body.name !==
         "string" ||
       typeof body.email !==
@@ -259,6 +269,11 @@ export async function POST(
     const name =
       body.name.trim();
 
+    const submissionId =
+      body.submissionId
+        .trim()
+        .toLowerCase();
+
     const email =
       body.email
         .trim()
@@ -266,6 +281,34 @@ export async function POST(
 
     const message =
       body.message.trim();
+
+
+    /*
+     * ============================================================
+     * SUBMISSION ID
+     * ============================================================
+     *
+     * crypto.randomUUID() generates RFC 4122 version 4 UUIDs.
+     */
+
+    const submissionIdRegex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
+    if (
+      !submissionIdRegex.test(
+        submissionId
+      )
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Invalid submission ID",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
 
 
     /*
@@ -436,6 +479,61 @@ export async function POST(
 
     /*
      * ============================================================
+     * PERSIST COMMISSION
+     * ============================================================
+     *
+     * The database is the source of truth. Email delivery is a
+     * best-effort side effect after the commission is persisted.
+     */
+
+    const commission =
+      await createCommission({
+        submissionId,
+
+        clientName:
+          name,
+
+        clientEmail:
+          email,
+
+        styleSnapshot:
+          style || null,
+
+        collectionSnapshot:
+          collection || null,
+
+        categorySnapshot:
+          category || null,
+
+        optionSnapshot:
+          option || null,
+
+        initialMessage:
+          message,
+
+        termsVersion:
+          CURRENT_COMMISSION_TERMS_VERSION,
+
+        agreementVersion:
+          null,
+      });
+
+    /*
+     * The original request already sent its emails. A retry only
+     * confirms the existing persisted commission.
+     */
+
+    if (!commission.wasCreated) {
+      return NextResponse.json({
+        success: true,
+        reference:
+          commission.reference,
+      });
+    }
+
+
+    /*
+     * ============================================================
      * SAFE EMAIL DATA
      * ============================================================
      */
@@ -479,44 +577,33 @@ export async function POST(
 
     /*
      * ============================================================
-     * OWNER EMAIL FIRST
+     * EMAIL SIDE EFFECTS
      * ============================================================
      *
-     * Primero debemos asegurarnos de que
-     * tú recibiste realmente la comisión.
-     */
-
-    const ownerResult =
-      await sendOwnerEmail(
-        safeData
-      );
-
-    if (ownerResult.error) {
-      console.error(
-        "Owner email failed:",
-        ownerResult.error
-      );
-
-      throw new Error(
-        ownerResult.error.message
-      );
-    }
-
-
-    /*
-     * ============================================================
-     * CLIENT CONFIRMATION
-     * ============================================================
-     *
-     * Solo llegamos aquí si tu correo
-     * se envió correctamente.
-     *
-     * Si falla la confirmación al cliente,
-     * NO perdemos la comisión.
+     * The persisted commission remains successful even if one or
+     * both email deliveries fail. Each delivery is independent.
      */
 
     try {
+      const ownerResult =
+        await sendOwnerEmail(
+          safeData
+        );
 
+      if (ownerResult.error) {
+        console.error(
+          "Owner email failed:",
+          ownerResult.error
+        );
+      }
+    } catch (error) {
+      console.error(
+        "Owner email failed:",
+        error
+      );
+    }
+
+    try {
       const clientResult =
         await sendClientConfirmationEmail(
           safeData
@@ -528,18 +615,17 @@ export async function POST(
           clientResult.error
         );
       }
-
     } catch (error) {
-
       console.error(
         "Client confirmation email failed:",
         error
       );
     }
 
-
     return NextResponse.json({
       success: true,
+      reference:
+        commission.reference,
     });
 
   } catch (error) {
@@ -552,7 +638,7 @@ export async function POST(
     return NextResponse.json(
       {
         error:
-          "Failed to send email",
+          "Failed to submit inquiry",
       },
       {
         status: 500,
