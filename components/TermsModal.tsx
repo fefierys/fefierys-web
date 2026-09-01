@@ -2,6 +2,8 @@
 
 import { AnimatePresence, motion } from 'framer-motion';
 
+import { CURRENT_COMMISSION_TERMS_VERSION } from '../lib/legal/commissionTerms';
+
 interface TermsModalProps {
   open: boolean;
   onClose: () => void;
@@ -141,6 +143,10 @@ export default function TermsModal({
               <p className="text-sm leading-relaxed text-white/80">
                 These terms are here to make the commission process clear,
                 transparent, and enjoyable for both of us.
+              </p>
+
+              <p className="mt-2 text-xs text-white/60">
+                Version {CURRENT_COMMISSION_TERMS_VERSION}
               </p>
 
               <br />

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 
 const TermsModal = dynamic(() => import('../TermsModal'));
@@ -39,6 +39,12 @@ export default function ContactForm({
 
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [termsOpen, setTermsOpen] = useState(false);
+
+  /*
+   * Reused when a request has an uncertain network result.
+   * The backend uses it as the commission idempotency key.
+   */
+  const submissionIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (termsOpen) {
@@ -146,6 +152,12 @@ export default function ContactForm({
 
 
     try {
+      const submissionId =
+        submissionIdRef.current ??
+        crypto.randomUUID();
+
+      submissionIdRef.current = submissionId;
+
       const response = await fetch('/api/contact', {
         method: 'POST',
 
@@ -154,6 +166,9 @@ export default function ContactForm({
         },
 
         body: JSON.stringify({
+          submissionId,
+          termsAccepted: true,
+
           name: normalizedName,
           email: normalizedEmail,
           message: normalizedMessage,
