@@ -12,7 +12,8 @@
     "db:migrate": "drizzle-kit migrate --config=drizzle.config.ts",
     "db:seed:portfolio": "tsx scripts/seedPortfolio.ts",
     "db:verify:portfolio-repository": "tsx scripts/verifyPortfolioRepository.ts",
-    "db:verify:commission-repository": "tsx scripts/verifyCommissionRepository.ts"
+    "db:verify:commission-repository": "tsx scripts/verifyCommissionRepository.ts",
+    "db:verify:commission-admin-queries": "tsx scripts/verifyCommissionAdminQueries.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1117.0",
