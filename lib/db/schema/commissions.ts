@@ -267,7 +267,7 @@ export const commissions = pgTable(
      * Human-readable reference.
      *
      * Example:
-     * FE-2027-0042
+     * COM-20260831-A1B2C3
      *
      * The UUID remains the real technical identity.
      */
@@ -1214,7 +1214,7 @@ export const commissionPaymentEvidence =
        * Private R2 object key.
        *
        * Example:
-       * commissions/FE-2027-0042/
+       * commissions/COM-20260831-A1B2C3/
        * payment-evidence/<uuid>.png
        */
       storageKey: text(
