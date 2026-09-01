@@ -6,6 +6,8 @@ import { requireAdmin } from "@/lib/auth/admin";
 import { COMMISSION_STATUS_LABELS } from "@/lib/commissions/commissionStatus";
 import { getAdminCommissionDetail } from "@/lib/repositories/commissionAdminRepository";
 
+import CommissionStatusForm from "@/components/admin/CommissionStatusForm";
+
 export const dynamic = "force-dynamic";
 
 interface CommissionDetailPageProps {
@@ -22,11 +24,14 @@ function formatDate(value: Date | null): string {
     return "Not recorded";
   }
 
-  return `${new Intl.DateTimeFormat("en-US", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: "UTC",
-  }).format(value)} UTC`;
+  return new Intl.DateTimeFormat("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "America/Santiago",
+  }).format(value);
 }
 
 function humanize(value: string): string {
@@ -90,6 +95,9 @@ export default async function CommissionDetailPage({
             </h1>
             <p className="mt-2 text-white/60">
               Submitted {formatDate(commission.submittedAt)}
+            </p>
+            <p className="mt-1 text-xs text-white/45">
+              All dates and times are shown in Chile local time.
             </p>
           </div>
 
@@ -263,6 +271,12 @@ export default async function CommissionDetailPage({
                   }
                 />
               </dl>
+
+              <CommissionStatusForm
+                key={commission.status}
+                commissionId={commission.id}
+                currentStatus={commission.status}
+              />
             </section>
 
             <section className="glass-card p-6">
