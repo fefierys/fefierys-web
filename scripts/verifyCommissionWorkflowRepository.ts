@@ -244,6 +244,101 @@ async function main() {
     );
 
     console.log("[OK] Cancellation closure metadata is valid");
+
+    const heldCommission = await createCommission({
+      submissionId: randomUUID(),
+      clientName: "Held Commission Workflow Verification",
+      clientEmail: `commission-held-${verificationId}@example.com`,
+      initialMessage: `Temporary held workflow verification ${verificationId}`,
+      termsVersion: "2026.1",
+    });
+
+    createdIds.push(heldCommission.id);
+
+    const holdStartedAt = new Date();
+
+    await db
+      .update(commissions)
+      .set({
+        isOnHold: true,
+        holdReason: "Client is temporarily unavailable.",
+        holdStartedAt,
+      })
+      .where(eq(commissions.id, heldCommission.id));
+
+    const blockedHeldTransition = await transitionCommissionStatus({
+      commissionId: heldCommission.id,
+      fromStatus: "received",
+      toStatus: "under_review",
+      initiatedBy: "artist",
+      changedByAdminUserId: "workflow-verifier",
+    });
+
+    equal(blockedHeldTransition.outcome, "on_hold");
+
+    const heldRowsAfterBlockedTransition = await db
+      .select()
+      .from(commissions)
+      .where(eq(commissions.id, heldCommission.id));
+
+    const commissionAfterBlockedTransition = heldRowsAfterBlockedTransition[0];
+
+    ok(commissionAfterBlockedTransition);
+    equal(commissionAfterBlockedTransition.status, "received");
+    equal(commissionAfterBlockedTransition.isOnHold, true);
+    equal(
+      commissionAfterBlockedTransition.holdReason,
+      "Client is temporarily unavailable.",
+    );
+    ok(commissionAfterBlockedTransition.holdStartedAt instanceof Date);
+
+    const historyAfterBlockedTransition = await db
+      .select()
+      .from(commissionStatusHistory)
+      .where(eq(commissionStatusHistory.commissionId, heldCommission.id));
+
+    equal(historyAfterBlockedTransition.length, 1);
+
+    console.log("[OK] Held commission rejected an operational transition");
+
+    const heldTerminalTransition = await transitionCommissionStatus({
+      commissionId: heldCommission.id,
+      fromStatus: "received",
+      toStatus: "cancelled",
+      initiatedBy: "client",
+      changedByAdminUserId: "workflow-verifier",
+      closeReason: "client_cancelled",
+      closeReasonNote: "Client cancelled while the commission was on hold.",
+    });
+
+    equal(heldTerminalTransition.outcome, "updated");
+
+    const heldRowsAfterClosure = await db
+      .select()
+      .from(commissions)
+      .where(eq(commissions.id, heldCommission.id));
+
+    const closedHeldCommission = heldRowsAfterClosure[0];
+
+    ok(closedHeldCommission);
+    equal(closedHeldCommission.status, "cancelled");
+    equal(closedHeldCommission.isOnHold, false);
+    equal(closedHeldCommission.holdReason, null);
+    equal(closedHeldCommission.holdStartedAt, null);
+    equal(closedHeldCommission.closeReason, "client_cancelled");
+    equal(closedHeldCommission.closedBy, "client");
+
+    const heldCommissionHistory = await db
+      .select()
+      .from(commissionStatusHistory)
+      .where(eq(commissionStatusHistory.commissionId, heldCommission.id));
+
+    equal(heldCommissionHistory.length, 2);
+
+    console.log(
+      "[OK] Terminal transition closed and resumed the held commission",
+    );
+
     console.log("[OK] Commission workflow repository verification passed");
   } finally {
     if (createdIds.length > 0) {

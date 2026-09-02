@@ -28,6 +28,7 @@ import CommissionTransitionConfirmDialog from "@/components/admin/CommissionTran
 interface CommissionStatusFormProps {
   commissionId: string;
   currentStatus: CommissionStatus;
+  isOnHold?: boolean;
   availableStatuses?: readonly CommissionStatus[];
   initialStatus?: CommissionStatus;
   onSuccess?: () => void;
@@ -49,6 +50,7 @@ function humanize(value: string): string {
 export default function CommissionStatusForm({
   commissionId,
   currentStatus,
+  isOnHold = false,
   availableStatuses,
   initialStatus,
   onSuccess,
@@ -56,9 +58,15 @@ export default function CommissionStatusForm({
 }: CommissionStatusFormProps) {
   const workflowTransitions = getAllowedCommissionTransitions(currentStatus);
 
-  const allowedTransitions = availableStatuses
-    ? workflowTransitions.filter((status) => availableStatuses.includes(status))
+  const holdFilteredTransitions = isOnHold
+    ? workflowTransitions.filter(isTerminalCommissionStatus)
     : workflowTransitions;
+
+  const allowedTransitions = availableStatuses
+    ? holdFilteredTransitions.filter((status) =>
+        availableStatuses.includes(status),
+      )
+    : holdFilteredTransitions;
 
   const initialToStatus =
     initialStatus && allowedTransitions.includes(initialStatus)
@@ -126,7 +134,9 @@ export default function CommissionStatusForm({
   if (allowedTransitions.length === 0) {
     return (
       <p className="mt-6 border-t border-white/10 pt-5 text-sm text-white/55">
-        This commission is closed and has no available transitions.
+        {isOnHold
+          ? "This commission is on hold. Resume it before changing its workflow status."
+          : "This commission is closed and has no available transitions."}
       </p>
     );
   }
@@ -238,6 +248,13 @@ export default function CommissionStatusForm({
       >
         <input name="commissionId" type="hidden" value={commissionId} />
         <input name="fromStatus" type="hidden" value={currentStatus} />
+
+        <div className="mb-5">
+          <h3 className="font-medium text-white">Update Status</h3>
+          <p className="mt-1 text-xs leading-relaxed text-white/50">
+            Change the current status of the commission.
+          </p>
+        </div>
 
         <div className="space-y-4">
           <label className="flex flex-col gap-2">

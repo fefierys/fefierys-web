@@ -173,6 +173,7 @@ export default function CommissionKanbanTransitionDialog({
               commissionId={commission.id}
               currentStatus={commission.status}
               initialStatus={initialStatus}
+              isOnHold={commission.isOnHold}
               onSuccess={onSuccess}
               variant="dialog"
             />

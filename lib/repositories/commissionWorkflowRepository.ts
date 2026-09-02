@@ -38,6 +38,9 @@ export type TransitionCommissionResult =
       outcome: "not_found";
     }
   | {
+      outcome: "on_hold";
+    }
+  | {
       outcome: "conflict";
       currentStatus: CommissionStatus;
     };
@@ -129,6 +132,7 @@ export async function transitionCommissionStatus(
         and(
           eq(commissions.id, input.commissionId),
           eq(commissions.status, input.fromStatus),
+          isTerminal ? undefined : eq(commissions.isOnHold, false),
         ),
       )
       .returning({
@@ -225,6 +229,7 @@ export async function transitionCommissionStatus(
   const currentRows = await db
     .select({
       status: commissions.status,
+      isOnHold: commissions.isOnHold,
     })
     .from(commissions)
     .where(eq(commissions.id, input.commissionId))
@@ -235,6 +240,16 @@ export async function transitionCommissionStatus(
   if (!currentCommission) {
     return {
       outcome: "not_found",
+    };
+  }
+
+  if (
+    !isTerminal &&
+    currentCommission.status === input.fromStatus &&
+    currentCommission.isOnHold
+  ) {
+    return {
+      outcome: "on_hold",
     };
   }
 
