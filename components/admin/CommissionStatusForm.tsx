@@ -1,11 +1,11 @@
 "use client";
 
-import { useActionState, useRef, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 
 import {
   updateCommissionStatusAction,
   type CommissionStatusActionState,
-} from "@/app/admin/(protected)/commissions/[id]/actions";
+} from "@/app/admin/(protected)/commissions/actions";
 import {
   COMMISSION_ACTORS,
   getAllowedCommissionActors,
@@ -28,6 +28,10 @@ import CommissionTransitionConfirmDialog from "@/components/admin/CommissionTran
 interface CommissionStatusFormProps {
   commissionId: string;
   currentStatus: CommissionStatus;
+  availableStatuses?: readonly CommissionStatus[];
+  initialStatus?: CommissionStatus;
+  onSuccess?: () => void;
+  variant?: "panel" | "dialog";
 }
 
 const initialState: CommissionStatusActionState = {
@@ -45,10 +49,21 @@ function humanize(value: string): string {
 export default function CommissionStatusForm({
   commissionId,
   currentStatus,
+  availableStatuses,
+  initialStatus,
+  onSuccess,
+  variant = "panel",
 }: CommissionStatusFormProps) {
-  const allowedTransitions = getAllowedCommissionTransitions(currentStatus);
+  const workflowTransitions = getAllowedCommissionTransitions(currentStatus);
 
-  const initialToStatus = allowedTransitions[0] ?? currentStatus;
+  const allowedTransitions = availableStatuses
+    ? workflowTransitions.filter((status) => availableStatuses.includes(status))
+    : workflowTransitions;
+
+  const initialToStatus =
+    initialStatus && allowedTransitions.includes(initialStatus)
+      ? initialStatus
+      : (allowedTransitions[0] ?? currentStatus);
 
   const initialCloseReasons = getAllowedCommissionCloseReasons(
     currentStatus,
@@ -71,14 +86,42 @@ export default function CommissionStatusForm({
       : (initialActors[0] ?? "artist"),
   );
 
+  const formRef = useRef<HTMLFormElement>(null);
+  const terminalTransitionConfirmed = useRef(false);
+  const submissionStarted = useRef(false);
+  const wasPending = useRef(false);
+  const onSuccessRef = useRef(onSuccess);
+
+  const [submissionLocked, setSubmissionLocked] = useState(false);
+  const [confirmationOpen, setConfirmationOpen] = useState(false);
+
   const [state, formAction, pending] = useActionState(
     updateCommissionStatusAction,
     initialState,
   );
 
-  const formRef = useRef<HTMLFormElement>(null);
-  const terminalTransitionConfirmed = useRef(false);
-  const [confirmationOpen, setConfirmationOpen] = useState(false);
+  useEffect(() => {
+    onSuccessRef.current = onSuccess;
+  }, [onSuccess]);
+
+  useEffect(() => {
+    if (pending) {
+      wasPending.current = true;
+      return;
+    }
+
+    if (wasPending.current) {
+      wasPending.current = false;
+      submissionStarted.current = false;
+      setSubmissionLocked(false);
+    }
+  }, [pending]);
+
+  useEffect(() => {
+    if (state.outcome === "success") {
+      onSuccessRef.current?.();
+    }
+  }, [state.outcome]);
 
   if (allowedTransitions.length === 0) {
     return (
@@ -154,6 +197,11 @@ export default function CommissionStatusForm({
   }
 
   function handleSubmit(event: React.SubmitEvent<HTMLFormElement>): void {
+    if (submissionStarted.current) {
+      event.preventDefault();
+      return;
+    }
+
     if (
       isTerminalCommissionStatus(toStatus) &&
       !terminalTransitionConfirmed.current
@@ -163,10 +211,16 @@ export default function CommissionStatusForm({
       return;
     }
 
+    submissionStarted.current = true;
+    setSubmissionLocked(true);
     terminalTransitionConfirmed.current = false;
   }
 
   function handleConfirmTransition(): void {
+    if (submissionStarted.current) {
+      return;
+    }
+
     terminalTransitionConfirmed.current = true;
     setConfirmationOpen(false);
     formRef.current?.requestSubmit();
@@ -177,7 +231,9 @@ export default function CommissionStatusForm({
       <form
         ref={formRef}
         action={formAction}
-        className="mt-6 border-t border-white/10 pt-6"
+        className={
+          variant === "panel" ? "mt-6 border-t border-white/10 pt-6" : ""
+        }
         onSubmit={handleSubmit}
       >
         <input name="commissionId" type="hidden" value={commissionId} />
@@ -272,10 +328,10 @@ export default function CommissionStatusForm({
 
         <button
           className="mt-5 w-full rounded-xl border border-white/15 bg-white/10 px-4 py-3 text-sm transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-50"
-          disabled={pending}
+          disabled={pending || submissionLocked}
           type="submit"
         >
-          {pending ? "Updating..." : "Update status"}
+          {pending || submissionLocked ? "Updating..." : "Update status"}
         </button>
       </form>
 
@@ -283,7 +339,7 @@ export default function CommissionStatusForm({
         onCancel={() => setConfirmationOpen(false)}
         onConfirm={handleConfirmTransition}
         open={confirmationOpen}
-        pending={pending}
+        pending={pending || submissionLocked}
         status={toStatus}
       />
     </>

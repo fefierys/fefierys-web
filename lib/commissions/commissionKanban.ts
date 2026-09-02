@@ -1,5 +1,7 @@
 import type { CommissionStatus } from "@/lib/repositories/commissionAdminRepository";
 
+import { getAllowedCommissionTransitions } from "@/lib/commissions/commissionWorkflow";
+
 export const COMMISSION_KANBAN_COLUMNS = [
   {
     id: "inbox",
@@ -70,4 +72,42 @@ export function getCommissionKanbanColumn(
   }
 
   return column;
+}
+
+export function getCommissionKanbanColumnById(
+  columnId: CommissionKanbanColumnId,
+): CommissionKanbanColumn {
+  const column = COMMISSION_KANBAN_COLUMNS.find(
+    (candidate) => candidate.id === columnId,
+  );
+
+  if (!column) {
+    throw new Error(`Unknown Commission Kanban column: ${columnId}.`);
+  }
+
+  return column;
+}
+
+export function getCommissionKanbanTransitionStatuses(
+  fromStatus: CommissionStatus,
+  targetColumnId: CommissionKanbanColumnId,
+): readonly CommissionStatus[] {
+  const column = getCommissionKanbanColumnById(targetColumnId);
+  const allowedTransitions = getAllowedCommissionTransitions(fromStatus);
+
+  return column.statuses.filter((status) =>
+    (allowedTransitions as readonly CommissionStatus[]).includes(status),
+  );
+}
+
+export function getCommissionKanbanDropColumns(
+  fromStatus: CommissionStatus,
+): readonly CommissionKanbanColumn[] {
+  const sourceColumn = getCommissionKanbanColumn(fromStatus);
+
+  return COMMISSION_KANBAN_COLUMNS.filter(
+    (column) =>
+      column.id !== sourceColumn.id &&
+      getCommissionKanbanTransitionStatuses(fromStatus, column.id).length > 0,
+  );
 }
