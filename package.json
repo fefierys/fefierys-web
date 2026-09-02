@@ -15,7 +15,9 @@
     "db:verify:commission-repository": "tsx scripts/verifyCommissionRepository.ts",
     "db:verify:commission-admin-queries": "tsx scripts/verifyCommissionAdminQueries.ts",
     "verify:commission-workflow": "tsx scripts/verifyCommissionWorkflow.ts",
-    "db:verify:commission-workflow": "tsx scripts/verifyCommissionWorkflowRepository.ts"
+    "db:verify:commission-workflow": "tsx scripts/verifyCommissionWorkflowRepository.ts",
+    "verify:commission-kanban": "tsx scripts/verifyCommissionKanban.ts",
+    "db:verify:commission-kanban": "tsx scripts/verifyCommissionKanbanRepository.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1117.0",

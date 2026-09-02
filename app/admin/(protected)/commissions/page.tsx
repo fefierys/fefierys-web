@@ -16,6 +16,10 @@ import {
   getCommissionStatusCounts,
 } from "@/lib/repositories/commissionAdminRepository";
 
+import { formatCommissionDate } from "@/lib/commissions/commissionDate";
+
+import CommissionViewToggle from "@/components/admin/CommissionViewToggle";
+
 export const dynamic = "force-dynamic";
 
 interface CommissionsPageProps {
@@ -27,14 +31,6 @@ interface CommissionsPageProps {
 
 function singleValue(value: string | string[] | undefined): string | undefined {
   return typeof value === "string" ? value : undefined;
-}
-
-function formatDate(value: Date): string {
-  return new Intl.DateTimeFormat("en-US", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: "UTC",
-  }).format(value);
 }
 
 export default async function CommissionsPage({
@@ -99,32 +95,42 @@ export default async function CommissionsPage({
               Review incoming inquiries and monitor their current workflow
               state.
             </p>
+            <p className="mt-1 text-xs text-white/45">
+              Dates and times are shown in Chile local time.
+            </p>
           </div>
 
-          <form className="flex gap-3" method="get">
-            <label className="sr-only" htmlFor="commission-status">
-              Filter by status
-            </label>
-            <select
-              className="min-w-0 flex-1 rounded-xl border border-white/15 bg-[#5966A5]/80 px-4 py-3 outline-none md:flex-none"
-              defaultValue={status ?? ""}
-              id="commission-status"
-              name="status"
-            >
-              <option value="">All statuses ({total})</option>
-              {COMMISSION_STATUSES.map((value) => (
-                <option key={value} value={value}>
-                  {COMMISSION_STATUS_LABELS[value]} ({counts[value]})
-                </option>
-              ))}
-            </select>
-            <button
-              className="rounded-xl border border-white/15 bg-white/10 px-5 py-3 transition hover:bg-white/15"
-              type="submit"
-            >
-              Apply
-            </button>
-          </form>
+          <div className="flex flex-col gap-3 sm:items-end">
+            <CommissionViewToggle activeView="list" />
+
+            <form className="flex w-full gap-3 sm:w-auto" method="get">
+              <label className="sr-only" htmlFor="commission-status">
+                Filter by status
+              </label>
+
+              <select
+                className="min-w-0 flex-1 rounded-xl border border-white/15 bg-[#5966A5]/80 px-4 py-3 outline-none md:flex-none"
+                defaultValue={status ?? ""}
+                id="commission-status"
+                name="status"
+              >
+                <option value="">All statuses ({total})</option>
+
+                {COMMISSION_STATUSES.map((value) => (
+                  <option key={value} value={value}>
+                    {COMMISSION_STATUS_LABELS[value]} ({counts[value]})
+                  </option>
+                ))}
+              </select>
+
+              <button
+                className="rounded-xl border border-white/15 bg-white/10 px-5 py-3 transition hover:bg-white/15"
+                type="submit"
+              >
+                Apply
+              </button>
+            </form>
+          </div>
         </div>
 
         <section className="mb-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -176,7 +182,7 @@ export default async function CommissionsPage({
                     </p>
                   </div>
                   <p className="text-sm text-white/60">
-                    {formatDate(commission.submittedAt)} UTC
+                    {formatCommissionDate(commission.submittedAt)}
                   </p>
                 </article>
               </Link>

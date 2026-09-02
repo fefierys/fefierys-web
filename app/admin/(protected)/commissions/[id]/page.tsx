@@ -8,6 +8,8 @@ import { getAdminCommissionDetail } from "@/lib/repositories/commissionAdminRepo
 
 import CommissionStatusForm from "@/components/admin/CommissionStatusForm";
 
+import { formatCommissionDate } from "@/lib/commissions/commissionDate";
+
 export const dynamic = "force-dynamic";
 
 interface CommissionDetailPageProps {
@@ -18,21 +20,6 @@ interface CommissionDetailPageProps {
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-function formatDate(value: Date | null): string {
-  if (!value) {
-    return "Not recorded";
-  }
-
-  return new Intl.DateTimeFormat("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    timeZone: "America/Santiago",
-  }).format(value);
-}
 
 function humanize(value: string): string {
   return value
@@ -94,7 +81,7 @@ export default async function CommissionDetailPage({
               {commission.clientName}
             </h1>
             <p className="mt-2 text-white/60">
-              Submitted {formatDate(commission.submittedAt)}
+              Submitted {formatCommissionDate(commission.submittedAt)}
             </p>
             <p className="mt-1 text-xs text-white/45">
               All dates and times are shown in Chile local time.
@@ -182,7 +169,7 @@ export default async function CommissionDetailPage({
                           {COMMISSION_STATUS_LABELS[entry.toStatus]}
                         </p>
                         <time className="text-xs text-white/50">
-                          {formatDate(entry.createdAt)}
+                          {formatCommissionDate(entry.createdAt)}
                         </time>
                       </div>
                       <p className="mt-2 text-sm text-white/60">
@@ -219,7 +206,7 @@ export default async function CommissionDetailPage({
                           </p>
                         </div>
                         <time className="text-xs text-white/50">
-                          {formatDate(event.createdAt)}
+                          {formatCommissionDate(event.createdAt)}
                         </time>
                       </div>
                       {event.description && (
@@ -248,7 +235,7 @@ export default async function CommissionDetailPage({
                 />
                 <DetailItem
                   label="Hold started"
-                  value={formatDate(commission.holdStartedAt)}
+                  value={formatCommissionDate(commission.holdStartedAt)}
                 />
                 <DetailItem
                   label="Close reason"
@@ -298,27 +285,27 @@ export default async function CommissionDetailPage({
               <dl className="mt-5 space-y-5">
                 <DetailItem
                   label="Submitted"
-                  value={formatDate(commission.submittedAt)}
+                  value={formatCommissionDate(commission.submittedAt)}
                 />
                 <DetailItem
                   label="Started"
-                  value={formatDate(commission.startedAt)}
+                  value={formatCommissionDate(commission.startedAt)}
                 />
                 <DetailItem
                   label="Final delivered"
-                  value={formatDate(commission.finalDeliveredAt)}
+                  value={formatCommissionDate(commission.finalDeliveredAt)}
                 />
                 <DetailItem
                   label="Completed"
-                  value={formatDate(commission.completedAt)}
+                  value={formatCommissionDate(commission.completedAt)}
                 />
                 <DetailItem
                   label="Closed"
-                  value={formatDate(commission.closedAt)}
+                  value={formatCommissionDate(commission.closedAt)}
                 />
                 <DetailItem
                   label="Last updated"
-                  value={formatDate(commission.updatedAt)}
+                  value={formatCommissionDate(commission.updatedAt)}
                 />
               </dl>
             </section>
