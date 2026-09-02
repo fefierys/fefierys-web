@@ -99,6 +99,7 @@ export async function updateCommissionStatusAction(
       case "updated":
         revalidatePath("/admin");
         revalidatePath("/admin/commissions");
+        revalidatePath("/admin/commissions/kanban");
         revalidatePath(`/admin/commissions/${commissionId}`);
 
         return {
@@ -119,6 +120,8 @@ export async function updateCommissionStatusAction(
         };
 
       case "conflict":
+        revalidatePath("/admin/commissions");
+        revalidatePath("/admin/commissions/kanban");
         revalidatePath(`/admin/commissions/${commissionId}`);
 
         return {
