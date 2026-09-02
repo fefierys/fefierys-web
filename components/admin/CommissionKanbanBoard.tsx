@@ -27,6 +27,8 @@ import type {
   AdminCommissionKanbanCard,
 } from "@/lib/repositories/commissionKanbanRepository";
 
+import { isTerminalCommissionStatus } from "@/lib/commissions/commissionWorkflow";
+
 interface CommissionKanbanBoardProps {
   board: AdminCommissionKanbanBoard;
   counts: CommissionStatusCounts;
@@ -47,6 +49,8 @@ export default function CommissionKanbanBoard({
   const [activeStatus, setActiveStatus] = useState<CommissionStatus | null>(
     null,
   );
+
+  const [activeIsOnHold, setActiveIsOnHold] = useState(false);
 
   const [transitionRequest, setTransitionRequest] =
     useState<CommissionTransitionRequest | null>(null);
@@ -77,14 +81,26 @@ export default function CommissionKanbanBoard({
 
     if (!isCommissionKanbanCardDragData(sourceData)) {
       setActiveStatus(null);
+      setActiveIsOnHold(false);
+      return;
+    }
+
+    const commission = commissionsById.get(sourceData.commissionId);
+
+    if (!commission || commission.status !== sourceData.status) {
+      setActiveStatus(null);
+      setActiveIsOnHold(false);
+      router.refresh();
       return;
     }
 
     setActiveStatus(sourceData.status);
+    setActiveIsOnHold(commission.isOnHold);
   }
 
   function handleDragEnd(event: DragEndEvent): void {
     setActiveStatus(null);
+    setActiveIsOnHold(false);
 
     if (event.canceled) {
       return;
@@ -107,10 +123,14 @@ export default function CommissionKanbanBoard({
       return;
     }
 
-    const availableStatuses = getCommissionKanbanTransitionStatuses(
+    const destinationStatuses = getCommissionKanbanTransitionStatuses(
       sourceData.status,
       targetData.columnId,
     );
+
+    const availableStatuses = commission.isOnHold
+      ? destinationStatuses.filter(isTerminalCommissionStatus)
+      : destinationStatuses;
 
     const initialStatus = availableStatuses[0];
 
@@ -147,6 +167,7 @@ export default function CommissionKanbanBoard({
 
                 return (
                   <DroppableCommissionKanbanColumn
+                    activeIsOnHold={activeIsOnHold}
                     activeStatus={activeStatus}
                     column={column}
                     key={column.id}

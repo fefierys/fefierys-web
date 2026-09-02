@@ -1,14 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import CommissionHoldForm from "@/components/admin/CommissionHoldForm";
+import CommissionNoteForm from "@/components/admin/CommissionNoteForm";
 import CommissionStatusBadge from "@/components/admin/CommissionStatusBadge";
+import CommissionStatusForm from "@/components/admin/CommissionStatusForm";
 import { requireAdmin } from "@/lib/auth/admin";
+import { formatCommissionDate } from "@/lib/commissions/commissionDate";
 import { COMMISSION_STATUS_LABELS } from "@/lib/commissions/commissionStatus";
 import { getAdminCommissionDetail } from "@/lib/repositories/commissionAdminRepository";
-
-import CommissionStatusForm from "@/components/admin/CommissionStatusForm";
-
-import { formatCommissionDate } from "@/lib/commissions/commissionDate";
 
 export const dynamic = "force-dynamic";
 
@@ -64,7 +64,7 @@ export default async function CommissionDetailPage({
 
   return (
     <main className="min-h-screen px-6 pb-28 pt-36 md:py-28">
-      <div className="mx-auto max-w-7xl">
+      <div className="mx-auto max-w-[96rem]">
         <Link
           className="text-sm text-white/60 transition hover:text-white"
           href="/admin/commissions"
@@ -98,8 +98,8 @@ export default async function CommissionDetailPage({
           </div>
         </header>
 
-        <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)]">
-          <div className="space-y-6">
+        <div className="mt-8 grid items-start gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)] xl:grid-cols-[minmax(15rem,0.78fr)_minmax(0,1.45fr)_minmax(19rem,0.95fr)]">
+          <div className="order-1 space-y-6 xl:order-2">
             <section className="glass-card p-6">
               <h2 className="text-xl font-light">Client</h2>
               <dl className="mt-5 grid gap-5 sm:grid-cols-2">
@@ -149,7 +149,7 @@ export default async function CommissionDetailPage({
 
             <section className="glass-card p-6">
               <h2 className="text-xl font-light">Status history</h2>
-              <div className="mt-5 space-y-4">
+              <div className="mt-5 max-h-[26rem] space-y-4 overflow-y-auto overscroll-contain pr-2">
                 {statusHistory.length === 0 ? (
                   <p className="text-sm text-white/60">
                     No status transitions recorded.
@@ -189,7 +189,8 @@ export default async function CommissionDetailPage({
 
             <section className="glass-card p-6">
               <h2 className="text-xl font-light">Events</h2>
-              <div className="mt-5 space-y-4">
+              <CommissionNoteForm commissionId={commission.id} />
+              <div className="mt-5 max-h-[26rem] space-y-4 overflow-y-auto overscroll-contain pr-2">
                 {events.length === 0 ? (
                   <p className="text-sm text-white/60">No events recorded.</p>
                 ) : (
@@ -221,7 +222,7 @@ export default async function CommissionDetailPage({
             </section>
           </div>
 
-          <aside className="space-y-6">
+          <aside className="order-2 space-y-6 xl:order-3">
             <section className="glass-card p-6">
               <h2 className="text-xl font-light">Workflow</h2>
               <dl className="mt-5 space-y-5">
@@ -259,27 +260,23 @@ export default async function CommissionDetailPage({
                 />
               </dl>
 
-              <CommissionStatusForm
-                key={commission.status}
+              <CommissionHoldForm
+                key={`hold-${commission.status}-${commission.isOnHold}`}
                 commissionId={commission.id}
                 currentStatus={commission.status}
+                isOnHold={commission.isOnHold}
+              />
+
+              <CommissionStatusForm
+                key={`status-${commission.status}-${commission.isOnHold}`}
+                commissionId={commission.id}
+                currentStatus={commission.status}
+                isOnHold={commission.isOnHold}
               />
             </section>
+          </aside>
 
-            <section className="glass-card p-6">
-              <h2 className="text-xl font-light">Consent</h2>
-              <dl className="mt-5 space-y-5">
-                <DetailItem
-                  label="Terms version"
-                  value={displayValue(commission.termsVersion)}
-                />
-                <DetailItem
-                  label="Agreement version"
-                  value={displayValue(commission.agreementVersion)}
-                />
-              </dl>
-            </section>
-
+          <aside className="order-3 flex flex-col gap-6 lg:col-span-2 lg:grid lg:grid-cols-3 xl:order-1 xl:col-span-1 xl:flex">
             <section className="glass-card p-6">
               <h2 className="text-xl font-light">Dates</h2>
               <dl className="mt-5 space-y-5">
@@ -306,6 +303,20 @@ export default async function CommissionDetailPage({
                 <DetailItem
                   label="Last updated"
                   value={formatCommissionDate(commission.updatedAt)}
+                />
+              </dl>
+            </section>
+
+            <section className="glass-card p-6">
+              <h2 className="text-xl font-light">Consent</h2>
+              <dl className="mt-5 space-y-5">
+                <DetailItem
+                  label="Terms version"
+                  value={displayValue(commission.termsVersion)}
+                />
+                <DetailItem
+                  label="Agreement version"
+                  value={displayValue(commission.agreementVersion)}
                 />
               </dl>
             </section>

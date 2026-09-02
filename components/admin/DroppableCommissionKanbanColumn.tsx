@@ -21,6 +21,7 @@ import type {
 
 interface DroppableCommissionKanbanColumnProps {
   activeStatus: CommissionStatus | null;
+  activeIsOnHold: boolean;
   column: CommissionKanbanColumn;
   result: AdminCommissionKanbanBoard[CommissionKanbanColumn["id"]];
   total: number;
@@ -29,6 +30,7 @@ interface DroppableCommissionKanbanColumnProps {
 
 export default function DroppableCommissionKanbanColumn({
   activeStatus,
+  activeIsOnHold,
   column,
   result,
   total,
@@ -36,6 +38,7 @@ export default function DroppableCommissionKanbanColumn({
 }: DroppableCommissionKanbanColumnProps) {
   const enabled =
     activeStatus !== null &&
+    (!activeIsOnHold || column.id === "closed") &&
     getCommissionKanbanDropColumns(activeStatus).some(
       (candidate) => candidate.id === column.id,
     );
