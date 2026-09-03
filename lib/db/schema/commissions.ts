@@ -183,10 +183,12 @@ export const commissionEventTypeEnum = pgEnum(
     "client_details_received",
 
     "quote_created",
+    "quote_updated",
     "quote_sent",
     "quote_accepted",
     "quote_declined",
     "quote_expired",
+    "quote_superseded",
 
     "agreement_created",
     "agreement_sent",
@@ -707,6 +709,17 @@ export const commissionQuotes =
         table.version
       ),
 
+      uniqueIndex(
+        "commission_quotes_commission_active_unique"
+      )
+        .on(table.commissionId)
+        .where(
+          sql`
+            ${table.status}
+            IN ('draft', 'sent')
+          `,
+        ),
+
       index(
         "commission_quotes_commission_id_idx"
       ).on(
@@ -741,8 +754,145 @@ export const commissionQuotes =
           upper(${table.currency})
         `
       ),
+
+      check(
+        "commission_quotes_status_dates_check",
+        sql`
+          (
+            ${table.status} = 'draft'
+            AND ${table.sentAt} IS NULL
+            AND ${table.acceptedAt} IS NULL
+            AND ${table.declinedAt} IS NULL
+            AND ${table.expiredAt} IS NULL
+          )
+          OR
+          (
+            ${table.status} = 'sent'
+            AND ${table.validUntil} IS NOT NULL
+            AND ${table.sentAt} IS NOT NULL
+            AND ${table.acceptedAt} IS NULL
+            AND ${table.declinedAt} IS NULL
+            AND ${table.expiredAt} IS NULL
+          )
+          OR
+          (
+            ${table.status} = 'accepted'
+            AND ${table.validUntil} IS NOT NULL
+            AND ${table.sentAt} IS NOT NULL
+            AND ${table.acceptedAt} IS NOT NULL
+            AND ${table.declinedAt} IS NULL
+            AND ${table.expiredAt} IS NULL
+          )
+          OR
+          (
+            ${table.status} = 'declined'
+            AND ${table.validUntil} IS NOT NULL
+            AND ${table.sentAt} IS NOT NULL
+            AND ${table.acceptedAt} IS NULL
+            AND ${table.declinedAt} IS NOT NULL
+            AND ${table.expiredAt} IS NULL
+          )
+          OR
+          (
+            ${table.status} = 'expired'
+            AND ${table.validUntil} IS NOT NULL
+            AND ${table.sentAt} IS NOT NULL
+            AND ${table.acceptedAt} IS NULL
+            AND ${table.declinedAt} IS NULL
+            AND ${table.expiredAt} IS NOT NULL
+          )
+          OR
+          (
+            ${table.status} = 'superseded'
+            AND ${table.validUntil} IS NOT NULL
+            AND ${table.sentAt} IS NOT NULL
+            AND ${table.acceptedAt} IS NULL
+            AND ${table.declinedAt} IS NULL
+            AND ${table.expiredAt} IS NULL
+          )
+        `,
+      ),
     ]
   );
+
+/*
+ * ============================================================
+ * COMMISSION QUOTE ITEMS
+ * ============================================================
+ *
+ * Structured concepts included in a quote.
+ *
+ * Positive unit amounts represent services or additions.
+ * Negative unit amounts represent discounts or adjustments.
+ * The application layer validates that the quote total equals
+ * the sum of quantity * unitAmount for every item.
+ */
+
+export const commissionQuoteItems = pgTable(
+  "commission_quote_items",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+
+    quoteId: uuid("quote_id")
+      .notNull()
+      .references(() => commissionQuotes.id, {
+        onDelete: "restrict",
+      }),
+
+    sequence: integer("sequence").notNull(),
+
+    label: varchar("label", {
+      length: 250,
+    }).notNull(),
+
+    description: text("description"),
+
+    quantity: integer("quantity").notNull().default(1),
+
+    /*
+     * May be negative for discounts and adjustments.
+     * PostgreSQL numeric is used instead of float/real.
+     */
+    unitAmount: numeric("unit_amount", {
+      precision: 12,
+      scale: 2,
+    }).notNull(),
+
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("commission_quote_items_quote_sequence_unique").on(
+      table.quoteId,
+      table.sequence,
+    ),
+
+    index("commission_quote_items_quote_id_idx").on(table.quoteId),
+
+    check(
+      "commission_quote_items_sequence_check",
+      sql`
+        ${table.sequence} >= 1
+      `,
+    ),
+
+    check(
+      "commission_quote_items_quantity_check",
+      sql`
+        ${table.quantity} >= 1
+      `,
+    ),
+  ],
+);
 
 /*
  * ============================================================
