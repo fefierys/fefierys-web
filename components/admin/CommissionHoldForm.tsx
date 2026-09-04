@@ -13,10 +13,14 @@ import {
 import { isTerminalCommissionStatus } from "@/lib/commissions/commissionWorkflow";
 import type { CommissionStatus } from "@/lib/repositories/commissionAdminRepository";
 
+import CommissionSelect from "./CommissionSelect";
+
 interface CommissionHoldFormProps {
   commissionId: string;
   currentStatus: CommissionStatus;
   isOnHold: boolean;
+  onSuccess?: (message: string) => void;
+  variant?: "panel" | "dialog";
 }
 
 const initialState: CommissionActivityActionState = {
@@ -35,17 +39,25 @@ export default function CommissionHoldForm({
   commissionId,
   currentStatus,
   isOnHold,
+  onSuccess,
+  variant = "panel",
 }: CommissionHoldFormProps) {
   const formRef = useRef<HTMLFormElement>(null);
   const submissionStarted = useRef(false);
   const wasPending = useRef(false);
+  const onSuccessRef = useRef(onSuccess);
 
   const [submissionLocked, setSubmissionLocked] = useState(false);
+  const [actor, setActor] = useState("artist");
 
   const [state, formAction, pending] = useActionState(
     changeCommissionHoldAction,
     initialState,
   );
+
+  useEffect(() => {
+    onSuccessRef.current = onSuccess;
+  }, [onSuccess]);
 
   useEffect(() => {
     if (pending) {
@@ -63,8 +75,11 @@ export default function CommissionHoldForm({
   useEffect(() => {
     if (state.outcome === "success") {
       formRef.current?.reset();
+      onSuccessRef.current?.(
+        state.message ?? "Commission updated successfully.",
+      );
     }
-  }, [state.outcome]);
+  }, [state.message, state.outcome]);
 
   if (isTerminalCommissionStatus(currentStatus)) {
     return null;
@@ -87,7 +102,9 @@ export default function CommissionHoldForm({
     <form
       ref={formRef}
       action={formAction}
-      className="mt-6 border-t border-white/10 pt-6"
+      className={
+        variant === "panel" ? "mt-6 border-t border-white/10 pt-6" : ""
+      }
       onSubmit={handleSubmit}
     >
       <input name="commissionId" type="hidden" value={commissionId} />
@@ -98,30 +115,31 @@ export default function CommissionHoldForm({
         value={isOnHold ? "resume" : "pause"}
       />
 
-      <div className="mb-5">
-        <h3 className="font-medium text-white">{actionLabel}</h3>
-        <p className="mt-1 text-xs leading-relaxed text-white/50">
-          {isOnHold
-            ? "Resume this commission when work or client communication can continue."
-            : "Temporarily stop workflow progress without changing the current status."}
-        </p>
-      </div>
+      {variant === "panel" && (
+        <div className="mb-5">
+          <h3 className="font-medium text-white">{actionLabel}</h3>
+          <p className="mt-1 text-xs leading-relaxed text-white/50">
+            {isOnHold
+              ? "Resume this commission when work or client communication can continue."
+              : "Temporarily stop workflow progress without changing the current status."}
+          </p>
+        </div>
+      )}
 
       <div className="space-y-4">
-        <label className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2">
           <span className="text-sm text-white/70">Initiated by</span>
-          <select
-            className="w-full rounded-xl border border-white/15 bg-[#5966A5]/80 px-4 py-3 text-sm text-white outline-none"
-            defaultValue="artist"
+          <CommissionSelect
+            disabled={submitting}
             name="actor"
-          >
-            {COMMISSION_MANUAL_ACTORS.map((actor) => (
-              <option key={actor} value={actor}>
-                {humanize(actor)}
-              </option>
-            ))}
-          </select>
-        </label>
+            onChange={setActor}
+            options={COMMISSION_MANUAL_ACTORS.map((option) => ({
+              label: humanize(option),
+              value: option,
+            }))}
+            value={actor}
+          />
+        </div>
 
         <label className="flex flex-col gap-2">
           <span className="text-sm text-white/70">

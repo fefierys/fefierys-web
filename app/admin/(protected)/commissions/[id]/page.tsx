@@ -1,14 +1,15 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import CommissionHoldForm from "@/components/admin/CommissionHoldForm";
-import CommissionNoteForm from "@/components/admin/CommissionNoteForm";
+import CommissionEventNoteButton from "@/components/admin/CommissionEventNoteButton";
+import CommissionQuotePanel from "@/components/admin/CommissionQuotePanel";
 import CommissionStatusBadge from "@/components/admin/CommissionStatusBadge";
-import CommissionStatusForm from "@/components/admin/CommissionStatusForm";
+import CommissionWorkflowActions from "@/components/admin/CommissionWorkflowActions";
 import { requireAdmin } from "@/lib/auth/admin";
 import { formatCommissionDate } from "@/lib/commissions/commissionDate";
 import { COMMISSION_STATUS_LABELS } from "@/lib/commissions/commissionStatus";
 import { getAdminCommissionDetail } from "@/lib/repositories/commissionAdminRepository";
+import { getCommissionQuotes } from "@/lib/repositories/commissionQuoteRepository";
 
 export const dynamic = "force-dynamic";
 
@@ -54,7 +55,10 @@ export default async function CommissionDetailPage({
     notFound();
   }
 
-  const detail = await getAdminCommissionDetail(id);
+  const [detail, quotes] = await Promise.all([
+    getAdminCommissionDetail(id),
+    getCommissionQuotes(id),
+  ]);
 
   if (!detail) {
     notFound();
@@ -188,8 +192,10 @@ export default async function CommissionDetailPage({
             </section>
 
             <section className="glass-card p-6">
-              <h2 className="text-xl font-light">Events</h2>
-              <CommissionNoteForm commissionId={commission.id} />
+              <div className="flex items-center justify-between gap-4">
+                <h2 className="text-xl font-light">Events</h2>
+                <CommissionEventNoteButton commissionId={commission.id} />
+              </div>
               <div className="mt-5 max-h-[26rem] space-y-4 overflow-y-auto overscroll-contain pr-2">
                 {events.length === 0 ? (
                   <p className="text-sm text-white/60">No events recorded.</p>
@@ -260,20 +266,18 @@ export default async function CommissionDetailPage({
                 />
               </dl>
 
-              <CommissionHoldForm
-                key={`hold-${commission.status}-${commission.isOnHold}`}
-                commissionId={commission.id}
-                currentStatus={commission.status}
-                isOnHold={commission.isOnHold}
-              />
-
-              <CommissionStatusForm
-                key={`status-${commission.status}-${commission.isOnHold}`}
+              <CommissionWorkflowActions
                 commissionId={commission.id}
                 currentStatus={commission.status}
                 isOnHold={commission.isOnHold}
               />
             </section>
+
+            <CommissionQuotePanel
+              commissionId={commission.id}
+              commissionStatus={commission.status}
+              quotes={quotes}
+            />
           </aside>
 
           <aside className="order-3 flex flex-col gap-6 lg:col-span-2 lg:grid lg:grid-cols-3 xl:order-1 xl:col-span-1 xl:flex">

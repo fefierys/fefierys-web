@@ -36,6 +36,27 @@
       "when": 1788234320835,
       "tag": "0004_wealthy_william_stryker",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1788411222442,
+      "tag": "0005_flimsy_screwball",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1788415339678,
+      "tag": "0006_outstanding_thunderbolt",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1788416307535,
+      "tag": "0007_chilly_scarlet_witch",
+      "breakpoints": true
     }
   ]
 }
