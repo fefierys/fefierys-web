@@ -24,6 +24,7 @@ import {
 import type { CommissionStatus } from "@/lib/repositories/commissionAdminRepository";
 
 import CommissionTransitionConfirmDialog from "@/components/admin/CommissionTransitionConfirmDialog";
+import CommissionSelect from "./CommissionSelect";
 
 interface CommissionStatusFormProps {
   commissionId: string;
@@ -33,6 +34,7 @@ interface CommissionStatusFormProps {
   initialStatus?: CommissionStatus;
   onSuccess?: () => void;
   variant?: "panel" | "dialog";
+  confirmationVariant?: "dialog" | "inline";
 }
 
 const initialState: CommissionStatusActionState = {
@@ -55,6 +57,7 @@ export default function CommissionStatusForm({
   initialStatus,
   onSuccess,
   variant = "panel",
+  confirmationVariant = "dialog",
 }: CommissionStatusFormProps) {
   const workflowTransitions = getAllowedCommissionTransitions(currentStatus);
 
@@ -148,11 +151,7 @@ export default function CommissionStatusForm({
 
   const availableActors = getAllowedCommissionActors(closeReason || null);
 
-  function handleStatusChange(
-    event: React.ChangeEvent<HTMLSelectElement>,
-  ): void {
-    const value = event.target.value;
-
+  function handleStatusChange(value: string): void {
     if (!isCommissionStatus(value) || !allowedTransitions.includes(value)) {
       return;
     }
@@ -172,11 +171,7 @@ export default function CommissionStatusForm({
     );
   }
 
-  function handleCloseReasonChange(
-    event: React.ChangeEvent<HTMLSelectElement>,
-  ): void {
-    const value = event.target.value;
-
+  function handleCloseReasonChange(value: string): void {
     if (!value) {
       setCloseReason("");
       setInitiatedBy("artist");
@@ -196,11 +191,7 @@ export default function CommissionStatusForm({
     );
   }
 
-  function handleActorChange(
-    event: React.ChangeEvent<HTMLSelectElement>,
-  ): void {
-    const value = event.target.value;
-
+  function handleActorChange(value: string): void {
     if (isCommissionActor(value) && availableActors.includes(value)) {
       setInitiatedBy(value);
     }
@@ -241,78 +232,73 @@ export default function CommissionStatusForm({
       <form
         ref={formRef}
         action={formAction}
-        className={
-          variant === "panel" ? "mt-6 border-t border-white/10 pt-6" : ""
-        }
+        className={`${variant === "panel" ? "mt-6 border-t border-white/10 pt-6" : ""} ${
+          confirmationOpen && confirmationVariant === "inline" ? "hidden" : ""
+        }`}
         onSubmit={handleSubmit}
       >
         <input name="commissionId" type="hidden" value={commissionId} />
         <input name="fromStatus" type="hidden" value={currentStatus} />
 
-        <div className="mb-5">
-          <h3 className="font-medium text-white">Update Status</h3>
-          <p className="mt-1 text-xs leading-relaxed text-white/50">
-            Change the current status of the commission.
-          </p>
-        </div>
+        {variant === "panel" && (
+          <div className="mb-5">
+            <h3 className="font-medium text-white">Update Status</h3>
+            <p className="mt-1 text-xs leading-relaxed text-white/50">
+              Change the current status of the commission.
+            </p>
+          </div>
+        )}
 
         <div className="space-y-4">
-          <label className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2">
             <span className="text-sm text-white/70">Move to</span>
-            <select
-              className="w-full rounded-xl border border-white/15 bg-[#5966A5]/80 px-4 py-3 text-sm text-white outline-none"
+            <CommissionSelect
+              disabled={pending || submissionLocked}
               name="toStatus"
               onChange={handleStatusChange}
+              options={allowedTransitions.map((status) => ({
+                label: COMMISSION_STATUS_LABELS[status],
+                value: status,
+              }))}
               value={toStatus}
-            >
-              {allowedTransitions.map((status) => (
-                <option key={status} value={status}>
-                  {COMMISSION_STATUS_LABELS[status]}
-                </option>
-              ))}
-            </select>
-          </label>
+            />
+          </div>
 
           {closeReasons.length > 0 && (
-            <label className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2">
               <span className="text-sm text-white/70">Close reason</span>
-              <select
-                className="w-full rounded-xl border border-white/15 bg-[#5966A5]/80 px-4 py-3 text-sm text-white outline-none"
+              <CommissionSelect
+                disabled={pending || submissionLocked}
                 name="closeReason"
                 onChange={handleCloseReasonChange}
-                required
+                options={closeReasons.map((reason) => ({
+                  label: humanize(reason),
+                  value: reason,
+                }))}
                 value={closeReason}
-              >
-                {closeReasons.map((reason) => (
-                  <option key={reason} value={reason}>
-                    {humanize(reason)}
-                  </option>
-                ))}
-              </select>
-            </label>
+              />
+            </div>
           )}
 
           {closeReasons.length === 0 && (
             <input name="closeReason" type="hidden" value="" />
           )}
 
-          <label className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2">
             <span className="text-sm text-white/70">Initiated by</span>
-            <select
-              className="w-full rounded-xl border border-white/15 bg-[#5966A5]/80 px-4 py-3 text-sm text-white outline-none"
+            <CommissionSelect
+              disabled={pending || submissionLocked}
               name="initiatedBy"
               onChange={handleActorChange}
-              value={initiatedBy}
-            >
-              {COMMISSION_ACTORS.filter((actor) =>
+              options={COMMISSION_ACTORS.filter((actor) =>
                 availableActors.includes(actor),
-              ).map((actor) => (
-                <option key={actor} value={actor}>
-                  {humanize(actor)}
-                </option>
-              ))}
-            </select>
-          </label>
+              ).map((actor) => ({
+                label: humanize(actor),
+                value: actor,
+              }))}
+              value={initiatedBy}
+            />
+          </div>
 
           <label className="flex flex-col gap-2">
             <span className="text-sm text-white/70">
@@ -352,10 +338,46 @@ export default function CommissionStatusForm({
         </button>
       </form>
 
+      {confirmationOpen && confirmationVariant === "inline" && (
+        <div className="rounded-2xl border border-amber-100/20 bg-amber-100/[0.08] p-5">
+          <div className="flex h-11 w-11 items-center justify-center rounded-full border border-amber-200/20 bg-amber-200/10 text-lg text-amber-100">
+            !
+          </div>
+          <h3 className="mt-4 text-xl font-light">Confirm status change</h3>
+          <p className="mt-3 text-sm leading-relaxed text-white/70">
+            This commission will move to{" "}
+            <strong className="font-medium text-white">
+              {COMMISSION_STATUS_LABELS[toStatus]}
+            </strong>
+            . Terminal transitions cannot be reversed from the dashboard.
+          </p>
+          <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <button
+              className="rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-sm transition hover:bg-white/10"
+              disabled={pending || submissionLocked}
+              onClick={() => setConfirmationOpen(false)}
+              type="button"
+            >
+              Go back
+            </button>
+            <button
+              className="rounded-xl border border-rose-200/20 bg-rose-200/15 px-5 py-3 text-sm text-rose-50 transition hover:bg-rose-200/25 disabled:opacity-50"
+              disabled={pending || submissionLocked}
+              onClick={handleConfirmTransition}
+              type="button"
+            >
+              {pending || submissionLocked
+                ? "Updating..."
+                : "Confirm transition"}
+            </button>
+          </div>
+        </div>
+      )}
+
       <CommissionTransitionConfirmDialog
         onCancel={() => setConfirmationOpen(false)}
         onConfirm={handleConfirmTransition}
-        open={confirmationOpen}
+        open={confirmationOpen && confirmationVariant === "dialog"}
         pending={pending || submissionLocked}
         status={toStatus}
       />

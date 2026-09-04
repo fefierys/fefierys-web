@@ -11,8 +11,12 @@ import {
   MAX_COMMISSION_ACTIVITY_TEXT_LENGTH,
 } from "@/lib/commissions/commissionActivity";
 
+import CommissionSelect from "./CommissionSelect";
+
 interface CommissionNoteFormProps {
   commissionId: string;
+  onSuccess?: (message: string) => void;
+  variant?: "panel" | "dialog";
 }
 
 const initialState: CommissionActivityActionState = {
@@ -29,17 +33,25 @@ function humanize(value: string): string {
 
 export default function CommissionNoteForm({
   commissionId,
+  onSuccess,
+  variant = "panel",
 }: CommissionNoteFormProps) {
   const formRef = useRef<HTMLFormElement>(null);
   const submissionStarted = useRef(false);
   const wasPending = useRef(false);
+  const onSuccessRef = useRef(onSuccess);
 
   const [submissionLocked, setSubmissionLocked] = useState(false);
+  const [actor, setActor] = useState("artist");
 
   const [state, formAction, pending] = useActionState(
     addCommissionNoteAction,
     initialState,
   );
+
+  useEffect(() => {
+    onSuccessRef.current = onSuccess;
+  }, [onSuccess]);
 
   useEffect(() => {
     if (pending) {
@@ -57,8 +69,11 @@ export default function CommissionNoteForm({
   useEffect(() => {
     if (state.outcome === "success") {
       formRef.current?.reset();
+      onSuccessRef.current?.(
+        state.message ?? "Commission note added successfully.",
+      );
     }
-  }, [state]);
+  }, [state.message, state.outcome]);
 
   function handleSubmit(event: React.SubmitEvent<HTMLFormElement>): void {
     if (submissionStarted.current) {
@@ -76,31 +91,37 @@ export default function CommissionNoteForm({
     <form
       ref={formRef}
       action={formAction}
-      className="mt-5 rounded-2xl border border-white/10 bg-white/[0.04] p-4"
+      className={
+        variant === "panel"
+          ? "mt-5 rounded-2xl border border-white/10 bg-white/[0.04] p-4"
+          : ""
+      }
       onSubmit={handleSubmit}
     >
       <input name="commissionId" type="hidden" value={commissionId} />
-      <h3 className="font-medium">Add note</h3>
+      {variant === "panel" && (
+        <>
+          <h3 className="font-medium">Add note</h3>
+          <p className="mt-1 text-xs leading-relaxed text-white/50">
+            Notes are private administrative timeline entries.
+          </p>
+        </>
+      )}
 
-      <p className="mt-1 text-xs leading-relaxed text-white/50">
-        Notes are private administrative timeline entries.
-      </p>
-
-      <div className="mt-4 space-y-4">
-        <label className="flex flex-col gap-2">
+      <div className={variant === "panel" ? "mt-4 space-y-4" : "space-y-4"}>
+        <div className="flex flex-col gap-2">
           <span className="text-sm text-white/70">Source</span>
-          <select
-            className="w-full rounded-xl border border-white/15 bg-[#5966A5]/80 px-4 py-3 text-sm text-white outline-none"
-            defaultValue="artist"
+          <CommissionSelect
+            disabled={submitting}
             name="actor"
-          >
-            {COMMISSION_MANUAL_ACTORS.map((actor) => (
-              <option key={actor} value={actor}>
-                {humanize(actor)}
-              </option>
-            ))}
-          </select>
-        </label>
+            onChange={setActor}
+            options={COMMISSION_MANUAL_ACTORS.map((option) => ({
+              label: humanize(option),
+              value: option,
+            }))}
+            value={actor}
+          />
+        </div>
 
         <label className="flex flex-col gap-2">
           <span className="text-sm text-white/70">Note</span>
