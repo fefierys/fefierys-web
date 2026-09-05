@@ -21,7 +21,13 @@
     "verify:commission-activity": "tsx scripts/verifyCommissionActivity.ts",
     "db:verify:commission-activity": "tsx scripts/verifyCommissionActivityRepository.ts",
     "verify:commission-quotes": "tsx scripts/verifyCommissionQuote.ts",
-    "db:verify:commission-quotes": "tsx scripts/verifyCommissionQuoteRepository.ts"
+    "db:verify:commission-quotes": "tsx scripts/verifyCommissionQuoteRepository.ts",
+    "verify:commission-pricing": "tsx scripts/verifyCommissionPricing.ts",
+    "db:verify:commission-pricing": "tsx scripts/verifyCommissionPricingRepository.ts",
+    "verify:commission-pricing-catalog": "tsx scripts/verifyCommissionPricingCatalog.ts",
+    "db:seed:commission-pricing": "tsx scripts/seedCommissionPricingCatalog.ts",
+    "db:verify:commission-pricing-catalog": "tsx scripts/verifySeededCommissionPricingCatalog.ts",
+    "db:publish:commission-pricing": "tsx scripts/publishCommissionPricingCatalog.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1117.0",
