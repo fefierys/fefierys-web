@@ -89,7 +89,7 @@ export default function CommissionAdminModal({
       {open && (
         <motion.div
           animate={{ opacity: 1 }}
-          className="fixed inset-0 z-[100] flex items-end justify-center bg-[#35436d]/25 p-0 backdrop-blur-sm sm:items-center sm:p-6"
+          className="fixed inset-0 z-[1000] flex items-center justify-center bg-[#35436d]/25 p-3 backdrop-blur-sm sm:p-6"
           exit={{ opacity: 0 }}
           initial={{ opacity: 0 }}
         >
@@ -100,7 +100,7 @@ export default function CommissionAdminModal({
             }
             aria-labelledby="commission-admin-modal-title"
             aria-modal="true"
-            className="flex max-h-[100dvh] w-full flex-col overflow-hidden border border-white/15 bg-[#7880b2]/75 text-white shadow-[0_25px_75px_rgba(32,38,82,0.3)] backdrop-blur-2xl sm:max-h-[90dvh] sm:max-w-5xl sm:rounded-3xl"
+            className="flex max-h-[calc(100dvh-1.5rem)] w-full flex-col overflow-hidden rounded-2xl border border-white/15 bg-[#7880b2]/75 text-white shadow-[0_25px_75px_rgba(32,38,82,0.3)] backdrop-blur-2xl sm:max-h-[90dvh] sm:max-w-5xl sm:rounded-3xl"
             exit={{ opacity: 0, scale: 0.98, y: 10 }}
             initial={{ opacity: 0, scale: 0.98, y: 10 }}
             onKeyDown={handleKeyDown}

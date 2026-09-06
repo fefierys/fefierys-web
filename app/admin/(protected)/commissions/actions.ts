@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { requireAdmin } from "@/lib/auth/admin";
+import { isCommissionServiceClassification } from "@/lib/commissions/commissionClassification";
 import {
   isCommissionActor,
   isCommissionCloseReason,
@@ -30,6 +31,7 @@ import {
   supersedeCommissionQuote,
   updateCommissionQuoteDraft,
 } from "@/lib/repositories/commissionQuoteRepository";
+import { classifyCommission } from "@/lib/repositories/commissionClassificationRepository";
 
 export interface CommissionStatusActionState {
   outcome: "idle" | "success" | "error" | "conflict";
@@ -42,6 +44,11 @@ export interface CommissionActivityActionState {
 }
 
 export interface CommissionQuoteActionState {
+  outcome: "idle" | "success" | "error" | "conflict";
+  message: string | null;
+}
+
+export interface CommissionClassificationActionState {
   outcome: "idle" | "success" | "error" | "conflict";
   message: string | null;
 }
@@ -253,6 +260,128 @@ function revalidateCommissionActivityPaths(commissionId: string): void {
   revalidatePath("/admin/commissions");
   revalidatePath("/admin/commissions/kanban");
   revalidatePath(`/admin/commissions/${commissionId}`);
+}
+
+export async function classifyCommissionAction(
+  _previousState: CommissionClassificationActionState,
+  formData: FormData,
+): Promise<CommissionClassificationActionState> {
+  const session = await requireAdmin();
+  const commissionId = getFormValue(formData, "commissionId");
+  const classification = getFormValue(formData, "classification");
+  const pricingServiceId = getFormValue(formData, "pricingServiceId");
+  const pricingOptionId = getFormValue(formData, "pricingOptionId");
+  const note = getFormValue(formData, "note");
+  const expectedUpdatedAt = parseRequiredDate(
+    getFormValue(formData, "expectedUpdatedAt"),
+  );
+
+  if (!UUID_PATTERN.test(commissionId)) {
+    return {
+      outcome: "error",
+      message: "The commission identifier is invalid.",
+    };
+  }
+
+  if (
+    !isCommissionServiceClassification(classification) ||
+    classification === "unclassified"
+  ) {
+    return {
+      outcome: "error",
+      message: "The service classification is invalid.",
+    };
+  }
+
+  if (!expectedUpdatedAt) {
+    return {
+      outcome: "error",
+      message: "The commission timestamp is invalid.",
+    };
+  }
+
+  if (
+    classification === "catalog" &&
+    (!UUID_PATTERN.test(pricingServiceId) ||
+      !UUID_PATTERN.test(pricingOptionId))
+  ) {
+    return {
+      outcome: "error",
+      message: "Select a valid catalog service and option.",
+    };
+  }
+
+  try {
+    const result = await classifyCommission(
+      classification === "catalog"
+        ? {
+            classification,
+            commissionId,
+            expectedUpdatedAt,
+            note: note || null,
+            pricingOptionId,
+            pricingServiceId,
+            updatedByAdminUserId: session.user.id,
+          }
+        : {
+            classification,
+            commissionId,
+            expectedUpdatedAt,
+            note,
+            updatedByAdminUserId: session.user.id,
+          },
+    );
+
+    switch (result.outcome) {
+      case "classified":
+        revalidateCommissionActivityPaths(commissionId);
+        return {
+          outcome: "success",
+          message:
+            classification === "catalog"
+              ? "Commission classified from the pricing catalog."
+              : "Commission classified as custom.",
+        };
+      case "invalid":
+        return { outcome: "error", message: result.validation.message };
+      case "not_found":
+        return {
+          outcome: "error",
+          message: "The commission no longer exists.",
+        };
+      case "catalog_option_not_found":
+        return {
+          outcome: "error",
+          message: "The selected pricing option is no longer available.",
+        };
+      case "option_service_mismatch":
+        return {
+          outcome: "error",
+          message: "The selected option does not belong to that service.",
+        };
+      case "quote_exists":
+        revalidateCommissionActivityPaths(commissionId);
+        return {
+          outcome: "conflict",
+          message:
+            "The service cannot be reclassified after a quote has been created.",
+        };
+      case "conflict":
+        revalidateCommissionActivityPaths(commissionId);
+        return {
+          outcome: "conflict",
+          message:
+            "The commission changed before the classification was saved. Refresh the page and try again.",
+        };
+    }
+  } catch (error) {
+    console.error("Failed to classify commission:", error);
+    return {
+      outcome: "error",
+      message:
+        "The commission classification could not be saved. Please try again.",
+    };
+  }
 }
 
 export async function changeCommissionHoldAction(
