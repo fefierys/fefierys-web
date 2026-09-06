@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import CommissionEventNoteButton from "@/components/admin/CommissionEventNoteButton";
+import CommissionClassificationPanel from "@/components/admin/CommissionClassificationPanel";
 import CommissionQuotePanel from "@/components/admin/CommissionQuotePanel";
 import CommissionStatusBadge from "@/components/admin/CommissionStatusBadge";
 import CommissionWorkflowActions from "@/components/admin/CommissionWorkflowActions";
@@ -9,6 +10,7 @@ import { requireAdmin } from "@/lib/auth/admin";
 import { formatCommissionDate } from "@/lib/commissions/commissionDate";
 import { COMMISSION_STATUS_LABELS } from "@/lib/commissions/commissionStatus";
 import { getAdminCommissionDetail } from "@/lib/repositories/commissionAdminRepository";
+import { getActiveCommissionPricingCatalog } from "@/lib/repositories/commissionPricingRepository";
 import { getCommissionQuotes } from "@/lib/repositories/commissionQuoteRepository";
 
 export const dynamic = "force-dynamic";
@@ -33,6 +35,14 @@ function displayValue(value: string | null): string {
   return value?.trim() || "Not provided";
 }
 
+function displayRequestedValue(value: string | null): string {
+  const normalizedValue = value?.trim();
+
+  return normalizedValue && normalizedValue.toLowerCase() !== "not specified"
+    ? normalizedValue
+    : "Not specified by client";
+}
+
 function DetailItem({ label, value }: { label: string; value: string }) {
   return (
     <div>
@@ -55,9 +65,10 @@ export default async function CommissionDetailPage({
     notFound();
   }
 
-  const [detail, quotes] = await Promise.all([
+  const [detail, quotes, pricingCatalog] = await Promise.all([
     getAdminCommissionDetail(id),
     getCommissionQuotes(id),
+    getActiveCommissionPricingCatalog({ audience: "admin" }),
   ]);
 
   if (!detail) {
@@ -121,23 +132,27 @@ export default async function CommissionDetailPage({
             </section>
 
             <section className="glass-card p-6">
-              <h2 className="text-xl font-light">Requested service</h2>
+              <h2 className="text-xl font-light">Original client request</h2>
+              <p className="mt-1 text-xs leading-relaxed text-white/50">
+                Preserved exactly as submitted. The administrative selection is
+                shown under Service classification.
+              </p>
               <dl className="mt-5 grid gap-5 sm:grid-cols-2">
                 <DetailItem
                   label="Style"
-                  value={displayValue(commission.styleSnapshot)}
+                  value={displayRequestedValue(commission.styleSnapshot)}
                 />
                 <DetailItem
                   label="Collection"
-                  value={displayValue(commission.collectionSnapshot)}
+                  value={displayRequestedValue(commission.collectionSnapshot)}
                 />
                 <DetailItem
                   label="Category"
-                  value={displayValue(commission.categorySnapshot)}
+                  value={displayRequestedValue(commission.categorySnapshot)}
                 />
                 <DetailItem
                   label="Option"
-                  value={displayValue(commission.optionSnapshot)}
+                  value={displayRequestedValue(commission.optionSnapshot)}
                 />
               </dl>
 
@@ -272,6 +287,28 @@ export default async function CommissionDetailPage({
                 isOnHold={commission.isOnHold}
               />
             </section>
+
+            <CommissionClassificationPanel
+              classification={commission.serviceClassification}
+              classificationNote={commission.classificationNote}
+              commissionId={commission.id}
+              expectedUpdatedAt={commission.updatedAt.toISOString()}
+              hasQuotes={quotes.length > 0}
+              pricingOptionId={commission.pricingOptionId}
+              pricingServiceId={commission.pricingServiceId}
+              requestSource={commission.requestSource}
+              services={(pricingCatalog?.services ?? []).map((entry) => ({
+                code: entry.service.code,
+                id: entry.service.id,
+                options: entry.options.map(({ option }) => ({
+                  baseAmount: option.baseAmount,
+                  id: option.id,
+                  quoteLabel: option.quoteLabel,
+                  title: option.title,
+                })),
+                title: entry.service.title,
+              }))}
+            />
 
             <CommissionQuotePanel
               commissionId={commission.id}

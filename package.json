@@ -27,7 +27,12 @@
     "verify:commission-pricing-catalog": "tsx scripts/verifyCommissionPricingCatalog.ts",
     "db:seed:commission-pricing": "tsx scripts/seedCommissionPricingCatalog.ts",
     "db:verify:commission-pricing-catalog": "tsx scripts/verifySeededCommissionPricingCatalog.ts",
-    "db:publish:commission-pricing": "tsx scripts/publishCommissionPricingCatalog.ts"
+    "db:publish:commission-pricing": "tsx scripts/publishCommissionPricingCatalog.ts",
+    "verify:commission-classification": "tsx scripts/verifyCommissionClassification.ts",
+    "db:verify:commission-classification": "tsx scripts/verifyCommissionClassificationRepository.ts",
+    "verify:commission-pricing-snapshot-matcher": "tsx scripts/verifyCommissionPricingSnapshotMatcher.ts",
+    "db:verify:commission-auto-classification": "tsx scripts/verifyCommissionAutomaticClassificationRepository.ts",
+    "db:backfill:commission-classification": "tsx scripts/backfillCommissionServiceClassifications.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1117.0",

@@ -4,7 +4,6 @@ import { Resend } from "resend";
 import { CURRENT_COMMISSION_TERMS_VERSION } from "../../../lib/legal/commissionTerms";
 import { createCommission } from "../../../lib/repositories/commissionRepository";
 
-
 /*
  * ============================================================
  * ENVIRONMENT VARIABLES
@@ -15,26 +14,19 @@ function getRequiredEnv(name: string): string {
   const value = process.env[name];
 
   if (!value) {
-    throw new Error(
-      `${name} environment variable is not configured`
-    );
+    throw new Error(`${name} environment variable is not configured`);
   }
 
   return value;
 }
 
-const resendApiKey =
-  getRequiredEnv("RESEND_API_KEY");
+const resendApiKey = getRequiredEnv("RESEND_API_KEY");
 
-const ownerEmail =
-  getRequiredEnv("OWNER_EMAIL");
+const ownerEmail = getRequiredEnv("OWNER_EMAIL");
 
-const senderEmail =
-  getRequiredEnv("SENDER_EMAIL");
+const senderEmail = getRequiredEnv("SENDER_EMAIL");
 
-const resend =
-  new Resend(resendApiKey);
-
+const resend = new Resend(resendApiKey);
 
 /*
  * ============================================================
@@ -52,7 +44,6 @@ const MAX_STYLE_LENGTH = 100;
 const MAX_COLLECTION_LENGTH = 100;
 const MAX_CATEGORY_LENGTH = 100;
 const MAX_OPTION_LENGTH = 150;
-
 
 /*
  * ============================================================
@@ -87,68 +78,47 @@ interface SafeEmailData {
   option: string;
 }
 
-
 /*
  * ============================================================
  * POST
  * ============================================================
  */
 
-export async function POST(
-  request: Request
-) {
+export async function POST(request: Request) {
   try {
-
     /*
      * CONTENT TYPE
      */
 
-    const contentType =
-      request.headers.get(
-        "content-type"
-      );
+    const contentType = request.headers.get("content-type");
 
-    if (
-      !contentType
-        ?.toLowerCase()
-        .startsWith(
-          "application/json"
-        )
-    ) {
+    if (!contentType?.toLowerCase().startsWith("application/json")) {
       return NextResponse.json(
         {
-          error:
-            "Unsupported content type",
+          error: "Unsupported content type",
         },
         {
           status: 415,
-        }
+        },
       );
     }
-
 
     /*
      * BODY SIZE
      */
 
-    const rawBody =
-      await readBodyWithLimit(
-        request,
-        MAX_BODY_SIZE
-      );
+    const rawBody = await readBodyWithLimit(request, MAX_BODY_SIZE);
 
     if (rawBody === null) {
       return NextResponse.json(
         {
-          error:
-            "Request too large",
+          error: "Request too large",
         },
         {
           status: 413,
-        }
+        },
       );
     }
-
 
     /*
      * JSON
@@ -157,20 +127,17 @@ export async function POST(
     let parsedBody: unknown;
 
     try {
-      parsedBody =
-        JSON.parse(rawBody);
+      parsedBody = JSON.parse(rawBody);
     } catch {
       return NextResponse.json(
         {
-          error:
-            "Invalid request body",
+          error: "Invalid request body",
         },
         {
           status: 400,
-        }
+        },
       );
     }
-
 
     /*
      * Debe ser un objeto JSON.
@@ -179,18 +146,15 @@ export async function POST(
     if (!isRecord(parsedBody)) {
       return NextResponse.json(
         {
-          error:
-            "Invalid request body",
+          error: "Invalid request body",
         },
         {
           status: 400,
-        }
+        },
       );
     }
 
-    const body =
-      parsedBody as ContactBody;
-
+    const body = parsedBody as ContactBody;
 
     /*
      * ============================================================
@@ -205,20 +169,15 @@ export async function POST(
     ) {
       return NextResponse.json(
         {
-          error:
-            "Invalid field types",
+          error: "Invalid field types",
         },
         {
           status: 400,
-        }
+        },
       );
     }
 
-    if (
-      typeof body.website ===
-        "string" &&
-      body.website.trim() !== ""
-    ) {
+    if (typeof body.website === "string" && body.website.trim() !== "") {
       /*
        * Fingimos éxito para no
        * revelar al bot que lo detectamos.
@@ -229,7 +188,6 @@ export async function POST(
       });
     }
 
-
     /*
      * ============================================================
      * REQUIRED FIELD TYPES
@@ -237,28 +195,21 @@ export async function POST(
      */
 
     if (
-      typeof body.submissionId !==
-        "string" ||
-      body.termsAccepted !==
-        true ||
-      typeof body.name !==
-        "string" ||
-      typeof body.email !==
-        "string" ||
-      typeof body.message !==
-        "string"
+      typeof body.submissionId !== "string" ||
+      body.termsAccepted !== true ||
+      typeof body.name !== "string" ||
+      typeof body.email !== "string" ||
+      typeof body.message !== "string"
     ) {
       return NextResponse.json(
         {
-          error:
-            "Invalid field types",
+          error: "Invalid field types",
         },
         {
           status: 400,
-        }
+        },
       );
     }
-
 
     /*
      * ============================================================
@@ -266,22 +217,13 @@ export async function POST(
      * ============================================================
      */
 
-    const name =
-      body.name.trim();
+    const name = body.name.trim();
 
-    const submissionId =
-      body.submissionId
-        .trim()
-        .toLowerCase();
+    const submissionId = body.submissionId.trim().toLowerCase();
 
-    const email =
-      body.email
-        .trim()
-        .toLowerCase();
+    const email = body.email.trim().toLowerCase();
 
-    const message =
-      body.message.trim();
-
+    const message = body.message.trim();
 
     /*
      * ============================================================
@@ -294,22 +236,16 @@ export async function POST(
     const submissionIdRegex =
       /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
-    if (
-      !submissionIdRegex.test(
-        submissionId
-      )
-    ) {
+    if (!submissionIdRegex.test(submissionId)) {
       return NextResponse.json(
         {
-          error:
-            "Invalid submission ID",
+          error: "Invalid submission ID",
         },
         {
           status: 400,
-        }
+        },
       );
     }
-
 
     /*
      * ============================================================
@@ -317,22 +253,16 @@ export async function POST(
      * ============================================================
      */
 
-    if (
-      !name ||
-      !email ||
-      !message
-    ) {
+    if (!name || !email || !message) {
       return NextResponse.json(
         {
-          error:
-            "Missing required fields",
+          error: "Missing required fields",
         },
         {
           status: 400,
-        }
+        },
       );
     }
-
 
     /*
      * ============================================================
@@ -341,24 +271,19 @@ export async function POST(
      */
 
     if (
-      name.length >
-        MAX_NAME_LENGTH ||
-      email.length >
-        MAX_EMAIL_LENGTH ||
-      message.length >
-        MAX_MESSAGE_LENGTH
+      name.length > MAX_NAME_LENGTH ||
+      email.length > MAX_EMAIL_LENGTH ||
+      message.length > MAX_MESSAGE_LENGTH
     ) {
       return NextResponse.json(
         {
-          error:
-            "One or more fields are too long",
+          error: "One or more fields are too long",
         },
         {
           status: 400,
-        }
+        },
       );
     }
-
 
     /*
      * ============================================================
@@ -378,21 +303,18 @@ export async function POST(
      * HTML
      */
 
-    const nameRegex =
-      /^[a-zA-ZÀ-ÿ\s'.-]{2,100}$/;
+    const nameRegex = /^[a-zA-ZÀ-ÿ\s'.-]{2,100}$/;
 
     if (!nameRegex.test(name)) {
       return NextResponse.json(
         {
-          error:
-            "Invalid name",
+          error: "Invalid name",
         },
         {
           status: 400,
-        }
+        },
       );
     }
-
 
     /*
      * ============================================================
@@ -400,21 +322,18 @@ export async function POST(
      * ============================================================
      */
 
-    const emailRegex =
-      /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     if (!emailRegex.test(email)) {
       return NextResponse.json(
         {
-          error:
-            "Invalid email",
+          error: "Invalid email",
         },
         {
           status: 400,
-        }
+        },
       );
     }
-
 
     /*
      * ============================================================
@@ -435,29 +354,16 @@ export async function POST(
      * para neutralizarlos.
      */
 
-    const style =
-      normalizeClientField(
-        body.style,
-        MAX_STYLE_LENGTH
-      );
+    const style = normalizeClientField(body.style, MAX_STYLE_LENGTH);
 
-    const collection =
-      normalizeClientField(
-        body.collection,
-        MAX_COLLECTION_LENGTH
-      );
+    const collection = normalizeClientField(
+      body.collection,
+      MAX_COLLECTION_LENGTH,
+    );
 
-    const category =
-      normalizeClientField(
-        body.category,
-        MAX_CATEGORY_LENGTH
-      );
+    const category = normalizeClientField(body.category, MAX_CATEGORY_LENGTH);
 
-    const option =
-      normalizeClientField(
-        body.option,
-        MAX_OPTION_LENGTH
-      );
+    const option = normalizeClientField(body.option, MAX_OPTION_LENGTH);
 
     if (
       style === null ||
@@ -467,15 +373,13 @@ export async function POST(
     ) {
       return NextResponse.json(
         {
-          error:
-            "Invalid commission selection",
+          error: "Invalid commission selection",
         },
         {
           status: 400,
-        }
+        },
       );
     }
-
 
     /*
      * ============================================================
@@ -486,37 +390,29 @@ export async function POST(
      * best-effort side effect after the commission is persisted.
      */
 
-    const commission =
-      await createCommission({
-        submissionId,
+    const commission = await createCommission({
+      submissionId,
 
-        clientName:
-          name,
+      clientName: name,
 
-        clientEmail:
-          email,
+      clientEmail: email,
 
-        styleSnapshot:
-          style || null,
+      styleSnapshot: style || null,
 
-        collectionSnapshot:
-          collection || null,
+      collectionSnapshot: collection || null,
 
-        categorySnapshot:
-          category || null,
+      categorySnapshot: category || null,
 
-        optionSnapshot:
-          option || null,
+      optionSnapshot: option || null,
 
-        initialMessage:
-          message,
+      requestSource: option === "Not specified" ? "contact" : "portfolio",
 
-        termsVersion:
-          CURRENT_COMMISSION_TERMS_VERSION,
+      initialMessage: message,
 
-        agreementVersion:
-          null,
-      });
+      termsVersion: CURRENT_COMMISSION_TERMS_VERSION,
+
+      agreementVersion: null,
+    });
 
     /*
      * The original request already sent its emails. A retry only
@@ -526,11 +422,9 @@ export async function POST(
     if (!commission.wasCreated) {
       return NextResponse.json({
         success: true,
-        reference:
-          commission.reference,
+        reference: commission.reference,
       });
     }
-
 
     /*
      * ============================================================
@@ -539,8 +433,7 @@ export async function POST(
      */
 
     const safeData: SafeEmailData = {
-      name:
-        escapeHtml(name),
+      name: escapeHtml(name),
 
       /*
        * NO escapamos el email aquí.
@@ -558,22 +451,16 @@ export async function POST(
        * El HTML sí queda neutralizado.
        */
 
-      message:
-        escapeHtml(message),
+      message: escapeHtml(message),
 
-      style:
-        escapeHtml(style),
+      style: escapeHtml(style),
 
-      collection:
-        escapeHtml(collection),
+      collection: escapeHtml(collection),
 
-      category:
-        escapeHtml(category),
+      category: escapeHtml(category),
 
-      option:
-        escapeHtml(option),
+      option: escapeHtml(option),
     };
-
 
     /*
      * ============================================================
@@ -585,68 +472,42 @@ export async function POST(
      */
 
     try {
-      const ownerResult =
-        await sendOwnerEmail(
-          safeData
-        );
+      const ownerResult = await sendOwnerEmail(safeData);
 
       if (ownerResult.error) {
-        console.error(
-          "Owner email failed:",
-          ownerResult.error
-        );
+        console.error("Owner email failed:", ownerResult.error);
       }
     } catch (error) {
-      console.error(
-        "Owner email failed:",
-        error
-      );
+      console.error("Owner email failed:", error);
     }
 
     try {
-      const clientResult =
-        await sendClientConfirmationEmail(
-          safeData
-        );
+      const clientResult = await sendClientConfirmationEmail(safeData);
 
       if (clientResult.error) {
-        console.error(
-          "Client confirmation email failed:",
-          clientResult.error
-        );
+        console.error("Client confirmation email failed:", clientResult.error);
       }
     } catch (error) {
-      console.error(
-        "Client confirmation email failed:",
-        error
-      );
+      console.error("Client confirmation email failed:", error);
     }
 
     return NextResponse.json({
       success: true,
-      reference:
-        commission.reference,
+      reference: commission.reference,
     });
-
   } catch (error) {
-
-    console.error(
-      "Contact API error:",
-      error
-    );
+    console.error("Contact API error:", error);
 
     return NextResponse.json(
       {
-        error:
-          "Failed to submit inquiry",
+        error: "Failed to submit inquiry",
       },
       {
         status: 500,
-      }
+      },
     );
   }
 }
-
 
 /*
  * ============================================================
@@ -654,23 +515,15 @@ export async function POST(
  * ============================================================
  */
 
-async function sendOwnerEmail(
-  data: SafeEmailData
-) {
-
+async function sendOwnerEmail(data: SafeEmailData) {
   return resend.emails.send({
+    from: `Fefierys <${senderEmail}>`,
 
-    from:
-      `Fefierys <${senderEmail}>`,
+    to: ownerEmail,
 
-    to:
-      ownerEmail,
+    replyTo: data.email,
 
-    replyTo:
-      data.email,
-
-    subject:
-      "✨ New Commission Request - Fefierys",
+    subject: "✨ New Commission Request - Fefierys",
 
     html: `
       <div style="font-family: Arial, Helvetica, sans-serif; background:#f4f4f8; padding:40px;">
@@ -763,9 +616,7 @@ async function sendOwnerEmail(
               </td>
 
               <td style="padding:10px 0; color:#111827; font-weight:600;">
-                ${escapeHtml(
-                  data.email
-                )}
+                ${escapeHtml(data.email)}
               </td>
             </tr>
 
@@ -797,30 +648,21 @@ async function sendOwnerEmail(
   });
 }
 
-
 /*
  * ============================================================
  * CLIENT CONFIRMATION EMAIL
  * ============================================================
  */
 
-async function sendClientConfirmationEmail(
-  data: SafeEmailData
-) {
-
+async function sendClientConfirmationEmail(data: SafeEmailData) {
   return resend.emails.send({
+    from: `Fefierys <${senderEmail}>`,
 
-    from:
-      `Fefierys <${senderEmail}>`,
+    to: data.email,
 
-    to:
-      data.email,
+    replyTo: ownerEmail,
 
-    replyTo:
-      ownerEmail,
-
-    subject:
-      "✨ Your Fefierys commission request has been received",
+    subject: "✨ Your Fefierys commission request has been received",
 
     html: `
       <div style="font-family: Arial, Helvetica, sans-serif; background:#f4f4f8; padding:40px;">
@@ -931,7 +773,6 @@ async function sendClientConfirmationEmail(
   });
 }
 
-
 /*
  * ============================================================
  * CLIENT-FACING FIELD NORMALIZATION
@@ -940,69 +781,46 @@ async function sendClientConfirmationEmail(
 
 function normalizeClientField(
   value: unknown,
-  maxLength: number
+  maxLength: number,
 ): string | null {
-
-  if (
-    value === undefined ||
-    value === null ||
-    value === ""
-  ) {
+  if (value === undefined || value === null || value === "") {
     return "Not specified";
   }
-
 
   if (typeof value !== "string") {
     return null;
   }
 
-
-  const trimmed =
-    value.trim();
-
+  const trimmed = value.trim();
 
   if (!trimmed) {
     return "Not specified";
   }
 
-
-  if (
-    trimmed.length >
-      maxLength
-  ) {
+  if (trimmed.length > maxLength) {
     return null;
   }
-
 
   /*
    * No permitimos saltos de línea
    * en campos de resumen.
    */
 
-  if (
-    /[\r\n]/.test(trimmed)
-  ) {
+  if (/[\r\n]/.test(trimmed)) {
     return null;
   }
-
 
   /*
    * No permitimos URLs, dominios
    * ni direcciones de email.
    */
 
-  if (
-    containsLinkLikeContent(
-      trimmed
-    )
-  ) {
+  if (containsLinkLikeContent(trimmed)) {
     return null;
   }
 
-
   return trimmed;
 }
-
 
 /*
  * ============================================================
@@ -1010,26 +828,19 @@ function normalizeClientField(
  * ============================================================
  */
 
-function containsLinkLikeContent(
-  value: string
-): boolean {
-
+function containsLinkLikeContent(value: string): boolean {
   /*
    * http://
    * https://
    */
 
-  const protocolRegex =
-    /https?:\/\//i;
-
+  const protocolRegex = /https?:\/\//i;
 
   /*
    * www.example.com
    */
 
-  const wwwRegex =
-    /\bwww\./i;
-
+  const wwwRegex = /\bwww\./i;
 
   /*
    * example.com
@@ -1040,14 +851,11 @@ function containsLinkLikeContent(
   const domainRegex =
     /(?:^|[\s([{"'])(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}(?=$|[\s/:?#)\]}"',])/i;
 
-
   /*
    * test@example.com
    */
 
-  const emailLikeRegex =
-    /\b[^\s@]+@[^\s@]+\.[^\s@]+\b/i;
-
+  const emailLikeRegex = /\b[^\s@]+@[^\s@]+\.[^\s@]+\b/i;
 
   return (
     protocolRegex.test(value) ||
@@ -1057,7 +865,6 @@ function containsLinkLikeContent(
   );
 }
 
-
 /*
  * ============================================================
  * READ BODY WITH HARD LIMIT
@@ -1066,93 +873,53 @@ function containsLinkLikeContent(
 
 async function readBodyWithLimit(
   request: Request,
-  maxBytes: number
+  maxBytes: number,
 ): Promise<string | null> {
-
-  const contentLength =
-    request.headers.get(
-      "content-length"
-    );
-
+  const contentLength = request.headers.get("content-length");
 
   if (contentLength) {
+    const parsedLength = Number(contentLength);
 
-    const parsedLength =
-      Number(contentLength);
-
-
-    if (
-      Number.isFinite(
-        parsedLength
-      ) &&
-      parsedLength >
-        maxBytes
-    ) {
+    if (Number.isFinite(parsedLength) && parsedLength > maxBytes) {
       return null;
     }
   }
-
 
   if (!request.body) {
     return "";
   }
 
+  const reader = request.body.getReader();
 
-  const reader =
-    request.body.getReader();
-
-  const decoder =
-    new TextDecoder();
+  const decoder = new TextDecoder();
 
   let totalBytes = 0;
   let result = "";
 
-
   while (true) {
-
-    const {
-      done,
-      value,
-    } =
-      await reader.read();
-
+    const { done, value } = await reader.read();
 
     if (done) {
       break;
     }
 
+    totalBytes += value.byteLength;
 
-    totalBytes +=
-      value.byteLength;
-
-
-    if (
-      totalBytes >
-        maxBytes
-    ) {
+    if (totalBytes > maxBytes) {
       await reader.cancel();
 
       return null;
     }
 
-
-    result +=
-      decoder.decode(
-        value,
-        {
-          stream: true,
-        }
-      );
+    result += decoder.decode(value, {
+      stream: true,
+    });
   }
 
-
-  result +=
-    decoder.decode();
-
+  result += decoder.decode();
 
   return result;
 }
-
 
 /*
  * ============================================================
@@ -1160,21 +927,9 @@ async function readBodyWithLimit(
  * ============================================================
  */
 
-function isRecord(
-  value: unknown
-): value is Record<
-  string,
-  unknown
-> {
-
-  return (
-    typeof value ===
-      "object" &&
-    value !== null &&
-    !Array.isArray(value)
-  );
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
-
 
 /*
  * ============================================================
@@ -1182,29 +937,11 @@ function isRecord(
  * ============================================================
  */
 
-function escapeHtml(
-  value: string
-) {
-
+function escapeHtml(value: string) {
   return value
-    .replace(
-      /&/g,
-      "&amp;"
-    )
-    .replace(
-      /</g,
-      "&lt;"
-    )
-    .replace(
-      />/g,
-      "&gt;"
-    )
-    .replace(
-      /"/g,
-      "&quot;"
-    )
-    .replace(
-      /'/g,
-      "&#039;"
-    );
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }

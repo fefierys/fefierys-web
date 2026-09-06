@@ -71,6 +71,13 @@
       "when": 1788589840831,
       "tag": "0009_clean_queen_noir",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1788592144447,
+      "tag": "0010_numerous_shockwave",
+      "breakpoints": true
     }
   ]
 }
