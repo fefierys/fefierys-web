@@ -32,7 +32,9 @@
     "db:verify:commission-classification": "tsx scripts/verifyCommissionClassificationRepository.ts",
     "verify:commission-pricing-snapshot-matcher": "tsx scripts/verifyCommissionPricingSnapshotMatcher.ts",
     "db:verify:commission-auto-classification": "tsx scripts/verifyCommissionAutomaticClassificationRepository.ts",
-    "db:backfill:commission-classification": "tsx scripts/backfillCommissionServiceClassifications.ts"
+    "db:backfill:commission-classification": "tsx scripts/backfillCommissionServiceClassifications.ts",
+    "verify:commission-quote-pricing": "tsx scripts/verifyCommissionQuotePricing.ts",
+    "db:verify:commission-quote-pricing": "tsx scripts/verifyCommissionQuotePricingRepository.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1117.0",

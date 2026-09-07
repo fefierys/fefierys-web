@@ -16,8 +16,12 @@ import {
 } from "drizzle-orm/pg-core";
 
 import {
+  commissionPricingAdjustments,
+  commissionPricingCalculationBasisEnum,
+  commissionPricingCalculationTypeEnum,
   commissionPricingOptions,
   commissionPricingServices,
+  commissionPricingVersions,
 } from "./commissionPricing";
 
 /*
@@ -81,6 +85,21 @@ export const quoteStatusEnum = pgEnum("quote_status", [
   "declined",
   "expired",
   "superseded",
+]);
+
+export const quotePricingModeEnum = pgEnum("quote_pricing_mode", [
+  "legacy",
+  "catalog",
+  "custom",
+]);
+
+export const quoteItemKindEnum = pgEnum("quote_item_kind", [
+  "legacy",
+  "base",
+  "extra",
+  "license",
+  "discount",
+  "custom",
 ]);
 
 export const installmentTriggerEnum = pgEnum("installment_trigger", [
@@ -560,6 +579,37 @@ export const commissionQuotes = pgTable(
     status: quoteStatusEnum("status").notNull().default("draft"),
 
     /*
+     * Legacy quotes predate the versioned pricing catalog. Catalog and
+     * custom quotes store immutable totals calculated when the draft is
+     * created or updated.
+     */
+    pricingMode: quotePricingModeEnum("pricing_mode")
+      .notNull()
+      .default("legacy"),
+
+    pricingVersionId: uuid("pricing_version_id").references(
+      () => commissionPricingVersions.id,
+      {
+        onDelete: "restrict",
+      },
+    ),
+
+    baseSubtotal: numeric("base_subtotal", {
+      precision: 12,
+      scale: 2,
+    }),
+
+    preDiscountSubtotal: numeric("pre_discount_subtotal", {
+      precision: 12,
+      scale: 2,
+    }),
+
+    discountTotal: numeric("discount_total", {
+      precision: 12,
+      scale: 2,
+    }),
+
+    /*
      * ISO 4217-style currency code:
      * USD, CLP, EUR, etc.
      */
@@ -629,6 +679,8 @@ export const commissionQuotes = pgTable(
 
     index("commission_quotes_status_idx").on(table.status),
 
+    index("commission_quotes_pricing_version_idx").on(table.pricingVersionId),
+
     check(
       "commission_quotes_version_check",
       sql`
@@ -650,6 +702,50 @@ export const commissionQuotes = pgTable(
           =
           upper(${table.currency})
         `,
+    ),
+
+    check(
+      "commission_quotes_pricing_snapshot_check",
+      sql`
+        (
+          ${table.pricingMode} = 'legacy'
+          AND ${table.pricingVersionId} IS NULL
+          AND ${table.baseSubtotal} IS NULL
+          AND ${table.preDiscountSubtotal} IS NULL
+          AND ${table.discountTotal} IS NULL
+        )
+        OR
+        (
+          ${table.pricingMode} = 'catalog'
+          AND ${table.pricingVersionId} IS NOT NULL
+          AND ${table.baseSubtotal} IS NOT NULL
+          AND ${table.preDiscountSubtotal} IS NOT NULL
+          AND ${table.discountTotal} IS NOT NULL
+        )
+        OR
+        (
+          ${table.pricingMode} = 'custom'
+          AND ${table.pricingVersionId} IS NULL
+          AND ${table.baseSubtotal} IS NOT NULL
+          AND ${table.preDiscountSubtotal} IS NOT NULL
+          AND ${table.discountTotal} IS NOT NULL
+        )
+      `,
+    ),
+
+    check(
+      "commission_quotes_pricing_totals_check",
+      sql`
+        ${table.pricingMode} = 'legacy'
+        OR
+        (
+          ${table.baseSubtotal} >= 0
+          AND ${table.preDiscountSubtotal} >= ${table.baseSubtotal}
+          AND ${table.discountTotal} >= 0
+          AND ${table.totalAmount}
+            = ${table.preDiscountSubtotal} - ${table.discountTotal}
+        )
+      `,
     ),
 
     check(
@@ -738,6 +834,34 @@ export const commissionQuoteItems = pgTable(
 
     sequence: integer("sequence").notNull(),
 
+    kind: quoteItemKindEnum("kind").notNull().default("legacy"),
+
+    pricingOptionId: uuid("pricing_option_id").references(
+      () => commissionPricingOptions.id,
+      {
+        onDelete: "restrict",
+      },
+    ),
+
+    pricingAdjustmentId: uuid("pricing_adjustment_id").references(
+      () => commissionPricingAdjustments.id,
+      {
+        onDelete: "restrict",
+      },
+    ),
+
+    calculationType: commissionPricingCalculationTypeEnum("calculation_type"),
+
+    calculationBasis:
+      commissionPricingCalculationBasisEnum("calculation_basis"),
+
+    percentageRate: numeric("percentage_rate", {
+      precision: 5,
+      scale: 2,
+    }),
+
+    internalNote: text("internal_note"),
+
     label: varchar("label", {
       length: 250,
     }).notNull(),
@@ -775,6 +899,14 @@ export const commissionQuoteItems = pgTable(
 
     index("commission_quote_items_quote_id_idx").on(table.quoteId),
 
+    index("commission_quote_items_pricing_option_idx").on(
+      table.pricingOptionId,
+    ),
+
+    index("commission_quote_items_pricing_adjustment_idx").on(
+      table.pricingAdjustmentId,
+    ),
+
     check(
       "commission_quote_items_sequence_check",
       sql`
@@ -786,6 +918,62 @@ export const commissionQuoteItems = pgTable(
       "commission_quote_items_quantity_check",
       sql`
         ${table.quantity} >= 1
+      `,
+    ),
+
+    check(
+      "commission_quote_items_pricing_source_check",
+      sql`
+        (
+          ${table.kind} = 'legacy'
+          AND ${table.pricingOptionId} IS NULL
+          AND ${table.pricingAdjustmentId} IS NULL
+          AND ${table.calculationType} IS NULL
+          AND ${table.calculationBasis} IS NULL
+          AND ${table.percentageRate} IS NULL
+          AND ${table.internalNote} IS NULL
+        )
+        OR
+        (
+          ${table.kind} = 'custom'
+          AND ${table.pricingOptionId} IS NULL
+          AND ${table.pricingAdjustmentId} IS NULL
+          AND ${table.calculationType} = 'fixed'
+          AND ${table.calculationBasis} = 'none'
+          AND ${table.percentageRate} IS NULL
+        )
+        OR
+        (
+          ${table.kind} = 'base'
+          AND ${table.pricingOptionId} IS NOT NULL
+          AND ${table.pricingAdjustmentId} IS NULL
+          AND ${table.calculationType} = 'fixed'
+          AND ${table.calculationBasis} = 'none'
+          AND ${table.percentageRate} IS NULL
+        )
+        OR
+        (
+          ${table.kind} IN ('extra', 'license', 'discount')
+          AND ${table.pricingOptionId} IS NOT NULL
+          AND ${table.pricingAdjustmentId} IS NOT NULL
+          AND ${table.calculationType} IS NOT NULL
+          AND ${table.calculationBasis} IS NOT NULL
+          AND (
+            (
+              ${table.calculationType} = 'fixed'
+              AND ${table.calculationBasis} = 'none'
+              AND ${table.percentageRate} IS NULL
+            )
+            OR
+            (
+              ${table.calculationType} = 'percentage'
+              AND ${table.calculationBasis} != 'none'
+              AND ${table.percentageRate} IS NOT NULL
+              AND ${table.percentageRate} >= 0
+              AND ${table.percentageRate} <= 100
+            )
+          )
+        )
       `,
     ),
   ],

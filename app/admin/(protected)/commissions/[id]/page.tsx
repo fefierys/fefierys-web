@@ -9,8 +9,12 @@ import CommissionWorkflowActions from "@/components/admin/CommissionWorkflowActi
 import { requireAdmin } from "@/lib/auth/admin";
 import { formatCommissionDate } from "@/lib/commissions/commissionDate";
 import { COMMISSION_STATUS_LABELS } from "@/lib/commissions/commissionStatus";
+import type { CommissionQuotePricingEditorConfig } from "@/lib/commissions/commissionQuotePricingEditor";
 import { getAdminCommissionDetail } from "@/lib/repositories/commissionAdminRepository";
-import { getActiveCommissionPricingCatalog } from "@/lib/repositories/commissionPricingRepository";
+import {
+  getActiveCommissionPricingCatalog,
+  getCommissionPricingCatalogByVersion,
+} from "@/lib/repositories/commissionPricingRepository";
 import { getCommissionQuotes } from "@/lib/repositories/commissionQuoteRepository";
 
 export const dynamic = "force-dynamic";
@@ -76,6 +80,66 @@ export default async function CommissionDetailPage({
   }
 
   const { commission, events, statusHistory } = detail;
+  const editableDraft =
+    quotes.find(({ quote }) => quote.status === "draft") ?? null;
+  let quotePricingCatalog = pricingCatalog;
+
+  if (
+    editableDraft?.quote.pricingMode === "catalog" &&
+    editableDraft.quote.pricingVersionId &&
+    editableDraft.quote.pricingVersionId !== pricingCatalog?.version.id
+  ) {
+    quotePricingCatalog = await getCommissionPricingCatalogByVersion({
+      at: editableDraft.quote.createdAt,
+      audience: "admin",
+      versionId: editableDraft.quote.pricingVersionId,
+    });
+  }
+
+  const editorPricingMode = editableDraft
+    ? editableDraft.quote.pricingMode
+    : commission.serviceClassification;
+  const editorPricingOptionId =
+    editableDraft?.quote.pricingMode === "catalog"
+      ? (editableDraft.items.find((item) => item.kind === "base")
+          ?.pricingOptionId ?? null)
+      : commission.pricingOptionId;
+  const editorPricingOption = quotePricingCatalog?.services
+    .flatMap((service) => service.options)
+    .find(({ option }) => option.id === editorPricingOptionId);
+  const pricingConfig: CommissionQuotePricingEditorConfig | null =
+    editorPricingMode === "custom"
+      ? { mode: "custom" }
+      : editorPricingMode === "catalog" &&
+          quotePricingCatalog &&
+          editorPricingOption
+        ? {
+            adjustments: editorPricingOption.adjustments.map((adjustment) => ({
+              calculationBasis: adjustment.calculationBasis,
+              calculationType: adjustment.calculationType,
+              description: adjustment.description,
+              fixedAmount: adjustment.fixedAmount,
+              id: adjustment.id,
+              isValueEditable: adjustment.isValueEditable,
+              kind: adjustment.kind,
+              maximumPercentageRate: adjustment.maximumPercentageRate,
+              maxQuantity: adjustment.maxQuantity,
+              minimumPercentageRate: adjustment.minimumPercentageRate,
+              name: adjustment.name,
+              percentageRate: adjustment.percentageRate,
+              requiresInternalNote: adjustment.requiresInternalNote,
+              stackable: adjustment.stackable,
+            })),
+            mode: "catalog",
+            option: {
+              baseAmount: editorPricingOption.option.baseAmount,
+              description: editorPricingOption.option.description,
+              id: editorPricingOption.option.id,
+              quoteLabel: editorPricingOption.option.quoteLabel,
+            },
+            pricingVersionId: quotePricingCatalog.version.id,
+          }
+        : null;
 
   return (
     <main className="min-h-screen px-6 pb-28 pt-36 md:py-28">
@@ -313,6 +377,7 @@ export default async function CommissionDetailPage({
             <CommissionQuotePanel
               commissionId={commission.id}
               commissionStatus={commission.status}
+              pricingConfig={pricingConfig}
               quotes={quotes}
             />
           </aside>

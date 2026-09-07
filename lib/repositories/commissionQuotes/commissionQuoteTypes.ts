@@ -3,6 +3,7 @@ import type {
   CommissionQuoteDraftValidation,
   CommissionQuoteTransitionValidation,
 } from "../../commissions/commissionQuote";
+import type { CommissionQuotePricingSnapshot } from "../../commissions/commissionQuotePricing";
 import type { CommissionManualActor } from "../../commissions/commissionActivity";
 import type { CommissionTransitionValidation } from "../../commissions/commissionWorkflow";
 import type {
@@ -42,10 +43,24 @@ type InvalidCommissionTransitionValidation = Extract<
 export type CommissionStatusHistoryEntry =
   typeof commissionStatusHistory.$inferSelect;
 
-export interface CreateCommissionQuoteDraftInput extends CommissionQuoteDraftInput {
+interface CommissionQuoteDraftMetadataInput {
+  description?: string | null;
+  notes?: string | null;
+  validUntil?: Date | null;
+}
+
+export type CommissionQuoteDraftWriteInput =
+  | (CommissionQuoteDraftInput & {
+      pricingSnapshot?: undefined;
+    })
+  | (CommissionQuoteDraftMetadataInput & {
+      pricingSnapshot: CommissionQuotePricingSnapshot;
+    });
+
+export type CreateCommissionQuoteDraftInput = CommissionQuoteDraftWriteInput & {
   commissionId: string;
   createdByAdminUserId: string;
-}
+};
 
 export type CreateCommissionQuoteDraftResult =
   | {
@@ -73,11 +88,11 @@ export type CreateCommissionQuoteDraftResult =
       outcome: "conflict";
     };
 
-export interface UpdateCommissionQuoteDraftInput extends CommissionQuoteDraftInput {
+export type UpdateCommissionQuoteDraftInput = CommissionQuoteDraftWriteInput & {
   quoteId: string;
   expectedUpdatedAt: Date;
   updatedByAdminUserId: string;
-}
+};
 
 export type UpdateCommissionQuoteDraftResult =
   | {

@@ -9,18 +9,21 @@ import {
 } from "@/lib/commissions/commissionQuote";
 import type { CommissionStatus } from "@/lib/repositories/commissionAdminRepository";
 import type { CommissionQuoteWithItems } from "@/lib/repositories/commissionQuoteRepository";
+import type { CommissionQuotePricingEditorConfig } from "@/lib/commissions/commissionQuotePricingEditor";
 
 import CommissionAdminModal from "./CommissionAdminModal";
 import CommissionAdminToast from "./CommissionAdminToast";
 import CommissionQuoteEditor from "./CommissionQuoteEditor";
+import CommissionQuoteSendConfirm from "./CommissionQuoteSendConfirm";
 
 interface CommissionQuotePanelProps {
   commissionId: string;
   commissionStatus: CommissionStatus;
+  pricingConfig: CommissionQuotePricingEditorConfig | null;
   quotes: CommissionQuoteWithItems[];
 }
 
-type ModalMode = "create" | "edit" | "view" | null;
+type ModalMode = "create" | "edit" | "send" | "view" | null;
 
 const QUOTE_STATUS_STYLES = {
   draft: "border-sky-200/20 bg-sky-200/10 text-sky-100",
@@ -65,6 +68,7 @@ function QuoteStatusBadge({
 export default function CommissionQuotePanel({
   commissionId,
   commissionStatus,
+  pricingConfig,
   quotes,
 }: CommissionQuotePanelProps) {
   const [mode, setMode] = useState<ModalMode>(null);
@@ -114,9 +118,11 @@ export default function CommissionQuotePanel({
       ? "Create quote draft"
       : mode === "edit"
         ? `Edit quote v${draft?.quote.version ?? ""}`
-        : selectedQuote
-          ? `Quote v${selectedQuote.quote.version}`
-          : "Quote";
+        : mode === "send"
+          ? `Send quote v${selectedQuote?.quote.version ?? ""}`
+          : selectedQuote
+            ? `Quote v${selectedQuote.quote.version}`
+            : "Quote";
 
   return (
     <>
@@ -155,7 +161,7 @@ export default function CommissionQuotePanel({
               Open quote
             </button>
           </div>
-        ) : commissionStatus === "quoting" ? (
+        ) : commissionStatus === "quoting" && pricingConfig ? (
           <button
             className="mt-5 w-full rounded-xl border border-sky-200/25 bg-sky-200/10 px-4 py-3 text-sm text-sky-50 transition hover:bg-sky-200/15"
             onClick={openEditor}
@@ -163,6 +169,10 @@ export default function CommissionQuotePanel({
           >
             Create quote
           </button>
+        ) : commissionStatus === "quoting" ? (
+          <p className="mt-5 rounded-xl border border-amber-200/15 bg-amber-200/[0.07] px-3 py-3 text-sm leading-relaxed text-amber-100/80">
+            Classify the requested service before creating its first quote.
+          </p>
         ) : (
           <p className="mt-5 text-sm leading-relaxed text-white/55">
             Move the commission to Quoting to create its first quote.
@@ -205,7 +215,46 @@ export default function CommissionQuotePanel({
         description={
           mode === "view"
             ? "Review this version and its recorded values."
-            : "Add services, extras, discounts, validity, and internal notes."
+            : mode === "send"
+              ? "Confirm the quote before moving it to Awaiting quote response."
+              : "Add services, extras, discounts, validity, and internal notes."
+        }
+        footer={
+          mode === "view" && selectedQuote ? (
+            <div className="flex flex-col-reverse gap-3 border-t border-white/10 bg-[#7880b2] px-5 py-4 sm:flex-row sm:justify-end sm:px-7 sm:py-5">
+              <button
+                className="rounded-xl border border-white/15 px-5 py-3 text-sm text-white/70 transition hover:bg-white/10 hover:text-white"
+                onClick={closeModal}
+                type="button"
+              >
+                Close
+              </button>
+              {selectedQuote.quote.status === "draft" && (
+                <>
+                  <button
+                    className="rounded-xl border border-white/15 bg-white/[0.06] px-5 py-3 text-sm text-white/80 transition hover:bg-white/10 hover:text-white"
+                    onClick={() => {
+                      setSelectedQuoteId(selectedQuote.quote.id);
+                      setMode("edit");
+                    }}
+                    type="button"
+                  >
+                    Edit draft
+                  </button>
+                  <button
+                    className="rounded-xl border border-sky-200/25 bg-sky-200/15 px-5 py-3 text-sm text-sky-50 transition hover:bg-sky-200/20"
+                    onClick={() => {
+                      setSelectedQuoteId(selectedQuote.quote.id);
+                      setMode("send");
+                    }}
+                    type="button"
+                  >
+                    Send quote
+                  </button>
+                </>
+              )}
+            </div>
+          ) : undefined
         }
         onClose={closeModal}
         open={mode !== null}
@@ -217,6 +266,16 @@ export default function CommissionQuotePanel({
             draft={mode === "edit" ? draft : null}
             onCancel={closeModal}
             onSuccess={handleEditorSuccess}
+            pricingConfig={pricingConfig}
+          />
+        )}
+
+        {mode === "send" && selectedQuote?.quote.status === "draft" && (
+          <CommissionQuoteSendConfirm
+            commissionId={commissionId}
+            onBack={() => setMode("view")}
+            onSuccess={handleEditorSuccess}
+            quote={selectedQuote}
           />
         )}
 
@@ -310,27 +369,6 @@ export default function CommissionQuotePanel({
               </div>
             )}
 
-            <div className="sticky bottom-0 -mx-5 mt-6 flex flex-col-reverse gap-3 border-t border-white/10 bg-[#7880b2]/90 px-5 pb-1 pt-4 backdrop-blur-xl sm:mx-0 sm:flex-row sm:justify-end sm:bg-transparent sm:px-0">
-              <button
-                className="rounded-xl border border-white/15 px-5 py-3 text-sm text-white/70 transition hover:bg-white/10 hover:text-white"
-                onClick={closeModal}
-                type="button"
-              >
-                Close
-              </button>
-              {selectedQuote.quote.status === "draft" && (
-                <button
-                  className="rounded-xl border border-sky-200/25 bg-sky-200/15 px-5 py-3 text-sm text-sky-50 transition hover:bg-sky-200/20"
-                  onClick={() => {
-                    setSelectedQuoteId(selectedQuote.quote.id);
-                    setMode("edit");
-                  }}
-                  type="button"
-                >
-                  Edit draft
-                </button>
-              )}
-            </div>
           </div>
         )}
       </CommissionAdminModal>

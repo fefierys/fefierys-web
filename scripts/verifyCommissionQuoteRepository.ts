@@ -192,11 +192,27 @@ async function main(): Promise<void> {
     equal(createdDraft.quote.commissionId, primaryCommissionId);
     equal(createdDraft.quote.version, 1);
     equal(createdDraft.quote.status, "draft");
+    equal(createdDraft.quote.pricingMode, "legacy");
+    equal(createdDraft.quote.pricingVersionId, null);
+    equal(createdDraft.quote.baseSubtotal, null);
+    equal(createdDraft.quote.preDiscountSubtotal, null);
+    equal(createdDraft.quote.discountTotal, null);
     equal(createdDraft.quote.currency, "USD");
     equal(createdDraft.quote.totalAmount, "550.00");
     equal(createdDraft.quote.description, "Character illustration quote");
     equal(createdDraft.quote.notes, "Internal verification note");
     equal(createdDraft.items.length, 3);
+
+    for (const item of createdDraft.items) {
+      equal(item.kind, "legacy");
+      equal(item.pricingOptionId, null);
+      equal(item.pricingAdjustmentId, null);
+      equal(item.calculationType, null);
+      equal(item.calculationBasis, null);
+      equal(item.percentageRate, null);
+      equal(item.internalNote, null);
+    }
+
     equal(createdDraft.event.type, "quote_created");
     equal(createdDraft.event.actor, "artist");
     equal(createdDraft.event.createdByAdminUserId, "quote-verifier");
@@ -2643,6 +2659,26 @@ async function main(): Promise<void> {
 
     equal(supersededResult.draft.quote.version, 2);
     equal(supersededResult.draft.quote.status, "draft");
+    equal(
+      supersededResult.draft.quote.pricingMode,
+      revisionSent.quote.pricingMode,
+    );
+    equal(
+      supersededResult.draft.quote.pricingVersionId,
+      revisionSent.quote.pricingVersionId,
+    );
+    equal(
+      supersededResult.draft.quote.baseSubtotal,
+      revisionSent.quote.baseSubtotal,
+    );
+    equal(
+      supersededResult.draft.quote.preDiscountSubtotal,
+      revisionSent.quote.preDiscountSubtotal,
+    );
+    equal(
+      supersededResult.draft.quote.discountTotal,
+      revisionSent.quote.discountTotal,
+    );
     equal(supersededResult.draft.quote.currency, "USD");
 
     equal(supersededResult.draft.quote.totalAmount, "550.00");
@@ -2681,6 +2717,13 @@ async function main(): Promise<void> {
       equal(copiedItem.quantity, originalItem.quantity);
 
       equal(copiedItem.unitAmount, originalItem.unitAmount);
+      equal(copiedItem.kind, originalItem.kind);
+      equal(copiedItem.pricingOptionId, originalItem.pricingOptionId);
+      equal(copiedItem.pricingAdjustmentId, originalItem.pricingAdjustmentId);
+      equal(copiedItem.calculationType, originalItem.calculationType);
+      equal(copiedItem.calculationBasis, originalItem.calculationBasis);
+      equal(copiedItem.percentageRate, originalItem.percentageRate);
+      equal(copiedItem.internalNote, originalItem.internalNote);
 
       /*
        * A revision copies the business data but creates

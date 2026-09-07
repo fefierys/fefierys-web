@@ -1,6 +1,8 @@
 import { deepEqual, equal, ok } from "node:assert/strict";
 
 import {
+  COMMISSION_QUOTE_ITEM_KINDS,
+  COMMISSION_QUOTE_PRICING_MODES,
   COMMISSION_QUOTE_STATUSES,
   COMMISSION_QUOTE_STATUS_TRANSITIONS,
   MAX_COMMISSION_QUOTE_ITEMS,
@@ -8,12 +10,18 @@ import {
   formatCommissionQuoteAmount,
   getAllowedCommissionQuoteTransitions,
   isCommissionQuoteStatus,
+  isCommissionQuoteItemKind,
+  isCommissionQuotePricingMode,
   isTerminalCommissionQuoteStatus,
   parseCommissionQuoteAmount,
   validateCommissionQuoteDraft,
   validateCommissionQuoteTransition,
 } from "../lib/commissions/commissionQuote";
-import { quoteStatusEnum } from "../lib/db/schema/commissions";
+import {
+  quoteItemKindEnum,
+  quotePricingModeEnum,
+  quoteStatusEnum,
+} from "../lib/db/schema/commissions";
 
 function main(): void {
   deepEqual([...COMMISSION_QUOTE_STATUSES], [...quoteStatusEnum.enumValues]);
@@ -29,6 +37,28 @@ function main(): void {
   ok(!isCommissionQuoteStatus("unknown"));
 
   console.log("[OK] Quote rules cover every database status");
+
+  deepEqual(
+    [...COMMISSION_QUOTE_PRICING_MODES],
+    [...quotePricingModeEnum.enumValues],
+  );
+  deepEqual(
+    [...COMMISSION_QUOTE_ITEM_KINDS],
+    [...quoteItemKindEnum.enumValues],
+  );
+
+  for (const mode of COMMISSION_QUOTE_PRICING_MODES) {
+    ok(isCommissionQuotePricingMode(mode));
+  }
+
+  for (const kind of COMMISSION_QUOTE_ITEM_KINDS) {
+    ok(isCommissionQuoteItemKind(kind));
+  }
+
+  ok(!isCommissionQuotePricingMode("unknown"));
+  ok(!isCommissionQuoteItemKind("unknown"));
+
+  console.log("[OK] Quote pricing modes and item kinds match the database");
 
   for (const status of TERMINAL_COMMISSION_QUOTE_STATUSES) {
     ok(isTerminalCommissionQuoteStatus(status));

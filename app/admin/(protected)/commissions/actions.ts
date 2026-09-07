@@ -11,6 +11,10 @@ import {
 } from "@/lib/commissions/commissionWorkflow";
 import { isCommissionStatus } from "@/lib/commissions/commissionStatus";
 import type { CommissionQuoteItemInput } from "@/lib/commissions/commissionQuote";
+import type {
+  CommissionQuoteCustomItemSelection,
+  CommissionQuoteSelectedAdjustment,
+} from "@/lib/commissions/commissionQuotePricing";
 import { transitionCommissionStatus } from "@/lib/repositories/commissionWorkflowRepository";
 
 import {
@@ -32,6 +36,12 @@ import {
   updateCommissionQuoteDraft,
 } from "@/lib/repositories/commissionQuoteRepository";
 import { classifyCommission } from "@/lib/repositories/commissionClassificationRepository";
+import {
+  resolveCommissionQuotePricingForCreate,
+  resolveCommissionQuotePricingForUpdate,
+  type CommissionQuotePricingSelection,
+  type ResolveCommissionQuotePricingResult,
+} from "@/lib/repositories/commissionQuotePricingResolver";
 
 export interface CommissionStatusActionState {
   outcome: "idle" | "success" | "error" | "conflict";
@@ -127,6 +137,149 @@ function parseCommissionQuoteItems(
   } catch {
     return null;
   }
+}
+
+function parseCommissionQuotePricingSelection(
+  value: string,
+): CommissionQuotePricingSelection | null | "invalid" {
+  if (!value) {
+    return null;
+  }
+
+  if (value.length > 100_000) {
+    return "invalid";
+  }
+
+  try {
+    const parsed: unknown = JSON.parse(value);
+
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return "invalid";
+    }
+
+    const record = parsed as Record<string, unknown>;
+
+    if (record.mode !== "catalog" && record.mode !== "custom") {
+      return "invalid";
+    }
+
+    const customItems = parseQuoteCustomItems(record.customItems);
+
+    if (!customItems) {
+      return "invalid";
+    }
+
+    if (record.mode === "custom") {
+      return {
+        customItems,
+        mode: "custom",
+      };
+    }
+
+    const selectedAdjustments = parseQuoteSelectedAdjustments(
+      record.selectedAdjustments,
+    );
+
+    return selectedAdjustments
+      ? {
+          customItems,
+          mode: "catalog",
+          selectedAdjustments,
+        }
+      : "invalid";
+  } catch {
+    return "invalid";
+  }
+}
+
+function parseQuoteCustomItems(
+  value: unknown,
+): CommissionQuoteCustomItemSelection[] | null {
+  if (!Array.isArray(value) || value.length > 50) {
+    return null;
+  }
+
+  const items: CommissionQuoteCustomItemSelection[] = [];
+
+  for (const item of value) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      return null;
+    }
+
+    const record = item as Record<string, unknown>;
+
+    if (
+      typeof record.key !== "string" ||
+      typeof record.label !== "string" ||
+      (record.description !== undefined &&
+        record.description !== null &&
+        typeof record.description !== "string") ||
+      typeof record.quantity !== "number" ||
+      typeof record.unitAmount !== "string"
+    ) {
+      return null;
+    }
+
+    items.push({
+      description:
+        typeof record.description === "string" ? record.description : null,
+      key: record.key,
+      label: record.label,
+      quantity: record.quantity,
+      unitAmount: record.unitAmount,
+    });
+  }
+
+  return items;
+}
+
+function parseQuoteSelectedAdjustments(
+  value: unknown,
+): CommissionQuoteSelectedAdjustment[] | null {
+  if (!Array.isArray(value) || value.length > 50) {
+    return null;
+  }
+
+  const adjustments: CommissionQuoteSelectedAdjustment[] = [];
+
+  for (const adjustment of value) {
+    if (
+      !adjustment ||
+      typeof adjustment !== "object" ||
+      Array.isArray(adjustment)
+    ) {
+      return null;
+    }
+
+    const record = adjustment as Record<string, unknown>;
+
+    if (
+      typeof record.adjustmentId !== "string" ||
+      !UUID_PATTERN.test(record.adjustmentId) ||
+      typeof record.quantity !== "number" ||
+      (record.internalNote !== undefined &&
+        record.internalNote !== null &&
+        typeof record.internalNote !== "string") ||
+      (record.percentageRate !== undefined &&
+        record.percentageRate !== null &&
+        typeof record.percentageRate !== "string")
+    ) {
+      return null;
+    }
+
+    adjustments.push({
+      adjustmentId: record.adjustmentId,
+      internalNote:
+        typeof record.internalNote === "string" ? record.internalNote : null,
+      percentageRate:
+        typeof record.percentageRate === "string"
+          ? record.percentageRate
+          : null,
+      quantity: record.quantity,
+    });
+  }
+
+  return adjustments;
 }
 
 export async function updateCommissionStatusAction(
@@ -548,6 +701,14 @@ function quoteError(message: string): CommissionQuoteActionState {
   };
 }
 
+function quotePricingResolutionError(
+  result: Exclude<ResolveCommissionQuotePricingResult, { outcome: "resolved" }>,
+): CommissionQuoteActionState {
+  return quoteError(
+    result.outcome === "invalid" ? result.validation.message : result.message,
+  );
+}
+
 function quoteConflict(
   commissionId: string,
   message = "The quote changed before this action was applied. Refresh the page and try again.",
@@ -566,6 +727,7 @@ function parseQuoteDraftForm(formData: FormData):
       currency: string;
       description: string | null;
       notes: string | null;
+      pricingSelection: CommissionQuotePricingSelection | null;
       validUntil: Date | null;
       items: CommissionQuoteItemInput[];
     }
@@ -582,7 +744,20 @@ function parseQuoteDraftForm(formData: FormData):
     };
   }
 
-  const items = parseCommissionQuoteItems(getFormValue(formData, "items"));
+  const pricingSelection = parseCommissionQuotePricingSelection(
+    getFormValue(formData, "pricingSelection"),
+  );
+
+  if (pricingSelection === "invalid") {
+    return {
+      valid: false,
+      message: "The selected quote pricing is invalid.",
+    };
+  }
+
+  const items = pricingSelection
+    ? []
+    : parseCommissionQuoteItems(getFormValue(formData, "items"));
 
   if (!items) {
     return {
@@ -596,6 +771,7 @@ function parseQuoteDraftForm(formData: FormData):
     currency: getFormValue(formData, "currency"),
     description: getFormValue(formData, "description") || null,
     notes: getFormValue(formData, "notes") || null,
+    pricingSelection,
     validUntil,
     items,
   };
@@ -619,15 +795,36 @@ export async function createCommissionQuoteDraftAction(
   }
 
   try {
-    const result = await createCommissionQuoteDraft({
-      commissionId,
-      createdByAdminUserId: session.user.id,
-      currency: draft.currency,
-      description: draft.description,
-      notes: draft.notes,
-      validUntil: draft.validUntil,
-      items: draft.items,
-    });
+    const pricingResult = draft.pricingSelection
+      ? await resolveCommissionQuotePricingForCreate({
+          commissionId,
+          selection: draft.pricingSelection,
+        })
+      : null;
+
+    if (pricingResult && pricingResult.outcome !== "resolved") {
+      return quotePricingResolutionError(pricingResult);
+    }
+
+    const result =
+      pricingResult?.outcome === "resolved"
+        ? await createCommissionQuoteDraft({
+            commissionId,
+            createdByAdminUserId: session.user.id,
+            description: draft.description,
+            notes: draft.notes,
+            pricingSnapshot: pricingResult.snapshot,
+            validUntil: draft.validUntil,
+          })
+        : await createCommissionQuoteDraft({
+            commissionId,
+            createdByAdminUserId: session.user.id,
+            currency: draft.currency,
+            description: draft.description,
+            notes: draft.notes,
+            validUntil: draft.validUntil,
+            items: draft.items,
+          });
 
     switch (result.outcome) {
       case "created":
@@ -687,16 +884,38 @@ export async function updateCommissionQuoteDraftAction(
   }
 
   try {
-    const result = await updateCommissionQuoteDraft({
-      quoteId,
-      expectedUpdatedAt,
-      updatedByAdminUserId: session.user.id,
-      currency: draft.currency,
-      description: draft.description,
-      notes: draft.notes,
-      validUntil: draft.validUntil,
-      items: draft.items,
-    });
+    const pricingResult = draft.pricingSelection
+      ? await resolveCommissionQuotePricingForUpdate({
+          quoteId,
+          selection: draft.pricingSelection,
+        })
+      : null;
+
+    if (pricingResult && pricingResult.outcome !== "resolved") {
+      return quotePricingResolutionError(pricingResult);
+    }
+
+    const result =
+      pricingResult?.outcome === "resolved"
+        ? await updateCommissionQuoteDraft({
+            quoteId,
+            expectedUpdatedAt,
+            updatedByAdminUserId: session.user.id,
+            description: draft.description,
+            notes: draft.notes,
+            pricingSnapshot: pricingResult.snapshot,
+            validUntil: draft.validUntil,
+          })
+        : await updateCommissionQuoteDraft({
+            quoteId,
+            expectedUpdatedAt,
+            updatedByAdminUserId: session.user.id,
+            currency: draft.currency,
+            description: draft.description,
+            notes: draft.notes,
+            validUntil: draft.validUntil,
+            items: draft.items,
+          });
 
     switch (result.outcome) {
       case "updated":
