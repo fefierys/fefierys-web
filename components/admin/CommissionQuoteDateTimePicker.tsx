@@ -97,7 +97,13 @@ export default function CommissionQuoteDateTimePicker({
   );
 
   useEffect(() => {
-    setMounted(true);
+    const frame = window.requestAnimationFrame(() => {
+      setMounted(true);
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+    };
   }, []);
 
   const days = useMemo(() => {

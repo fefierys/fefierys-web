@@ -14,6 +14,8 @@ import type { CommissionQuotePricingEditorConfig } from "@/lib/commissions/commi
 import CommissionAdminModal from "./CommissionAdminModal";
 import CommissionAdminToast from "./CommissionAdminToast";
 import CommissionQuoteEditor from "./CommissionQuoteEditor";
+import CommissionQuoteExpireConfirm from "./CommissionQuoteExpireConfirm";
+import CommissionQuoteRevisionConfirm from "./CommissionQuoteRevisionConfirm";
 import CommissionQuoteSendConfirm from "./CommissionQuoteSendConfirm";
 
 interface CommissionQuotePanelProps {
@@ -23,7 +25,7 @@ interface CommissionQuotePanelProps {
   quotes: CommissionQuoteWithItems[];
 }
 
-type ModalMode = "create" | "edit" | "send" | "view" | null;
+type ModalMode = "create" | "edit" | "expire" | "revise" | "send" | "view" | null;
 
 const QUOTE_STATUS_STYLES = {
   draft: "border-sky-200/20 bg-sky-200/10 text-sky-100",
@@ -120,9 +122,13 @@ export default function CommissionQuotePanel({
         ? `Edit quote v${draft?.quote.version ?? ""}`
         : mode === "send"
           ? `Send quote v${selectedQuote?.quote.version ?? ""}`
-          : selectedQuote
-            ? `Quote v${selectedQuote.quote.version}`
-            : "Quote";
+          : mode === "revise"
+            ? `Create revision from quote v${selectedQuote?.quote.version ?? ""}`
+            : mode === "expire"
+              ? `Expire quote v${selectedQuote?.quote.version ?? ""}`
+              : selectedQuote
+                ? `Quote v${selectedQuote.quote.version}`
+                : "Quote";
 
   return (
     <>
@@ -217,7 +223,11 @@ export default function CommissionQuotePanel({
             ? "Review this version and its recorded values."
             : mode === "send"
               ? "Confirm the quote before moving it to Awaiting quote response."
-              : "Add services, extras, discounts, validity, and internal notes."
+              : mode === "revise"
+                ? "Create a new draft version while preserving this sent quote in history."
+                : mode === "expire"
+                  ? "Record the expiration of a sent quote after its validity period has ended."
+                  : "Add services, extras, discounts, validity, and internal notes."
         }
         footer={
           mode === "view" && selectedQuote ? (
@@ -253,6 +263,31 @@ export default function CommissionQuotePanel({
                   </button>
                 </>
               )}
+              {selectedQuote.quote.status === "sent" &&
+                commissionStatus === "awaiting_quote_response" && (
+                  <>
+                    <button
+                      className="rounded-xl border border-violet-200/25 bg-violet-200/15 px-5 py-3 text-sm text-violet-50 transition hover:bg-violet-200/20"
+                      onClick={() => {
+                        setSelectedQuoteId(selectedQuote.quote.id);
+                        setMode("revise");
+                      }}
+                      type="button"
+                    >
+                      Create revision
+                    </button>
+                    <button
+                      className="rounded-xl border border-red-200/25 bg-red-200/10 px-5 py-3 text-sm text-red-50 transition hover:bg-red-200/15"
+                      onClick={() => {
+                        setSelectedQuoteId(selectedQuote.quote.id);
+                        setMode("expire");
+                      }}
+                      type="button"
+                    >
+                      Expire quote
+                    </button>
+                  </>
+                )}
             </div>
           ) : undefined
         }
@@ -278,6 +313,30 @@ export default function CommissionQuotePanel({
             quote={selectedQuote}
           />
         )}
+
+        {mode === "revise" &&
+          selectedQuote?.quote.status === "sent" &&
+          commissionStatus === "awaiting_quote_response" && (
+            <CommissionQuoteRevisionConfirm
+              commissionId={commissionId}
+              onBack={() => setMode("view")}
+              onSuccess={handleEditorSuccess}
+              quote={selectedQuote}
+            />
+          )}
+
+        {mode === "expire" &&
+          selectedQuote?.quote.status === "sent" &&
+          commissionStatus === "awaiting_quote_response" && (
+            <CommissionQuoteExpireConfirm
+              commissionId={commissionId}
+              onBack={() => setMode("view")}
+              onSuccess={handleEditorSuccess}
+              quote={selectedQuote}
+            />
+          )}
+
+
 
         {mode === "view" && selectedQuote && (
           <div className="min-w-0">

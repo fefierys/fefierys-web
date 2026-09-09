@@ -207,7 +207,15 @@ export default function CommissionPricedQuoteEditor({
   );
 
   useEffect(() => {
-    setFooterRoot(document.getElementById("commission-admin-modal-footer-root"));
+    const frame = window.requestAnimationFrame(() => {
+      setFooterRoot(
+        document.getElementById("commission-admin-modal-footer-root"),
+      );
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+    };
   }, []);
 
   useEffect(() => {

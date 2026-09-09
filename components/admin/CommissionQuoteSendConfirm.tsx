@@ -36,7 +36,15 @@ export default function CommissionQuoteSendConfirm({
   const formId = `commission-quote-send-form-${quote.quote.id}`;
 
   useEffect(() => {
-    setFooterRoot(document.getElementById("commission-admin-modal-footer-root"));
+    const frame = window.requestAnimationFrame(() => {
+        setFooterRoot(
+        document.getElementById("commission-admin-modal-footer-root"),
+        );
+    });
+
+    return () => {
+        window.cancelAnimationFrame(frame);
+    };
   }, []);
 
   useEffect(() => {

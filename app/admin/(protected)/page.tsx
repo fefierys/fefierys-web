@@ -1,11 +1,13 @@
 import Link from "next/link";
 
 import { requireAdmin } from "@/lib/auth/admin";
+import { getPastDueCommissionQuoteCount } from "@/lib/repositories/commissionAdminRepository";
 
 import { logoutAction } from "./actions";
 
 export default async function AdminPage() {
   const session = await requireAdmin();
+  const pastDueQuoteCount = await getPastDueCommissionQuoteCount();
 
   return (
     <main className="min-h-screen px-6 py-28">
@@ -30,6 +32,40 @@ export default async function AdminPage() {
             </button>
           </form>
         </div>
+
+        {pastDueQuoteCount > 0 && (
+          <section className="mt-10 rounded-2xl border border-amber-200/20 bg-amber-200/[0.08] p-5 sm:p-6">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-sm font-medium text-amber-50">
+                  Quotes needing attention
+                </p>
+                <h2 className="mt-2 text-2xl font-light text-white">
+                  {pastDueQuoteCount}{" "}
+                  {pastDueQuoteCount === 1
+                    ? "quote is past its validity date"
+                    : "quotes are past their validity date"}
+                </h2>
+                <p className="mt-3 max-w-2xl text-sm leading-relaxed text-white/60">
+                  {pastDueQuoteCount === 1
+                    ? "A sent quote is still awaiting a client response even though its validity period has ended."
+                    : "Some sent quotes are still awaiting a client response even though their validity periods have ended."}
+                </p>
+              </div>
+
+              <span className="inline-flex min-w-10 items-center justify-center self-start rounded-full border border-amber-100/20 bg-amber-100/10 px-3 py-1.5 text-sm font-medium text-amber-50">
+                {pastDueQuoteCount}
+              </span>
+            </div>
+
+            <Link
+              className="mt-5 inline-flex text-sm text-amber-50 transition hover:text-white"
+              href="/admin/commissions?status=awaiting_quote_response"
+            >
+              Review commissions →
+            </Link>
+          </section>
+        )}
 
         <section className="mt-10 grid gap-5 md:grid-cols-2">
           <Link

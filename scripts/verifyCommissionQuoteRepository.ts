@@ -2615,6 +2615,35 @@ async function main(): Promise<void> {
       throw new Error("Expected the revision fixture draft to be created.");
     }
 
+    /*
+     * Turn this fixture into a non-legacy priced quote without depending
+     * on the seeded pricing catalog. This makes the revision test catch
+     * any accidental downgrade from priced -> legacy.
+     */
+    await db
+      .update(commissionQuotes)
+      .set({
+        pricingMode: "custom",
+        pricingVersionId: null,
+        baseSubtotal: "450.00",
+        preDiscountSubtotal: "610.00",
+        discountTotal: "60.00",
+      })
+      .where(eq(commissionQuotes.id, revisionDraft.quote.id));
+
+    await db
+      .update(commissionQuoteItems)
+      .set({
+        kind: "custom",
+        pricingOptionId: null,
+        pricingAdjustmentId: null,
+        calculationType: "fixed",
+        calculationBasis: "none",
+        percentageRate: null,
+        internalNote: "Preserve priced revision metadata.",
+      })
+      .where(eq(commissionQuoteItems.quoteId, revisionDraft.quote.id));
+
     const revisionSent = await sendCommissionQuote({
       quoteId: revisionDraft.quote.id,
       expectedUpdatedAt: revisionDraft.quote.updatedAt,
@@ -2625,6 +2654,22 @@ async function main(): Promise<void> {
 
     if (revisionSent.outcome !== "sent") {
       throw new Error("Expected the revision fixture quote to be sent.");
+    }
+
+    equal(revisionSent.quote.pricingMode, "custom");
+    equal(revisionSent.quote.pricingVersionId, null);
+    equal(revisionSent.quote.baseSubtotal, "450.00");
+    equal(revisionSent.quote.preDiscountSubtotal, "610.00");
+    equal(revisionSent.quote.discountTotal, "60.00");
+
+    for (const item of revisionSent.items) {
+      equal(item.kind, "custom");
+      equal(item.pricingOptionId, null);
+      equal(item.pricingAdjustmentId, null);
+      equal(item.calculationType, "fixed");
+      equal(item.calculationBasis, "none");
+      equal(item.percentageRate, null);
+      equal(item.internalNote, "Preserve priced revision metadata.");
     }
 
     const supersededResult = await supersedeCommissionQuote({
@@ -2857,7 +2902,7 @@ async function main(): Promise<void> {
     equal(revisionCreatedEventRows.length, 2);
 
     console.log(
-      "[OK] Quote revision superseded the sent version and copied a new draft atomically",
+      "[OK] Quote revision preserved priced metadata and copied a new draft atomically",
     );
 
     const missingSupersede = await supersedeCommissionQuote({
