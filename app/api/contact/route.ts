@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
 
-import { CURRENT_COMMISSION_TERMS_VERSION } from "../../../lib/legal/commissionTerms";
 import { createCommission } from "../../../lib/repositories/commissionRepository";
 
 /*
@@ -53,7 +52,6 @@ const MAX_OPTION_LENGTH = 150;
 
 interface ContactBody {
   submissionId?: unknown;
-  termsAccepted?: unknown;
 
   name?: unknown;
   email?: unknown;
@@ -196,7 +194,6 @@ export async function POST(request: Request) {
 
     if (
       typeof body.submissionId !== "string" ||
-      body.termsAccepted !== true ||
       typeof body.name !== "string" ||
       typeof body.email !== "string" ||
       typeof body.message !== "string"
@@ -409,7 +406,7 @@ export async function POST(request: Request) {
 
       initialMessage: message,
 
-      termsVersion: CURRENT_COMMISSION_TERMS_VERSION,
+      termsVersion: null,
 
       agreementVersion: null,
     });
@@ -523,7 +520,7 @@ async function sendOwnerEmail(data: SafeEmailData) {
 
     replyTo: data.email,
 
-    subject: "✨ New Commission Request - Fefierys",
+    subject: "✨ New Project Inquiry - Fefierys",
 
     html: `
       <div style="font-family: Arial, Helvetica, sans-serif; background:#f4f4f8; padding:40px;">
@@ -531,16 +528,16 @@ async function sendOwnerEmail(data: SafeEmailData) {
         <div style="max-width:640px; margin:0 auto; background:#ffffff; border-radius:16px; padding:32px; border:1px solid #e5e7eb;">
 
           <h1 style="margin:0 0 8px; color:#2f3558; font-size:28px; font-weight:400;">
-            New Commission Inquiry
+            New Project Inquiry
           </h1>
 
           <p style="margin:0 0 24px; color:#6b7280;">
-            A new commission request has been submitted through the Fefierys website.
+            A new project inquiry has been submitted through the Fefierys website.
           </p>
 
 
           <h2 style="margin:0 0 12px; color:#374151; font-size:18px;">
-            Commission Summary
+            Inquiry Summary
           </h2>
 
 
@@ -662,7 +659,7 @@ async function sendClientConfirmationEmail(data: SafeEmailData) {
 
     replyTo: ownerEmail,
 
-    subject: "✨ Your Fefierys commission request has been received",
+    subject: "✨ Your Fefierys inquiry has been received",
 
     html: `
       <div style="font-family: Arial, Helvetica, sans-serif; background:#f4f4f8; padding:40px;">
@@ -681,7 +678,7 @@ async function sendClientConfirmationEmail(data: SafeEmailData) {
 
 
           <p style="color:#374151; line-height:1.6;">
-            Your commission request has been successfully received through the Fefierys website.
+            Your project inquiry has been successfully received through the Fefierys website.
           </p>
 
 
@@ -691,7 +688,7 @@ async function sendClientConfirmationEmail(data: SafeEmailData) {
 
 
           <h2 style="margin-top:28px; margin-bottom:12px; color:#374151; font-size:18px;">
-            Commission Summary
+            Inquiry Summary
           </h2>
 
 
@@ -751,7 +748,7 @@ async function sendClientConfirmationEmail(data: SafeEmailData) {
 
 
             <p style="margin:8px 0 0; color:#374151;">
-              🟡 Request Received - Under Review
+              🟡 Inquiry Received - Under Review
             </p>
 
           </div>

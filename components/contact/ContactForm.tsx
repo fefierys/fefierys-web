@@ -1,16 +1,16 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import dynamic from 'next/dynamic';
-
-const TermsModal = dynamic(() => import('../TermsModal'));
+import {
+  type FormEvent,
+  useRef,
+  useState,
+} from 'react';
 
 interface ContactFormProps {
   style?: string;
   collection?: string;
   category?: string;
   option?: string;
-  initialMessage: string;
   onSuccess?: () => void;
 }
 
@@ -19,56 +19,60 @@ export default function ContactForm({
   collection,
   category,
   option,
-  initialMessage,
   onSuccess,
 }: ContactFormProps) {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [message, setMessage] = useState(initialMessage);
+  const [name, setName] =
+    useState('');
+
+  const [email, setEmail] =
+    useState('');
+
+  const [message, setMessage] =
+    useState('');
 
   /*
    * Honeypot.
    *
-   * Los usuarios reales no ven ni rellenan este campo.
-   * Muchos bots intentan completar todos los inputs.
+   * Invisible to real users.
    */
-  const [website, setWebsite] = useState('');
+  const [website, setWebsite] =
+    useState('');
 
-  const [sending, setSending] = useState(false);
-  const [error, setError] = useState('');
+  const [sending, setSending] =
+    useState(false);
 
-  const [termsAccepted, setTermsAccepted] = useState(false);
-  const [termsOpen, setTermsOpen] = useState(false);
+  const [error, setError] =
+    useState('');
 
   /*
-   * Reused when a request has an uncertain network result.
-   * The backend uses it as the commission idempotency key.
+   * Reused if the request has an
+   * uncertain network result.
+   *
+   * The backend uses this as its
+   * idempotency key.
    */
-  const submissionIdRef = useRef<string | null>(null);
+  const submissionIdRef =
+    useRef<string | null>(null);
 
-  useEffect(() => {
-    if (termsOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [termsOpen]);
-
-
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(
+    e: FormEvent<HTMLFormElement>,
+  ) {
     e.preventDefault();
 
-    const nameRegex = /^[a-zA-ZÀ-ÿ\s'-]{2,}$/;
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const nameRegex =
+      /^[a-zA-ZÀ-ÿ\s'.-]{2,100}$/;
 
-    const normalizedName = name.trim();
-    const normalizedEmail = email.trim();
-    const normalizedMessage = message.trim();
+    const emailRegex =
+      /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+    const normalizedName =
+      name.trim();
+
+    const normalizedEmail =
+      email.trim();
+
+    const normalizedMessage =
+      message.trim();
 
     /*
      * ============================================================
@@ -77,20 +81,34 @@ export default function ContactForm({
      */
 
     if (!normalizedName) {
-      setError('Please enter your name.');
+      setError(
+        'Please enter your name.',
+      );
+
       return;
     }
 
-    if (normalizedName.length > 100) {
-      setError('Your name is too long.');
+    if (
+      normalizedName.length > 100
+    ) {
+      setError(
+        'Your name is too long.',
+      );
+
       return;
     }
 
-    if (!nameRegex.test(normalizedName)) {
-      setError('Please enter a valid name.');
+    if (
+      !nameRegex.test(
+        normalizedName,
+      )
+    ) {
+      setError(
+        'Please enter a valid name.',
+      );
+
       return;
     }
-
 
     /*
      * ============================================================
@@ -99,20 +117,34 @@ export default function ContactForm({
      */
 
     if (!normalizedEmail) {
-      setError('Please enter your email.');
+      setError(
+        'Please enter your email.',
+      );
+
       return;
     }
 
-    if (normalizedEmail.length > 254) {
-      setError('Your email address is too long.');
+    if (
+      normalizedEmail.length > 254
+    ) {
+      setError(
+        'Your email address is too long.',
+      );
+
       return;
     }
 
-    if (!emailRegex.test(normalizedEmail)) {
-      setError('Please enter a valid email address.');
+    if (
+      !emailRegex.test(
+        normalizedEmail,
+      )
+    ) {
+      setError(
+        'Please enter a valid email address.',
+      );
+
       return;
     }
-
 
     /*
      * ============================================================
@@ -121,327 +153,477 @@ export default function ContactForm({
      */
 
     if (!normalizedMessage) {
-      setError('Please tell me about your project.');
-      return;
-    }
-
-    if (normalizedMessage.length > 5000) {
       setError(
-        'Your project message is too long. Please keep it under 5000 characters.'
+        'Please tell me about your project.',
       );
+
       return;
     }
 
-
-    /*
-     * ============================================================
-     * TERMS
-     * ============================================================
-     */
-
-    if (!termsAccepted) {
+    if (
+      normalizedMessage.length > 5000
+    ) {
       setError(
-        'You must accept the Terms & Conditions before sending your inquiry.'
+        'Your project message is too long. Please keep it under 5000 characters.',
       );
+
       return;
     }
-
 
     setError('');
     setSending(true);
-
 
     try {
       const submissionId =
         submissionIdRef.current ??
         crypto.randomUUID();
 
-      submissionIdRef.current = submissionId;
+      submissionIdRef.current =
+        submissionId;
 
-      const response = await fetch('/api/contact', {
-        method: 'POST',
+      const response =
+        await fetch(
+          '/api/contact',
+          {
+            method: 'POST',
 
-        headers: {
-          'Content-Type': 'application/json',
-        },
+            headers: {
+              'Content-Type':
+                'application/json',
+            },
 
-        body: JSON.stringify({
-          submissionId,
-          termsAccepted: true,
+            body: JSON.stringify({
+              submissionId,
 
-          name: normalizedName,
-          email: normalizedEmail,
-          message: normalizedMessage,
+              name:
+                normalizedName,
 
-          style,
-          collection,
-          category,
-          option,
+              email:
+                normalizedEmail,
 
-          /*
-           * Honeypot.
-           */
-          website,
-        }),
-      });
+              message:
+                normalizedMessage,
 
+              style,
+              collection,
+              category,
+              option,
+
+              /*
+               * Honeypot.
+               */
+              website,
+            }),
+          },
+        );
 
       if (!response.ok) {
-        throw new Error('Failed to send inquiry');
+        throw new Error(
+          'Failed to send inquiry',
+        );
       }
-
 
       if (onSuccess) {
         onSuccess();
       }
 
-
-      window.location.href = '/contact/success';
-
+      window.location.href =
+        '/contact/success';
     } catch (err) {
       console.error(err);
 
       setError(
-        'Something went wrong while sending your inquiry. Please try again.'
+        'Something went wrong while sending your inquiry. Please try again.',
       );
-
     } finally {
       setSending(false);
     }
   }
 
-
   return (
-    <>
-      <form
-        onSubmit={handleSubmit}
-        noValidate
-        className="space-y-5"
+    <form
+      onSubmit={handleSubmit}
+      noValidate
+      className="
+        relative
+        rounded-[2rem]
+        border
+        border-white/10
+        bg-[#5966A5]/45
+        p-5
+        text-white
+        backdrop-blur-xl
+        shadow-[0_20px_60px_rgba(40,40,90,0.16)]
+        sm:p-7
+        lg:p-8
+      "
+    >
+      {/* ======================================================
+          FORM INTRO
+      ====================================================== */}
+
+      <div
+        className="
+          mb-6
+          border-b
+          border-white/10
+          pb-5
+        "
       >
-
-        {/* ======================================================
-            HONEYPOT
-        ====================================================== */}
-
-        <div
-          aria-hidden="true"
+        <h2
           className="
-            absolute
-            -left-[9999px]
-            top-auto
-            h-px
-            w-px
-            overflow-hidden
+            text-xl
+            font-light
+            text-white
+            sm:text-2xl
           "
         >
-          <label htmlFor="website">
-            Website
+          Your project
+        </h2>
+
+        <p
+          className="
+            mt-2
+            max-w-2xl
+            text-xs
+            leading-relaxed
+            text-white/55
+            sm:text-sm
+          "
+        >
+          Share whatever information you have for now, whether it’s a lot or a little. 
+          We can discuss references, timelines, budget, or other details once I receive your request.
+        </p>
+      </div>
+
+      {/* ======================================================
+          HONEYPOT
+      ====================================================== */}
+
+      <div
+        aria-hidden="true"
+        className="
+          absolute
+          -left-[9999px]
+          top-auto
+          h-px
+          w-px
+          overflow-hidden
+        "
+      >
+        <label htmlFor="website">
+          Website
+        </label>
+
+        <input
+          id="website"
+          name="website"
+          type="text"
+          value={website}
+          tabIndex={-1}
+          autoComplete="off"
+          onChange={(e) =>
+            setWebsite(
+              e.target.value,
+            )
+          }
+        />
+      </div>
+
+      {/* ======================================================
+          NAME + EMAIL
+      ====================================================== */}
+
+      <div
+        className="
+          grid
+          gap-4
+          md:grid-cols-2
+        "
+      >
+        <div>
+          <label
+            htmlFor="contact-name"
+            className="
+              mb-2
+              block
+              text-xs
+              text-white/65
+            "
+          >
+            Your name
           </label>
 
           <input
-            id="website"
-            name="website"
+            id="contact-name"
+            name="name"
             type="text"
-            value={website}
-            tabIndex={-1}
-            autoComplete="off"
-            onChange={(e) =>
-              setWebsite(e.target.value)
-            }
+            value={name}
+            required
+            maxLength={100}
+            autoComplete="name"
+            placeholder="What should I call you?"
+            onChange={(e) => {
+              setName(
+                e.target.value,
+              );
+
+              setError('');
+            }}
+            className="
+              w-full
+              rounded-2xl
+              border
+              border-white/10
+              bg-black/[0.08]
+              px-4
+              py-3.5
+              text-sm
+              text-white
+              outline-none
+              transition
+              placeholder:text-white/30
+              focus:border-white/30
+              focus:bg-white/[0.055]
+            "
           />
         </div>
 
+        <div>
+          <label
+            htmlFor="contact-email"
+            className="
+              mb-2
+              block
+              text-xs
+              text-white/65
+            "
+          >
+            Your email
+          </label>
 
-        {/* ======================================================
-            NAME
-        ====================================================== */}
+          <input
+            id="contact-email"
+            name="email"
+            type="email"
+            value={email}
+            required
+            maxLength={254}
+            autoComplete="email"
+            placeholder="you@example.com"
+            onChange={(e) => {
+              setEmail(
+                e.target.value,
+              );
 
-        <input
-          type="text"
-          placeholder="Your name"
-          value={name}
-          required
-          maxLength={100}
-          autoComplete="name"
-          onChange={(e) => {
-            setName(e.target.value);
-            setError('');
-          }}
+              setError('');
+            }}
+            className="
+              w-full
+              rounded-2xl
+              border
+              border-white/10
+              bg-black/[0.08]
+              px-4
+              py-3.5
+              text-sm
+              text-white
+              outline-none
+              transition
+              placeholder:text-white/30
+              focus:border-white/30
+              focus:bg-white/[0.055]
+            "
+          />
+        </div>
+      </div>
+
+      {/* ======================================================
+          MESSAGE
+      ====================================================== */}
+
+      <div className="mt-5">
+        <div
           className="
-            w-full rounded-2xl border border-white/10 bg-[#5966A5]/55
-            px-5 py-4 text-white placeholder:text-white/50
-            backdrop-blur-xl outline-none
+            mb-2
+            flex
+            items-end
+            justify-between
+            gap-3
           "
-        />
+        >
+          <label
+            htmlFor="contact-message"
+            className="
+              text-xs
+              text-white/65
+            "
+          >
+            Tell me about your project
+          </label>
 
-
-        {/* ======================================================
-            EMAIL
-        ====================================================== */}
-
-        <input
-          type="email"
-          placeholder="Your email"
-          value={email}
-          required
-          maxLength={254}
-          autoComplete="email"
-          onChange={(e) => {
-            setEmail(e.target.value);
-            setError('');
-          }}
-          className="
-            w-full rounded-2xl border border-white/10 bg-[#5966A5]/55
-            px-5 py-4 text-white placeholder:text-white/50
-            backdrop-blur-xl outline-none
-          "
-        />
-
-
-        {/* ======================================================
-            MESSAGE
-        ====================================================== */}
+          <span
+            className="
+              text-[0.65rem]
+              text-white/35
+            "
+          >
+            {message.length}/5000
+          </span>
+        </div>
 
         <textarea
-          rows={8}
+          id="contact-message"
+          name="message"
+          rows={9}
           value={message}
           required
           maxLength={5000}
           onChange={(e) => {
-            setMessage(e.target.value);
+            setMessage(
+              e.target.value,
+            );
+
             setError('');
           }}
-          placeholder="Tell me about your project..."
+          placeholder="Tell me what you're working on, what kind of illustration you have in mind, your timeline, budget, references, or anything else you'd like me to know..."
           className="
-            w-full rounded-2xl border border-white/10 bg-[#5966A5]/55
-            px-5 py-4 text-white placeholder:text-white/50
-            backdrop-blur-xl outline-none
+            w-full
+            resize-y
+            rounded-2xl
+            border
+            border-white/10
+            bg-black/[0.08]
+            px-4
+            py-4
+            text-sm
+            leading-relaxed
+            text-white
+            outline-none
+            transition
+            placeholder:text-white/30
+            focus:border-white/30
+            focus:bg-white/[0.055]
           "
         />
+      </div>
 
+      {/* ======================================================
+          REASSURANCE
+      ====================================================== */}
 
-        {/* ======================================================
-            TERMS & CONDITIONS
-        ====================================================== */}
+      <div
+        className="
+          mt-5
+          rounded-2xl
+          border
+          border-white/10
+          bg-white/[0.035]
+          px-4
+          py-3
+        "
+      >
+        <p
+          className="
+            text-xs
+            leading-relaxed
+            text-white/55
+          "
+        >
+          Sending an inquiry does not
+          require payment or commit you
+          to a commission. If you decide
+          to move forward, the applicable
+          Terms of Service will be
+          accepted later in the
+          commission process.
+        </p>
+      </div>
 
-        <label className="flex items-start gap-3 text-sm text-white">
+      {/* ======================================================
+          ERROR
+      ====================================================== */}
 
-          <input
-            type="checkbox"
-            checked={termsAccepted}
-            onChange={(e) => {
-              setTermsAccepted(
-                e.target.checked
-              );
-              setError('');
-            }}
+      {error && (
+        <div
+          role="alert"
+          className="
+            mt-5
+            rounded-2xl
+            border
+            border-red-200/15
+            bg-red-200/[0.06]
+            px-4
+            py-3
+          "
+        >
+          <p
             className="
-              mt-1
-              h-4
-              w-4
-              rounded
-              border-white/20
-              bg-white/10
-              text-white
-            "
-          />
-
-
-          <span>
-            I have read and agree to the{' '}
-
-            <button
-              type="button"
-              onClick={() =>
-                setTermsOpen(true)
-              }
-              className="
-                underline
-                decoration-white/40
-                underline-offset-2
-                transition
-                hover:text-white
-              "
-            >
-              Terms of Service
-            </button>
-
-            .
-          </span>
-
-        </label>
-
-
-        {/* ======================================================
-            SUBMIT
-        ====================================================== */}
-
-        <div className="flex justify-center md:justify-start">
-
-          <button
-            type="submit"
-            disabled={
-              sending ||
-              !termsAccepted
-            }
-            className="
-              rounded-full
-              border
-              border-white/20
-              bg-[#2f3558]/20
-
-              px-8
-              py-3
-
               text-sm
-              uppercase
-              tracking-[0.15em]
-
-              text-white
-
-              transition
-              duration-300
-
-              hover:bg-white
-              hover:text-[#2f3558]
-
-              disabled:cursor-not-allowed
+              text-red-200
             "
           >
-            {sending
-              ? 'Sending...'
-              : 'Send inquiry'}
-          </button>
-
-        </div>
-
-
-        {/* ======================================================
-            ERROR
-        ====================================================== */}
-
-        {error && (
-          <p className="text-sm text-red-300">
             {error}
           </p>
-        )}
-
-      </form>
-
-
-      {/* ========================================================
-          TERMS MODAL
-      ======================================================== */}
-
-      {termsOpen && (
-        <TermsModal
-          open={termsOpen}
-          onClose={() =>
-            setTermsOpen(false)
-          }
-        />
+        </div>
       )}
 
-    </>
+      {/* ======================================================
+          SUBMIT
+      ====================================================== */}
+
+      <div
+        className="
+          mt-6
+          flex
+          flex-col
+          gap-3
+          sm:flex-row
+          sm:items-center
+          sm:justify-between
+        "
+      >
+        <p
+          className="
+            text-[0.7rem]
+            leading-relaxed
+            text-white/40
+          "
+        >
+          I&apos;ll review your inquiry
+          and get back to you by email.
+        </p>
+
+        <button
+          type="submit"
+          disabled={sending}
+          className="
+            inline-flex
+            shrink-0
+            items-center
+            justify-center
+            rounded-full
+            border
+            border-white/20
+            bg-white
+            px-7
+            py-3
+            text-xs
+            uppercase
+            tracking-[0.15em]
+            text-[#353a70]
+            transition
+            duration-200
+            hover:bg-white/90
+            disabled:cursor-not-allowed
+            disabled:opacity-50
+          "
+        >
+          {sending
+            ? 'Sending...'
+            : 'Send inquiry'}
+        </button>
+      </div>
+    </form>
   );
 }
