@@ -3,98 +3,201 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+
 import { portfolioSections } from '@/data/portfolio';
 
 export default function Navbar() {
-  const [scrolled, setScrolled] = useState(false);
-  const [portfolioOpen, setPortfolioOpen] = useState(false);
+  const [portfolioOpen, setPortfolioOpen] =
+    useState(false);
+
+  const [mobileMenuOpen, setMobileMenuOpen] =
+    useState(false);
+
+  const [
+    mobilePortfolioOpen,
+    setMobilePortfolioOpen,
+  ] = useState(false);
 
   /*
-   * Desktop:
-   * > 1024px → hover
+   * ============================================================
+   * BREAKPOINTS
+   * ============================================================
    *
-   * Tablet + móvil:
-   * <= 1024px → tap / click
+   * < 768px:
+   * Mobile menu.
+   *
+   * 768px - 1024px:
+   * Horizontal navigation + Portfolio by tap.
+   *
+   * > 1024px:
+   * Horizontal navigation + Portfolio by hover.
    */
+
+  const MOBILE_BREAKPOINT = 768;
   const DESKTOP_BREAKPOINT = 1024;
 
-  useEffect(() => {
-    const handleScroll = () => {
-      setScrolled(window.scrollY > 50);
-    };
-
-    window.addEventListener('scroll', handleScroll);
-
-    return () => {
-      window.removeEventListener('scroll', handleScroll);
-    };
-  }, []);
-
   /*
-   * Cerramos el dropdown si la pantalla cambia
-   * desde tablet/móvil hacia desktop.
-   *
-   * No hacemos ningún setState directamente dentro
-   * del efecto: solamente reaccionamos al evento resize.
+   * ============================================================
+   * RESIZE
+   * ============================================================
    */
+
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth > DESKTOP_BREAKPOINT) {
+      /*
+       * Leaving mobile:
+       * close the mobile panel.
+       */
+      if (
+        window.innerWidth >=
+        MOBILE_BREAKPOINT
+      ) {
+        setMobileMenuOpen(false);
+        setMobilePortfolioOpen(false);
+      }
+
+      /*
+       * Moving into desktop:
+       * reset the click-controlled Portfolio
+       * dropdown so hover takes over cleanly.
+       */
+      if (
+        window.innerWidth >
+        DESKTOP_BREAKPOINT
+      ) {
         setPortfolioOpen(false);
       }
     };
 
-    window.addEventListener('resize', handleResize);
+    window.addEventListener(
+      'resize',
+      handleResize,
+    );
 
     return () => {
-      window.removeEventListener('resize', handleResize);
+      window.removeEventListener(
+        'resize',
+        handleResize,
+      );
     };
   }, []);
 
+  /*
+   * ============================================================
+   * ESCAPE
+   * ============================================================
+   */
+
+  useEffect(() => {
+    const handleKeyDown = (
+      event: KeyboardEvent,
+    ) => {
+      if (event.key !== 'Escape') {
+        return;
+      }
+
+      setMobileMenuOpen(false);
+      setMobilePortfolioOpen(false);
+      setPortfolioOpen(false);
+    };
+
+    window.addEventListener(
+      'keydown',
+      handleKeyDown,
+    );
+
+    return () => {
+      window.removeEventListener(
+        'keydown',
+        handleKeyDown,
+      );
+    };
+  }, []);
+
+  /*
+   * ============================================================
+   * HELPERS
+   * ============================================================
+   */
+
   const isDesktop = () => {
-    return window.innerWidth > DESKTOP_BREAKPOINT;
+    return (
+      window.innerWidth >
+      DESKTOP_BREAKPOINT
+    );
   };
 
   const handlePortfolioClick = () => {
+    /*
+     * On desktop, Portfolio is controlled
+     * through hover.
+     *
+     * Tablet uses click / tap.
+     */
     if (!isDesktop()) {
-      setPortfolioOpen((prev) => !prev);
+      setPortfolioOpen(
+        (current) => !current,
+      );
     }
   };
 
-  const closePortfolio = () => {
+  const closeMenus = () => {
     setPortfolioOpen(false);
+    setMobileMenuOpen(false);
+    setMobilePortfolioOpen(false);
+  };
+
+  const toggleMobileMenu = () => {
+    setMobileMenuOpen((current) => {
+      const next = !current;
+
+      /*
+       * Whenever the whole mobile menu
+       * closes, also collapse Portfolio.
+       */
+      if (!next) {
+        setMobilePortfolioOpen(false);
+      }
+
+      return next;
+    });
   };
 
   return (
     <nav
       className="
         fixed
-        top-0
         left-0
+        top-0
         z-50
         w-full
 
+        bg-[#111184]/20
         px-4
         py-3
-        md:px-8
+        backdrop-blur-md
+        shadow-lg
 
         transition-all
         duration-500
 
-        bg-[#111184]/20
-        backdrop-blur-md
-        shadow-lg
+        md:px-8
       "
     >
-      <div className="flex items-center justify-between">
-
+      <div
+        className="
+          flex
+          items-center
+          justify-between
+        "
+      >
         {/* ==================================================
             LOGO
         ================================================== */}
 
         <Link
           href="/"
-          onClick={closePortfolio}
+          onClick={closeMenus}
           className="
             transition
             hover:text-white/70
@@ -105,7 +208,10 @@ export default function Navbar() {
             alt="Fefierys"
             width={360}
             height={97}
-            sizes="(max-width: 767px) 120px, 180px"
+            sizes="
+              (max-width: 767px) 120px,
+              180px
+            "
             className="
               h-auto
               w-[120px]
@@ -116,19 +222,100 @@ export default function Navbar() {
         </Link>
 
         {/* ==================================================
-            NAVIGATION
+            MOBILE MENU BUTTON
+        ================================================== */}
+
+        <button
+          type="button"
+          onClick={toggleMobileMenu}
+          aria-expanded={mobileMenuOpen}
+          aria-controls="mobile-navigation"
+          className="
+            inline-flex
+            items-center
+            gap-2
+
+            rounded-full
+            border
+            border-white/10
+            bg-white/[0.04]
+
+            px-4
+            py-2
+
+            text-xs
+            font-light
+            tracking-wide
+            text-white
+
+            backdrop-blur-md
+
+            transition
+            duration-200
+
+            hover:bg-white/10
+
+            md:hidden
+          "
+        >
+          <span>
+            {mobileMenuOpen
+              ? 'Close'
+              : 'Menu'}
+          </span>
+
+          {mobileMenuOpen ? (
+            /*
+             * Close icon
+             */
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.7"
+              strokeLinecap="round"
+              className="h-4 w-4"
+            >
+              <path d="M6 6l12 12" />
+              <path d="M18 6 6 18" />
+            </svg>
+          ) : (
+            /*
+             * Menu icon
+             */
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.7"
+              strokeLinecap="round"
+              className="h-4 w-4"
+            >
+              <path d="M5 7h14" />
+              <path d="M5 12h14" />
+              <path d="M5 17h14" />
+            </svg>
+          )}
+        </button>
+
+        {/* ==================================================
+            TABLET / DESKTOP NAVIGATION
         ================================================== */}
 
         <div
           className="
-            flex
+            hidden
             items-center
 
-            gap-3
-            md:gap-10
+            gap-6
+            md:flex
+            md:gap-8
+            lg:gap-10
 
-            text-xs
-            md:text-lg
+            text-sm
+            lg:text-lg
 
             font-light
             tracking-wide
@@ -137,14 +324,11 @@ export default function Navbar() {
             [font-family:var(--font-lexend)]
           "
         >
-
-          {/* ==================================================
-              HOME
-          ================================================== */}
+          {/* HOME */}
 
           <Link
             href="/"
-            onClick={closePortfolio}
+            onClick={closeMenus}
             className="
               transition
               hover:text-white/70
@@ -159,15 +343,6 @@ export default function Navbar() {
 
           <div
             className="relative"
-
-            /*
-             * DESKTOP:
-             * El dropdown se controla mediante hover.
-             *
-             * TABLET / MOBILE:
-             * No hacemos nada aquí.
-             * El dropdown se controla mediante tap.
-             */
             onMouseEnter={() => {
               if (isDesktop()) {
                 setPortfolioOpen(true);
@@ -179,43 +354,54 @@ export default function Navbar() {
               }
             }}
           >
-            {/* Portfolio button */}
-
             <button
               type="button"
-              onClick={handlePortfolioClick}
+              onClick={
+                handlePortfolioClick
+              }
+              aria-expanded={portfolioOpen}
               className="
+                inline-flex
+                items-center
+                gap-1.5
+
                 transition
                 hover:text-white/70
               "
             >
               Portfolio
+
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.7"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className={`
+                  h-3.5
+                  w-3.5
+                  transition-transform
+                  duration-200
+                  ${
+                    portfolioOpen
+                      ? 'rotate-180'
+                      : ''
+                  }
+                `}
+              >
+                <path d="m6 9 6 6 6-6" />
+              </svg>
             </button>
 
-            {/* ==================================================
-                DROPDOWN INTERACTION AREA
-
-                IMPORTANTE:
-
-                Antes teníamos:
-
-                  mt-4
-
-                Eso generaba un hueco real entre Portfolio
-                y el dropdown.
-
-                Ahora el contenedor ocupa ese espacio mediante
-                padding-top, por lo que el cursor nunca abandona
-                el área del elemento padre.
-
-                Visualmente seguimos teniendo 16px de separación.
-            ================================================== */}
+            {/* Dropdown interaction area */}
 
             <div
               className={`
                 absolute
-                top-full
                 left-1/2
+                top-full
                 -translate-x-1/2
 
                 pt-4
@@ -225,71 +411,79 @@ export default function Navbar() {
 
                 ${
                   portfolioOpen
-                    ? 'visible opacity-100 translate-y-0'
-                    : 'invisible opacity-0 -translate-y-2 pointer-events-none'
+                    ? 'visible translate-y-0 opacity-100'
+                    : 'pointer-events-none invisible -translate-y-2 opacity-0'
                 }
               `}
             >
-              {/* ==================================================
-                  DROPDOWN VISUAL CONTAINER
-              ================================================== */}
-
               <div
                 className="
                   rounded-2xl
 
-                  bg-[#4a4594]/50
-                  backdrop-blur-xl
-
                   border
                   border-[#3A4D84]/10
 
+                  bg-[#4a4594]/50
                   px-6
                   py-4
 
+                  backdrop-blur-xl
                   shadow-xl
 
                   [font-family:var(--font-lexend)]
                 "
               >
-                {portfolioSections.map((section) => (
-                  <Link
-                    key={section.slug}
-                    href={`/portfolio/${section.slug}`}
-                    onClick={closePortfolio}
-                    className="
-                      block
-                      whitespace-nowrap
+                {portfolioSections.map(
+                  (section) => (
+                    <Link
+                      key={section.slug}
+                      href={`/portfolio/${section.slug}`}
+                      onClick={closeMenus}
+                      className="
+                        block
+                        whitespace-nowrap
 
-                      py-2
+                        py-2
 
-                      text-base
-                      md:text-lg
+                        text-base
+                        font-light
+                        tracking-wide
+                        text-white
 
-                      font-light
-                      tracking-wide
+                        transition
+                        hover:text-white/70
 
-                      text-white
-
-                      transition
-
-                      hover:text-white/70
-                    "
-                  >
-                    {section.title}
-                  </Link>
-                ))}
+                        md:text-lg
+                      "
+                    >
+                      {section.title}
+                    </Link>
+                  ),
+                )}
               </div>
             </div>
           </div>
 
           {/* ==================================================
-              CONTACT
+              COMMISSIONS
           ================================================== */}
 
           <Link
+            href="/commissions"
+            onClick={closeMenus}
+            className="
+              transition
+              hover:text-white/70
+            "
+          >
+            Commissions
+          </Link>
+
+          {/* CONTACT */}
+
+          <Link
             href="/contact"
-            onClick={closePortfolio}
+            onClick={closeMenus}
             className="
               transition
               hover:text-white/70
@@ -298,13 +492,11 @@ export default function Navbar() {
             Contact
           </Link>
 
-          {/* ==================================================
-              ABOUT
-          ================================================== */}
+          {/* ABOUT */}
 
           <Link
             href="/about"
-            onClick={closePortfolio}
+            onClick={closeMenus}
             className="
               transition
               hover:text-white/70
@@ -312,7 +504,250 @@ export default function Navbar() {
           >
             About
           </Link>
+        </div>
+      </div>
 
+      {/* ======================================================
+          MOBILE NAVIGATION PANEL
+      ====================================================== */}
+
+      <div
+        id="mobile-navigation"
+        className={`
+          grid
+          transition-[grid-template-rows]
+          duration-300
+          ease-out
+
+          md:hidden
+
+          ${
+            mobileMenuOpen
+              ? 'grid-rows-[1fr]'
+              : 'pointer-events-none grid-rows-[0fr]'
+          }
+        `}
+      >
+        <div className="overflow-hidden">
+          <div
+            className="
+              mt-3
+              overflow-hidden
+
+              rounded-[1.5rem]
+              border
+              border-white/10
+
+              bg-white/[0.025]
+              p-2
+
+              backdrop-blur-sm
+              shadow-[0_16px_40px_rgba(20,20,70,0.12)]
+            "
+          >
+            {/* ================================================
+                PORTFOLIO MOBILE
+            ================================================ */}
+
+            <button
+              type="button"
+              onClick={() =>
+                setMobilePortfolioOpen(
+                  (current) => !current,
+                )
+              }
+              aria-expanded={
+                mobilePortfolioOpen
+              }
+              className="
+                flex
+                w-full
+                items-center
+                justify-between
+
+                rounded-xl
+
+                px-4
+                py-3.5
+
+                text-left
+                text-sm
+                font-light
+                tracking-wide
+                text-white
+
+                transition
+                hover:bg-white/[0.06]
+              "
+            >
+              Portfolio
+
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.7"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className={`
+                  h-4
+                  w-4
+
+                  text-white/60
+
+                  transition-transform
+                  duration-200
+
+                  ${
+                    mobilePortfolioOpen
+                      ? 'rotate-180'
+                      : ''
+                  }
+                `}
+              >
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </button>
+
+            {/* Portfolio children */}
+
+            <div
+              className={`
+                grid
+                transition-[grid-template-rows]
+                duration-300
+
+                ${
+                  mobilePortfolioOpen
+                    ? 'grid-rows-[1fr]'
+                    : 'grid-rows-[0fr]'
+                }
+              `}
+            >
+              <div className="overflow-hidden">
+                <div
+                  className="
+                    mx-3
+                    mb-2
+
+                    rounded-xl
+                    border
+                    border-white/10
+
+                    px-2
+                    py-1
+                  "
+                >
+                  {portfolioSections.map(
+                    (section) => (
+                      <Link
+                        key={section.slug}
+                        href={`/portfolio/${section.slug}`}
+                        onClick={closeMenus}
+                        className="
+                          block
+
+                          rounded-lg
+
+                          px-3
+                          py-2.5
+
+                          text-sm
+                          font-light
+                          text-white/70
+
+                          transition
+
+                          hover:bg-white/[0.06]
+                          hover:text-white
+                        "
+                      >
+                        {section.title}
+                      </Link>
+                    ),
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* ================================================
+                COMMISSIONS
+            ================================================ */}
+
+            <Link
+              href="/commissions"
+              onClick={closeMenus}
+              className="
+                block
+
+                rounded-xl
+
+                px-4
+                py-3.5
+
+                text-sm
+                font-light
+                tracking-wide
+                text-white
+
+                transition
+                hover:bg-white/[0.06]
+              "
+            >
+              Commissions
+            </Link>
+
+            {/* CONTACT */}
+
+            <Link
+              href="/contact"
+              onClick={closeMenus}
+              className="
+                block
+
+                rounded-xl
+
+                px-4
+                py-3.5
+
+                text-sm
+                font-light
+                tracking-wide
+                text-white
+
+                transition
+                hover:bg-white/[0.06]
+              "
+            >
+              Contact
+            </Link>
+
+            {/* ABOUT */}
+
+            <Link
+              href="/about"
+              onClick={closeMenus}
+              className="
+                block
+
+                rounded-xl
+
+                px-4
+                py-3.5
+
+                text-sm
+                font-light
+                tracking-wide
+                text-white
+
+                transition
+                hover:bg-white/[0.06]
+              "
+            >
+              About
+            </Link>
+          </div>
         </div>
       </div>
     </nav>

@@ -483,7 +483,7 @@ export async function POST(
      * ============================================================
      *
      * Primero debemos asegurarnos de que
-     * tú recibiste realmente la comisión.
+     * tú recibiste realmente la consulta.
      */
 
     const ownerResult =
@@ -512,7 +512,7 @@ export async function POST(
      * se envió correctamente.
      *
      * Si falla la confirmación al cliente,
-     * NO perdemos la comisión.
+     * NO perdemos la consulta.
      */
 
     try {
@@ -584,7 +584,7 @@ async function sendOwnerEmail(
       data.email,
 
     subject:
-      "✨ New Commission Request - Fefierys",
+      "✨ New Project Inquiry - Fefierys",
 
     html: `
       <div style="font-family: Arial, Helvetica, sans-serif; background:#f4f4f8; padding:40px;">
@@ -592,16 +592,16 @@ async function sendOwnerEmail(
         <div style="max-width:640px; margin:0 auto; background:#ffffff; border-radius:16px; padding:32px; border:1px solid #e5e7eb;">
 
           <h1 style="margin:0 0 8px; color:#2f3558; font-size:28px; font-weight:400;">
-            New Commission Inquiry
+            New Project Inquiry
           </h1>
 
           <p style="margin:0 0 24px; color:#6b7280;">
-            A new commission request has been submitted through the Fefierys website.
+            A new project inquiry has been submitted through the Fefierys website.
           </p>
 
 
           <h2 style="margin:0 0 12px; color:#374151; font-size:18px;">
-            Commission Summary
+            Inquiry Summary
           </h2>
 
 
@@ -734,7 +734,7 @@ async function sendClientConfirmationEmail(
       ownerEmail,
 
     subject:
-      "✨ Your Fefierys commission request has been received",
+      "✨ Your Fefierys inquiry has been received",
 
     html: `
       <div style="font-family: Arial, Helvetica, sans-serif; background:#f4f4f8; padding:40px;">
@@ -753,7 +753,7 @@ async function sendClientConfirmationEmail(
 
 
           <p style="color:#374151; line-height:1.6;">
-            Your commission request has been successfully received through the Fefierys website.
+            Your project inquiry has been successfully received through the Fefierys website.
           </p>
 
 
@@ -763,7 +763,7 @@ async function sendClientConfirmationEmail(
 
 
           <h2 style="margin-top:28px; margin-bottom:12px; color:#374151; font-size:18px;">
-            Commission Summary
+            Inquiry Summary
           </h2>
 
 
@@ -823,7 +823,7 @@ async function sendClientConfirmationEmail(
 
 
             <p style="margin:8px 0 0; color:#374151;">
-              🟡 Request Received - Under Review
+              🟡 Inquiry Received - Under Review
             </p>
 
           </div>

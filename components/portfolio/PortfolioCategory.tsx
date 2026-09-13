@@ -1,18 +1,49 @@
 'use client';
 
-import dynamic from 'next/dynamic';
-import { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useRef } from 'react';
 
 import { PortfolioData } from '@/data/portfolio/types';
-import { commissions } from '@/data/portfolio/commissions';
 
 import ArtworkGrid from './ArtworkGrid';
 
-const CommissionModal = dynamic(
-  () => import('./CommissionModal')
-);
+const commissionAnchorByCategoryId: Record<
+  string,
+  string
+> = {
+  'semi-covers': 'book-covers',
+  'sty-covers': 'book-covers',
+
+  'semi-interior-illustration':
+    'interior-illustrations',
+  'sty-interior-illustration':
+    'interior-illustrations',
+
+  'semi-character-illustrations':
+    'character-illustrations',
+  'sty-character-illustrations':
+    'character-illustrations',
+
+  'semi-character-design':
+    'character-design',
+  'sty-character-design':
+    'character-design',
+
+  'semi-ref-sheets': 'reference-sheets',
+
+  'semi-icons': 'icons',
+  'sty-icons': 'icons',
+
+  'semi-environments': 'environments',
+
+  'semi-pets': 'pet-illustrations',
+  'sty-pets': 'pet-illustrations',
+
+  characters: 'chibis',
+  custom: 'emotes',
+};
 
 interface PortfolioCategoryProps {
   data: PortfolioData;
@@ -51,9 +82,7 @@ export default function PortfolioCategory({
   );
 
   const selectedGroupIndex =
-    foundGroupIndex === -1
-      ? 0
-      : foundGroupIndex;
+    foundGroupIndex === -1 ? 0 : foundGroupIndex;
 
   const selectedGroup =
     data.groups[selectedGroupIndex];
@@ -78,38 +107,35 @@ export default function PortfolioCategory({
     ];
 
   /*
-   * Estado del modal de comisión
-   */
-  const [commissionOpen, setCommissionOpen] =
-    useState(false);
+ * ============================================================
+ * COMMISSIONS LINK
+ * ============================================================
+ */
 
-  useEffect(() => {
-    if (commissionOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
+const commissionAnchor =
+  commissionAnchorByCategoryId[
+    selectedSubcategory.id
+  ];
+
+const commissionHref = commissionAnchor
+  ? {
+      pathname: '/commissions',
+      query: {
+        style: data.slug,
+      },
+      hash: commissionAnchor,
     }
+  : '/commissions';
 
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [commissionOpen]);
-
-  /*
-   * Comisión asociada a la categoría actual
-   */
-  const commission =
-    commissions[selectedSubcategory.id];
+/*
+ * Punto al que vuelve el scroll al cambiar
+ * de página dentro de ArtworkGrid.
+ */
+const galleryTopRef =
+  useRef<HTMLDivElement | null>(null);
 
   /*
-   * Punto al que vuelve el scroll al cambiar
-   * de página dentro de ArtworkGrid.
-   */
-  const commissionButtonRef =
-    useRef<HTMLDivElement | null>(null);
-
-  /*
-   * Cambiar COLLECTION
+   * Cambiar COLLECTION.
    *
    * Al cambiar de colección entramos a su
    * primera subcategoría.
@@ -130,7 +156,7 @@ export default function PortfolioCategory({
   }
 
   /*
-   * Cambiar CATEGORY
+   * Cambiar CATEGORY.
    */
   function changeSubcategory(
     subcategorySlug: string
@@ -140,16 +166,17 @@ export default function PortfolioCategory({
     );
   }
 
+
   /*
    * Scroll hacia botón de comisión.
    */
-  const scrollToCommission = () => {
-    if (!commissionButtonRef.current) return;
+  const scrollToGallery = () => {
+    if (!galleryTopRef.current) return;
 
     const navbarOffset = 100;
 
     const y =
-      commissionButtonRef.current
+      galleryTopRef.current
         .getBoundingClientRect().top +
       window.scrollY -
       navbarOffset;
@@ -161,244 +188,280 @@ export default function PortfolioCategory({
   };
 
   return (
-    <>
-      <section className="min-h-screen px-6 py-24 md:py-32">
-        <div className="mx-auto max-w-6xl text-white">
+    <section className="min-h-screen px-6 py-24 md:py-32">
+      <div className="mx-auto max-w-6xl text-white">
+        {/* TÍTULO */}
+        <h1 className="mb-12 text-center text-3xl font-light md:mb-16 md:text-5xl">
+          {data.title}
+        </h1>
 
-          {/* TÍTULO */}
-          <h1 className="mb-12 text-center text-3xl font-light md:mb-16 md:text-5xl">
-            {data.title}
-          </h1>
+        {/* COLLECTION */}
+        <div className="mb-8 flex flex-col items-center">
+          <p className="mb-3 text-[11px] uppercase tracking-[0.22em] text-white/45">
+            Collection
+          </p>
 
-          {/* COLLECTION */}
-          <div className="mb-8 flex flex-col items-center">
-            <p className="mb-3 text-[11px] uppercase tracking-[0.22em] text-white/45">
-              Collection
-            </p>
-
-            <div className="flex flex-wrap justify-center gap-6 md:gap-16">
-              {data.groups.map(
-                (group, index) => (
-                  <button
-                    type="button"
-                    key={group.id}
-                    onClick={() =>
-                      changeGroup(index)
-                    }
-                    className="
-                      relative
-                      pb-2
-                      text-sm
-                      uppercase
-                      tracking-[0.16em]
-                      transition-colors
-                      duration-300
-                      md:text-lg
-                    "
-                  >
-                    <span
-                      className={
-                        selectedGroupIndex ===
-                        index
-                          ? 'text-white'
-                          : 'text-white/45 hover:text-white'
-                      }
-                    >
-                      {group.title}
-                    </span>
-
-                    {selectedGroupIndex ===
-                      index && (
-                      <motion.div
-                        layoutId="group-underline"
-                        className="
-                          absolute
-                          left-0
-                          right-0
-                          -bottom-0.5
-                          h-px
-                          bg-white
-                        "
-                        transition={{
-                          type: 'spring',
-                          stiffness: 500,
-                          damping: 40,
-                        }}
-                      />
-                    )}
-                  </button>
-                )
-              )}
-            </div>
-          </div>
-
-          {/* CATEGORY */}
-          <div className="mb-14 flex flex-col items-center md:mb-20">
-            <p className="mb-3 text-[11px] uppercase tracking-[0.22em] text-white/45">
-              Category
-            </p>
-
-            <div
-              className="
-                flex
-                flex-wrap
-                justify-center
-                gap-4
-                md:gap-8
-              "
-            >
-              {selectedGroup.subcategories.map(
-                (subcategory, index) => (
-                  <button
-                    type="button"
-                    key={subcategory.id}
-                    onClick={() =>
-                      changeSubcategory(
-                        subcategory.slug
-                      )
-                    }
-                    className="
-                      relative
-                      pb-2
-                      text-[11px]
-                      uppercase
-                      tracking-[0.15em]
-                      transition-colors
-                      duration-300
-                      md:text-sm
-                    "
-                  >
-                    <span
-                      className={
-                        selectedSubcategoryIndex ===
-                        index
-                          ? 'text-white'
-                          : 'text-white/50 hover:text-white'
-                      }
-                    >
-                      {subcategory.title}
-                    </span>
-
-                    {selectedSubcategoryIndex ===
-                      index && (
-                      <motion.div
-                        layoutId="subcategory-underline"
-                        className="
-                          absolute
-                          left-0
-                          right-0
-                          -bottom-0.5
-                          h-px
-                          bg-white
-                        "
-                        transition={{
-                          type: 'spring',
-                          stiffness: 500,
-                          damping: 40,
-                        }}
-                      />
-                    )}
-                  </button>
-                )
-              )}
-            </div>
-          </div>
-
-          {/* BOTÓN DE COMISIÓN */}
-          {commission && (
-            <div
-              ref={commissionButtonRef}
-              className="mb-10 flex justify-center md:mb-12 md:justify-end"
-            >
-              <button
-                type="button"
-                onClick={() =>
-                  setCommissionOpen(true)
-                }
-                className="
-                  group
-                  inline-flex
-                  w-full
-                  max-w-sm
-                  items-center
-                  justify-center
-                  gap-2
-                  rounded-full
-                  border
-                  border-white/20
-                  bg-white/10
-                  px-5
-                  py-3
-                  text-xs
-                  uppercase
-                  tracking-[0.18em]
-                  text-white
-                  transition
-                  duration-300
-                  hover:bg-white
-                  hover:text-[#2f3558]
-                  md:w-auto
-                "
-              >
-                <svg
-                  className="h-4 w-4 transition group-hover:scale-110"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
+          <div className="flex flex-wrap justify-center gap-6 md:gap-16">
+            {data.groups.map(
+              (group, index) => (
+                <button
+                  type="button"
+                  key={group.id}
+                  onClick={() =>
+                    changeGroup(index)
+                  }
+                  className="
+                    relative
+                    pb-2
+                    text-sm
+                    uppercase
+                    tracking-[0.16em]
+                    transition-colors
+                    duration-300
+                    md:text-lg
+                  "
                 >
-                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                </svg>
+                  <span
+                    className={
+                      selectedGroupIndex ===
+                      index
+                        ? 'text-white'
+                        : 'text-white/45 hover:text-white'
+                    }
+                  >
+                    {group.title}
+                  </span>
 
-                Commission this style
-              </button>
-            </div>
-          )}
-
-          {/* GALERÍA */}
-          <div key={selectedSubcategory.id}>
-            <ArtworkGrid
-              artworks={
-                selectedSubcategory.artworks
-              }
-              scrollTargetRef={
-                scrollToCommission
-              }
-              initialArtworkSlug={
-                artworkSlug
-              }
-              portfolioSlug={
-                data.slug
-              }
-              groupSlug={
-                selectedGroup.slug
-              }
-              categorySlug={
-                selectedSubcategory.slug
-              }
-            />
+                  {selectedGroupIndex ===
+                    index && (
+                    <motion.div
+                      layoutId="group-underline"
+                      className="
+                        absolute
+                        left-0
+                        right-0
+                        -bottom-0.5
+                        h-px
+                        bg-white
+                      "
+                      transition={{
+                        type: 'spring',
+                        stiffness: 500,
+                        damping: 40,
+                      }}
+                    />
+                  )}
+                </button>
+              )
+            )}
           </div>
         </div>
-      </section>
 
-      {/* MODAL DE COMISIÓN */}
-      {commission && (
-        <CommissionModal
-          key={commission.id}
-          open={commissionOpen}
-          onClose={() =>
-            setCommissionOpen(false)
-          }
-          commission={commission}
-          styleTitle={data.title}
-          collectionTitle={
-            selectedGroup.title
-          }
-          categoryTitle={
-            selectedSubcategory.title
-          }
-        />
-      )}
-    </>
+        {/* CATEGORY */}
+        <div className="mb-14 flex flex-col items-center md:mb-20">
+          <p className="mb-3 text-[11px] uppercase tracking-[0.22em] text-white/45">
+            Category
+          </p>
+
+          <div
+            className="
+              flex
+              flex-wrap
+              justify-center
+              gap-4
+              md:gap-8
+            "
+          >
+            {selectedGroup.subcategories.map(
+              (subcategory, index) => (
+                <button
+                  type="button"
+                  key={subcategory.id}
+                  onClick={() =>
+                    changeSubcategory(
+                      subcategory.slug
+                    )
+                  }
+                  className="
+                    relative
+                    pb-2
+                    text-[11px]
+                    uppercase
+                    tracking-[0.15em]
+                    transition-colors
+                    duration-300
+                    md:text-sm
+                  "
+                >
+                  <span
+                    className={
+                      selectedSubcategoryIndex ===
+                      index
+                        ? 'text-white'
+                        : 'text-white/50 hover:text-white'
+                    }
+                  >
+                    {subcategory.title}
+                  </span>
+
+                  {selectedSubcategoryIndex ===
+                    index && (
+                    <motion.div
+                      layoutId="subcategory-underline"
+                      className="
+                        absolute
+                        left-0
+                        right-0
+                        -bottom-0.5
+                        h-px
+                        bg-white
+                      "
+                      transition={{
+                        type: 'spring',
+                        stiffness: 500,
+                        damping: 40,
+                      }}
+                    />
+                  )}
+                </button>
+              )
+            )}
+          </div>
+        </div>
+    
+
+        {/* GALERÍA */}
+        <div
+          key={selectedSubcategory.id}
+          ref={galleryTopRef}
+        >
+          <ArtworkGrid
+            artworks={
+              selectedSubcategory.artworks
+            }
+            scrollTargetRef={
+              scrollToGallery
+            }
+            initialArtworkSlug={
+              artworkSlug
+            }
+            portfolioSlug={
+              data.slug
+            }
+            groupSlug={
+              selectedGroup.slug
+            }
+            categorySlug={
+              selectedSubcategory.slug
+            }
+          />
+        </div>
+
+        {/* COMMISSIONS CTA */}
+        <div
+          className="
+            mx-auto
+            mt-14
+            max-w-2xl
+
+            rounded-3xl
+            border
+            border-white/10
+
+            bg-white/[0.04]
+
+            px-6
+            py-8
+            text-center
+
+            backdrop-blur-xl
+
+            shadow-[0_18px_45px_rgba(24,30,80,0.12)]
+
+            md:mt-16
+            md:px-10
+            md:py-10
+          "
+        >
+          <p
+            className="
+              text-lg
+              font-light
+              text-white
+
+              md:text-xl
+            "
+          >
+            Interested in commissioning
+            something like this?
+          </p>
+
+          <p
+            className="
+              mx-auto
+              mt-2
+              max-w-lg
+
+              text-sm
+              font-light
+              leading-relaxed
+              text-white/60
+            "
+          >
+            Explore pricing, styles and
+            commission options for this type
+            of artwork.
+          </p>
+
+          <Link
+            href={commissionHref}
+            className="
+              group
+
+              mt-6
+              inline-flex
+              items-center
+              justify-center
+              gap-2
+
+              rounded-full
+              border
+              border-white/15
+
+              bg-white/[0.08]
+
+              px-5
+              py-3
+
+              text-xs
+              font-light
+              uppercase
+              tracking-[0.14em]
+              text-white
+
+              transition
+              duration-300
+
+              hover:bg-white
+              hover:text-[#353a70]
+            "
+          >
+            View commission options
+
+            <span
+              aria-hidden="true"
+              className="
+                transition-transform
+                duration-300
+
+                group-hover:translate-x-1
+              "
+            >
+              →
+            </span>
+          </Link>
+        </div>
+      </div>
+    </section>
   );
 }
