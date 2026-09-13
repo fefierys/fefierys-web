@@ -78,6 +78,13 @@
       "when": 1788592144447,
       "tag": "0010_numerous_shockwave",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1788745919721,
+      "tag": "0011_chubby_pixie",
+      "breakpoints": true
     }
   ]
 }

@@ -100,6 +100,13 @@ export interface CommissionPricingBaseItemInput {
   unitAmount: string;
 }
 
+export interface CommissionPricingCustomItemInput {
+  key: string;
+  label: string;
+  quantity: number;
+  unitAmount: string;
+}
+
 export interface CommissionPricingAdjustmentInput extends CommissionPricingAdjustmentDefinitionInput {
   baseItemKey?: string | null;
   internalNote?: string | null;
@@ -114,7 +121,7 @@ export interface CalculatedCommissionPricingItem {
   calculationBasis: CommissionPricingCalculationBasis;
   calculationType: CommissionPricingCalculationType;
   key: string;
-  kind: "base" | CommissionPricingAdjustmentKind;
+  kind: "base" | "custom" | CommissionPricingAdjustmentKind;
   label: string;
   lineAmount: string;
   quantity: number;
@@ -136,6 +143,7 @@ export type CommissionPricingCalculationResult =
         | "base_item_required"
         | "duplicate_key"
         | "base_item_invalid"
+        | "custom_item_invalid"
         | "adjustment_invalid"
         | "adjustment_quantity_invalid"
         | "base_item_link_required"
@@ -149,6 +157,12 @@ export type CommissionPricingCalculationResult =
 
 interface NormalizedBaseItem {
   input: CommissionPricingBaseItemInput;
+  lineMinorUnits: bigint;
+  unitMinorUnits: bigint;
+}
+
+interface NormalizedCustomItem {
+  input: CommissionPricingCustomItemInput;
   lineMinorUnits: bigint;
   unitMinorUnits: bigint;
 }
@@ -331,12 +345,15 @@ export function validateCommissionPricingAdjustmentDefinition(
 export function calculateCommissionPricing(input: {
   adjustments: readonly CommissionPricingAdjustmentInput[];
   baseItems: readonly CommissionPricingBaseItemInput[];
+  customItems?: readonly CommissionPricingCustomItemInput[];
 }): CommissionPricingCalculationResult {
-  if (input.baseItems.length === 0) {
+  const customItems = input.customItems ?? [];
+
+  if (input.baseItems.length === 0 && customItems.length === 0) {
     return {
       valid: false,
       code: "base_item_required",
-      message: "At least one catalog base item is required.",
+      message: "At least one catalog or custom pricing item is required.",
     };
   }
 
@@ -386,6 +403,49 @@ export function calculateCommissionPricing(input: {
   const baseItemByKey = new Map(
     normalizedBaseItems.map((item) => [item.input.key, item]),
   );
+  const normalizedCustomItems: NormalizedCustomItem[] = [];
+
+  for (const customItem of customItems) {
+    const key = customItem.key.trim();
+    const label = customItem.label.trim();
+    const unitMinorUnits = parseCommissionQuoteAmount(customItem.unitAmount);
+
+    if (!key || seenKeys.has(key)) {
+      return {
+        valid: false,
+        code: "duplicate_key",
+        message: "Every pricing item requires a unique non-empty key.",
+      };
+    }
+
+    seenKeys.add(key);
+
+    if (
+      !label ||
+      unitMinorUnits === null ||
+      unitMinorUnits < ZERO ||
+      !Number.isInteger(customItem.quantity) ||
+      customItem.quantity < 1
+    ) {
+      return {
+        valid: false,
+        code: "custom_item_invalid",
+        message:
+          "A custom service needs a name, a whole quantity, and a valid price.",
+      };
+    }
+
+    normalizedCustomItems.push({
+      input: {
+        ...customItem,
+        key,
+        label,
+      },
+      lineMinorUnits: unitMinorUnits * BigInt(customItem.quantity),
+      unitMinorUnits,
+    });
+  }
+
   const normalizedAdjustments: NormalizedAdjustment[] = [];
 
   for (const adjustment of input.adjustments) {
@@ -536,6 +596,20 @@ export function calculateCommissionPricing(input: {
 
     calculatedItems.push(line.item);
     preDiscountSubtotalMinorUnits += line.lineMinorUnits;
+  }
+
+  for (const customItem of normalizedCustomItems) {
+    calculatedItems.push({
+      calculationBasis: "none",
+      calculationType: "fixed",
+      key: customItem.input.key,
+      kind: "custom",
+      label: customItem.input.label,
+      lineAmount: formatCommissionQuoteAmount(customItem.lineMinorUnits),
+      quantity: customItem.input.quantity,
+      unitAmount: formatCommissionQuoteAmount(customItem.unitMinorUnits),
+    });
+    preDiscountSubtotalMinorUnits += customItem.lineMinorUnits;
   }
 
   let discountTotalMinorUnits = ZERO;

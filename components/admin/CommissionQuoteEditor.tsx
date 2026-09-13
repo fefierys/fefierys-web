@@ -16,14 +16,17 @@ import {
   validateCommissionQuoteDraft,
 } from "@/lib/commissions/commissionQuote";
 import type { CommissionQuoteWithItems } from "@/lib/repositories/commissionQuoteRepository";
+import type { CommissionQuotePricingEditorConfig } from "@/lib/commissions/commissionQuotePricingEditor";
 
 import CommissionQuoteDateTimePicker from "./CommissionQuoteDateTimePicker";
+import CommissionPricedQuoteEditor from "./CommissionPricedQuoteEditor";
 
 interface CommissionQuoteEditorProps {
   commissionId: string;
   draft?: CommissionQuoteWithItems | null;
   onCancel: () => void;
   onSuccess: (message: string) => void;
+  pricingConfig?: CommissionQuotePricingEditorConfig | null;
 }
 
 interface EditableQuoteItem {
@@ -180,7 +183,34 @@ function calculateLineTotal(item: EditableQuoteItem): bigint | null {
   return amount * BigInt(quantity);
 }
 
-export default function CommissionQuoteEditor({
+export default function CommissionQuoteEditor(
+  props: CommissionQuoteEditorProps,
+) {
+  if (props.pricingConfig) {
+    return (
+      <CommissionPricedQuoteEditor
+        commissionId={props.commissionId}
+        config={props.pricingConfig}
+        draft={props.draft}
+        onCancel={props.onCancel}
+        onSuccess={props.onSuccess}
+      />
+    );
+  }
+
+  if (props.draft && props.draft.quote.pricingMode !== "legacy") {
+    return (
+      <p className="rounded-xl border border-amber-200/20 bg-amber-200/10 px-4 py-3 text-sm leading-relaxed text-amber-100">
+        This quote&apos;s pricing catalog could not be loaded. Refresh the page
+        before trying to edit it.
+      </p>
+    );
+  }
+
+  return <LegacyCommissionQuoteEditor {...props} />;
+}
+
+function LegacyCommissionQuoteEditor({
   commissionId,
   draft = null,
   onCancel,

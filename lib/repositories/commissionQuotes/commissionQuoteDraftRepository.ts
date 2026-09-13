@@ -2,7 +2,11 @@ import { randomUUID } from "node:crypto";
 
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 
-import { validateCommissionQuoteDraft } from "../../commissions/commissionQuote";
+import {
+  validateCommissionQuoteDraft,
+  type CommissionQuoteDraftInput,
+} from "../../commissions/commissionQuote";
+import type { CommissionQuotePricingSnapshot } from "../../commissions/commissionQuotePricing";
 import { db } from "../../db";
 import {
   commissionEvents,
@@ -19,10 +23,61 @@ import type {
   UpdateCommissionQuoteDraftResult,
 } from "./commissionQuoteTypes";
 
+type NewCommissionQuoteItem = typeof commissionQuoteItems.$inferInsert;
+
+function getPricingSnapshot(
+  input: CreateCommissionQuoteDraftInput | UpdateCommissionQuoteDraftInput,
+): CommissionQuotePricingSnapshot | null {
+  return "pricingSnapshot" in input && input.pricingSnapshot
+    ? input.pricingSnapshot
+    : null;
+}
+
+function getQuoteDraftInput(
+  input: CreateCommissionQuoteDraftInput | UpdateCommissionQuoteDraftInput,
+): CommissionQuoteDraftInput {
+  const pricingSnapshot = getPricingSnapshot(input);
+
+  if (!pricingSnapshot) {
+    return input as CommissionQuoteDraftInput;
+  }
+
+  return {
+    currency: pricingSnapshot.currency,
+    description: input.description,
+    notes: input.notes,
+    validUntil: input.validUntil,
+    items: pricingSnapshot.items.map((item) => ({
+      description: item.description,
+      label: item.label,
+      quantity: item.quantity,
+      unitAmount: item.unitAmount,
+    })),
+  };
+}
+
+function assertPricingSnapshotMatchesDraft(
+  pricingSnapshot: CommissionQuotePricingSnapshot | null,
+  validation: Extract<
+    ReturnType<typeof validateCommissionQuoteDraft>,
+    { valid: true }
+  >,
+): void {
+  if (
+    pricingSnapshot &&
+    (validation.currency !== pricingSnapshot.currency ||
+      validation.totalAmount !== pricingSnapshot.totalAmount ||
+      validation.items.length !== pricingSnapshot.items.length)
+  ) {
+    throw new Error("The pricing snapshot does not match its quote draft.");
+  }
+}
+
 export async function createCommissionQuoteDraft(
   input: CreateCommissionQuoteDraftInput,
 ): Promise<CreateCommissionQuoteDraftResult> {
-  const validation = validateCommissionQuoteDraft(input);
+  const pricingSnapshot = getPricingSnapshot(input);
+  const validation = validateCommissionQuoteDraft(getQuoteDraftInput(input));
 
   if (!validation.valid) {
     return {
@@ -30,6 +85,8 @@ export async function createCommissionQuoteDraft(
       validation,
     };
   }
+
+  assertPricingSnapshotMatchesDraft(pricingSnapshot, validation);
 
   const createdByAdminUserId = input.createdByAdminUserId.trim();
 
@@ -121,6 +178,26 @@ export async function createCommissionQuoteDraft(
                   ${"draft"}::quote_status
                 `.as("status"),
 
+              pricingMode: sql<CommissionQuote["pricingMode"]>`
+                  ${pricingSnapshot?.pricingMode ?? "legacy"}::quote_pricing_mode
+                `.as("pricing_mode"),
+
+              pricingVersionId: sql<string | null>`
+                  ${pricingSnapshot?.pricingVersionId ?? null}::uuid
+                `.as("pricing_version_id"),
+
+              baseSubtotal: sql<string | null>`
+                  ${pricingSnapshot?.baseSubtotal ?? null}::numeric
+                `.as("base_subtotal"),
+
+              preDiscountSubtotal: sql<string | null>`
+                  ${pricingSnapshot?.preDiscountSubtotal ?? null}::numeric
+                `.as("pre_discount_subtotal"),
+
+              discountTotal: sql<string | null>`
+                  ${pricingSnapshot?.discountTotal ?? null}::numeric
+                `.as("discount_total"),
+
               currency: sql<string>`
                   ${validation.currency}
                 `.as("currency"),
@@ -178,9 +255,21 @@ export async function createCommissionQuoteDraft(
       db
         .insert(commissionQuoteItems)
         .values(
-          validation.items.map((item) => ({
+          validation.items.map<NewCommissionQuoteItem>((item, index) => ({
             quoteId,
             sequence: item.sequence,
+            kind: pricingSnapshot?.items[index]?.kind ?? "legacy",
+            pricingOptionId:
+              pricingSnapshot?.items[index]?.pricingOptionId ?? null,
+            pricingAdjustmentId:
+              pricingSnapshot?.items[index]?.pricingAdjustmentId ?? null,
+            calculationType:
+              pricingSnapshot?.items[index]?.calculationType ?? null,
+            calculationBasis:
+              pricingSnapshot?.items[index]?.calculationBasis ?? null,
+            percentageRate:
+              pricingSnapshot?.items[index]?.percentageRate ?? null,
+            internalNote: pricingSnapshot?.items[index]?.internalNote ?? null,
             label: item.label,
             description: item.description,
             quantity: item.quantity,
@@ -217,6 +306,8 @@ export async function createCommissionQuoteDraft(
             version,
             currency: validation.currency,
             totalAmount: validation.totalAmount,
+            pricingMode: pricingSnapshot?.pricingMode ?? "legacy",
+            pricingVersionId: pricingSnapshot?.pricingVersionId ?? null,
           },
           createdByAdminUserId,
           createdAt,
@@ -405,7 +496,8 @@ async function classifyQuoteDraftUpdateFailure(quoteId: string): Promise<
 export async function updateCommissionQuoteDraft(
   input: UpdateCommissionQuoteDraftInput,
 ): Promise<UpdateCommissionQuoteDraftResult> {
-  const validation = validateCommissionQuoteDraft(input);
+  const pricingSnapshot = getPricingSnapshot(input);
+  const validation = validateCommissionQuoteDraft(getQuoteDraftInput(input));
 
   if (!validation.valid) {
     return {
@@ -413,6 +505,8 @@ export async function updateCommissionQuoteDraft(
       validation,
     };
   }
+
+  assertPricingSnapshotMatchesDraft(pricingSnapshot, validation);
 
   const updatedByAdminUserId = input.updatedByAdminUserId.trim();
 
@@ -431,8 +525,17 @@ export async function updateCommissionQuoteDraft(
   const updatedAt = new Date();
 
   const serializedItems = JSON.stringify(
-    validation.items.map((item) => ({
+    validation.items.map((item, index) => ({
       sequence: item.sequence,
+      kind: pricingSnapshot?.items[index]?.kind ?? "legacy",
+      pricing_option_id: pricingSnapshot?.items[index]?.pricingOptionId ?? null,
+      pricing_adjustment_id:
+        pricingSnapshot?.items[index]?.pricingAdjustmentId ?? null,
+      calculation_type: pricingSnapshot?.items[index]?.calculationType ?? null,
+      calculation_basis:
+        pricingSnapshot?.items[index]?.calculationBasis ?? null,
+      percentage_rate: pricingSnapshot?.items[index]?.percentageRate ?? null,
+      internal_note: pricingSnapshot?.items[index]?.internalNote ?? null,
       label: item.label,
       description: item.description,
       quantity: item.quantity,
@@ -444,6 +547,8 @@ export async function updateCommissionQuoteDraft(
     quoteId: input.quoteId,
     currency: validation.currency,
     totalAmount: validation.totalAmount,
+    pricingMode: pricingSnapshot?.pricingMode ?? "legacy",
+    pricingVersionId: pricingSnapshot?.pricingVersionId ?? null,
     updatedAt: updatedAt.toISOString(),
   });
 
@@ -454,6 +559,13 @@ export async function updateCommissionQuoteDraft(
           input_items AS MATERIALIZED (
             SELECT
               input_item.sequence,
+              input_item.kind,
+              input_item.pricing_option_id,
+              input_item.pricing_adjustment_id,
+              input_item.calculation_type,
+              input_item.calculation_basis,
+              input_item.percentage_rate,
+              input_item.internal_note,
               input_item.label,
               input_item.description,
               input_item.quantity,
@@ -462,6 +574,13 @@ export async function updateCommissionQuoteDraft(
               ${serializedItems}::jsonb
             ) AS input_item(
               sequence integer,
+              kind text,
+              pricing_option_id uuid,
+              pricing_adjustment_id uuid,
+              calculation_type text,
+              calculation_basis text,
+              percentage_rate numeric(5, 2),
+              internal_note text,
               label text,
               description text,
               quantity integer,
@@ -472,6 +591,9 @@ export async function updateCommissionQuoteDraft(
           updated_quote AS (
             UPDATE commission_quotes AS quote
             SET
+              base_subtotal = ${pricingSnapshot?.baseSubtotal ?? null}::numeric,
+              pre_discount_subtotal = ${pricingSnapshot?.preDiscountSubtotal ?? null}::numeric,
+              discount_total = ${pricingSnapshot?.discountTotal ?? null}::numeric,
               currency = ${validation.currency},
               total_amount =
                 ${validation.totalAmount}::numeric,
@@ -485,6 +607,21 @@ export async function updateCommissionQuoteDraft(
               AND quote.status = 'draft'
               AND quote.updated_at =
                 ${input.expectedUpdatedAt}
+              AND (
+                (
+                  ${pricingSnapshot === null}
+                  AND quote.pricing_mode = 'legacy'
+                  AND quote.pricing_version_id IS NULL
+                )
+                OR
+                (
+                  ${pricingSnapshot !== null}
+                  AND quote.pricing_mode =
+                    ${pricingSnapshot?.pricingMode ?? "legacy"}::quote_pricing_mode
+                  AND quote.pricing_version_id IS NOT DISTINCT FROM
+                    ${pricingSnapshot?.pricingVersionId ?? null}::uuid
+                )
+              )
               AND commission.id =
                 quote.commission_id
               AND commission.status = 'quoting'
@@ -499,6 +636,13 @@ export async function updateCommissionQuoteDraft(
               id,
               quote_id,
               sequence,
+              kind,
+              pricing_option_id,
+              pricing_adjustment_id,
+              calculation_type,
+              calculation_basis,
+              percentage_rate,
+              internal_note,
               label,
               description,
               quantity,
@@ -510,6 +654,13 @@ export async function updateCommissionQuoteDraft(
               gen_random_uuid(),
               updated_quote.id,
               input_items.sequence,
+              input_items.kind::quote_item_kind,
+              input_items.pricing_option_id,
+              input_items.pricing_adjustment_id,
+              input_items.calculation_type::commission_pricing_calculation_type,
+              input_items.calculation_basis::commission_pricing_calculation_basis,
+              input_items.percentage_rate,
+              input_items.internal_note,
               input_items.label,
               input_items.description,
               input_items.quantity,
@@ -523,6 +674,13 @@ export async function updateCommissionQuoteDraft(
               sequence
             )
             DO UPDATE SET
+              kind = EXCLUDED.kind,
+              pricing_option_id = EXCLUDED.pricing_option_id,
+              pricing_adjustment_id = EXCLUDED.pricing_adjustment_id,
+              calculation_type = EXCLUDED.calculation_type,
+              calculation_basis = EXCLUDED.calculation_basis,
+              percentage_rate = EXCLUDED.percentage_rate,
+              internal_note = EXCLUDED.internal_note,
               label = EXCLUDED.label,
               description = EXCLUDED.description,
               quantity = EXCLUDED.quantity,

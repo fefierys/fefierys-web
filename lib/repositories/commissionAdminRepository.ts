@@ -1,8 +1,9 @@
-import { and, asc, count, desc, eq, lt, or } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, lt, or } from "drizzle-orm";
 
 import { db } from "../db";
 import {
   commissionEvents,
+  commissionQuotes,
   commissionStatusEnum,
   commissions,
   commissionStatusHistory,
@@ -27,7 +28,9 @@ export type AdminCommissionSummary = Pick<
   | "isOnHold"
   | "submittedAt"
   | "updatedAt"
->;
+> & {
+  hasPastDueQuote: boolean;
+};
 
 export interface AdminCommissionCursor {
   submittedAt: Date;
@@ -88,6 +91,33 @@ export async function getCommissionStatusCounts(): Promise<CommissionStatusCount
 }
 
 /*
+ * A quote is "past due" when its validity timestamp has already passed but
+ * the persisted workflow still says it is sent and awaiting a client response.
+ * This is a derived admin signal only; it does not mutate quote or commission
+ * status. The expiration action/job remains responsible for that transition.
+ */
+export async function getPastDueCommissionQuoteCount(): Promise<number> {
+  const rows = await db
+    .select({
+      total: count(),
+    })
+    .from(commissionQuotes)
+    .innerJoin(
+      commissions,
+      eq(commissions.id, commissionQuotes.commissionId),
+    )
+    .where(
+      and(
+        eq(commissionQuotes.status, "sent"),
+        eq(commissions.status, "awaiting_quote_response"),
+        lt(commissionQuotes.validUntil, new Date()),
+      ),
+    );
+
+  return Number(rows[0]?.total ?? 0);
+}
+
+/*
  * Stable keyset pagination ordered by submittedAt DESC, id DESC.
  * The summary intentionally excludes client email and initial message;
  * those sensitive fields are returned only by the detail query.
@@ -132,7 +162,38 @@ export async function getAdminCommissionPage(
     .limit(pageSize + 1);
 
   const hasNextPage = rows.length > pageSize;
-  const items = hasNextPage ? rows.slice(0, pageSize) : rows;
+  const pageRows = hasNextPage ? rows.slice(0, pageSize) : rows;
+
+  const pastDueQuoteRows =
+    pageRows.length === 0
+      ? []
+      : await db
+          .select({
+            commissionId: commissionQuotes.commissionId,
+          })
+          .from(commissionQuotes)
+          .where(
+            and(
+              inArray(
+                commissionQuotes.commissionId,
+                pageRows.map((commission) => commission.id),
+              ),
+              eq(commissionQuotes.status, "sent"),
+              lt(commissionQuotes.validUntil, new Date()),
+            ),
+          );
+
+  const pastDueCommissionIds = new Set(
+    pastDueQuoteRows.map((row) => row.commissionId),
+  );
+
+  const items: AdminCommissionSummary[] = pageRows.map((commission) => ({
+    ...commission,
+    hasPastDueQuote:
+      commission.status === "awaiting_quote_response" &&
+      pastDueCommissionIds.has(commission.id),
+  }));
+
   const lastItem = items[items.length - 1];
 
   return {

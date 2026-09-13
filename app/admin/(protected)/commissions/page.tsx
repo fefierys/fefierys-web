@@ -169,6 +169,14 @@ export default async function CommissionsPage({
                         {commission.clientName}
                       </h2>
                       <CommissionStatusBadge status={commission.status} />
+                      {commission.hasPastDueQuote && (
+                        <span
+                          className="rounded-full border border-amber-300/25 bg-amber-300/10 px-3 py-1 text-xs text-amber-100"
+                          title="This sent quote is past its validity date and still awaiting a client response."
+                        >
+                          ⚠ Past due
+                        </span>
+                      )}
                       {commission.isOnHold && (
                         <span className="rounded-full border border-amber-300/25 bg-amber-300/10 px-3 py-1 text-xs text-amber-100">
                           On hold

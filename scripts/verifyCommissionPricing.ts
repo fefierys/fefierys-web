@@ -224,6 +224,78 @@ function main(): void {
   }
   console.log("[OK] Complete subtotal and indie discount are exact");
 
+  const catalogWithCustomItem = calculateCommissionPricing({
+    baseItems: [
+      {
+        key: "base",
+        label: "Cover — Book Covers",
+        quantity: 1,
+        unitAmount: "450",
+      },
+    ],
+    customItems: [
+      {
+        key: "custom-lettering",
+        label: "Custom illustrated lettering",
+        quantity: 2,
+        unitAmount: "50",
+      },
+    ],
+    adjustments: [
+      percentageAdjustment({
+        baseItemKey: null,
+        calculationBasis: "pre_discount_subtotal",
+        internalNote: "Indie publishing budget agreed with the client.",
+        key: "indie",
+        kind: "discount",
+        label: "Indie Author Discount",
+        percentageRate: "20",
+        requiresInternalNote: true,
+      }),
+    ],
+  });
+
+  equal(catalogWithCustomItem.valid, true);
+  if (catalogWithCustomItem.valid) {
+    equal(catalogWithCustomItem.baseSubtotal, "450.00");
+    equal(catalogWithCustomItem.preDiscountSubtotal, "550.00");
+    equal(catalogWithCustomItem.discountTotal, "110.00");
+    equal(catalogWithCustomItem.totalAmount, "440.00");
+    deepEqual(catalogWithCustomItem.items[1], {
+      calculationBasis: "none",
+      calculationType: "fixed",
+      key: "custom-lettering",
+      kind: "custom",
+      label: "Custom illustrated lettering",
+      lineAmount: "100.00",
+      quantity: 2,
+      unitAmount: "50.00",
+    });
+  }
+
+  const customQuote = calculateCommissionPricing({
+    baseItems: [],
+    customItems: [
+      {
+        key: "custom-service",
+        label: "Custom commission service",
+        quantity: 1,
+        unitAmount: "325",
+      },
+    ],
+    adjustments: [],
+  });
+
+  equal(customQuote.valid, true);
+  if (customQuote.valid) {
+    equal(customQuote.baseSubtotal, "0.00");
+    equal(customQuote.preDiscountSubtotal, "325.00");
+    equal(customQuote.discountTotal, "0.00");
+    equal(customQuote.totalAmount, "325.00");
+    equal(customQuote.items[0]?.kind, "custom");
+  }
+  console.log("[OK] Catalog and custom quotes support fixed custom items");
+
   const repeatedExtra = calculateCommissionPricing({
     baseItems: [
       {
@@ -261,6 +333,14 @@ function main(): void {
         unitAmount: "450",
       },
     ],
+    customItems: [
+      {
+        key: "custom-production",
+        label: "Custom production preparation",
+        quantity: 1,
+        unitAmount: "100",
+      },
+    ],
     adjustments: [
       fixedAdjustment({
         baseItemKey: "base",
@@ -285,11 +365,29 @@ function main(): void {
   equal(volumeDiscount.valid, true);
   if (volumeDiscount.valid) {
     equal(volumeDiscount.baseSubtotal, "4500.00");
-    equal(volumeDiscount.preDiscountSubtotal, "4580.00");
+    equal(volumeDiscount.preDiscountSubtotal, "4680.00");
     equal(volumeDiscount.discountTotal, "450.00");
-    equal(volumeDiscount.totalAmount, "4130.00");
+    equal(volumeDiscount.totalAmount, "4230.00");
   }
   console.log("[OK] Future base-only volume discounts are supported");
+
+  const invalidCustomItem = calculateCommissionPricing({
+    baseItems: [],
+    customItems: [
+      {
+        key: "custom",
+        label: " ",
+        quantity: 1,
+        unitAmount: "25",
+      },
+    ],
+    adjustments: [],
+  });
+  equal(invalidCustomItem.valid, false);
+  if (!invalidCustomItem.valid) {
+    equal(invalidCustomItem.code, "custom_item_invalid");
+  }
+  console.log("[OK] Invalid custom pricing items are rejected");
 
   const exactHalf = calculateCommissionPricing({
     baseItems: [

@@ -1,6 +1,16 @@
-import type { quoteStatusEnum } from "@/lib/db/schema/commissions";
+import type {
+  quoteItemKindEnum,
+  quotePricingModeEnum,
+  quoteStatusEnum,
+} from "@/lib/db/schema/commissions";
 
 export type CommissionQuoteStatus = (typeof quoteStatusEnum.enumValues)[number];
+
+export type CommissionQuotePricingMode =
+  (typeof quotePricingModeEnum.enumValues)[number];
+
+export type CommissionQuoteItemKind =
+  (typeof quoteItemKindEnum.enumValues)[number];
 
 export const COMMISSION_QUOTE_STATUSES = [
   "draft",
@@ -10,6 +20,21 @@ export const COMMISSION_QUOTE_STATUSES = [
   "expired",
   "superseded",
 ] as const satisfies readonly CommissionQuoteStatus[];
+
+export const COMMISSION_QUOTE_PRICING_MODES = [
+  "legacy",
+  "catalog",
+  "custom",
+] as const satisfies readonly CommissionQuotePricingMode[];
+
+export const COMMISSION_QUOTE_ITEM_KINDS = [
+  "legacy",
+  "base",
+  "extra",
+  "license",
+  "discount",
+  "custom",
+] as const satisfies readonly CommissionQuoteItemKind[];
 
 export const TERMINAL_COMMISSION_QUOTE_STATUSES = [
   "accepted",
@@ -116,6 +141,18 @@ export function isCommissionQuoteStatus(
   value: string,
 ): value is CommissionQuoteStatus {
   return (COMMISSION_QUOTE_STATUSES as readonly string[]).includes(value);
+}
+
+export function isCommissionQuotePricingMode(
+  value: string,
+): value is CommissionQuotePricingMode {
+  return (COMMISSION_QUOTE_PRICING_MODES as readonly string[]).includes(value);
+}
+
+export function isCommissionQuoteItemKind(
+  value: string,
+): value is CommissionQuoteItemKind {
+  return (COMMISSION_QUOTE_ITEM_KINDS as readonly string[]).includes(value);
 }
 
 export function isTerminalCommissionQuoteStatus(
