@@ -3,9 +3,11 @@ import Image from "next/image";
 import Link from "next/link";
 
 import CommissionCatalog from "@/components/commissions/CommissionCatalog";
-import { publicCommissionGroups } from "@/lib/commissions/publicCommissionCatalog";
+import { getPublicCommissionGroups } from "@/lib/commissions/publicCommissionCatalog";
 
 import CommissionTermsButton from "@/components/commissions/CommissionTermsButton";
+
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Commissions | Fefierys",
@@ -46,7 +48,9 @@ const faq = [
   },
 ];
 
-export default function CommissionsPage() {
+export default async function CommissionsPage() {
+  const publicCommissionGroups = await getPublicCommissionGroups();
+
   return (
     <main
       className="
@@ -215,7 +219,7 @@ export default function CommissionsPage() {
               "
             >
               <Link
-                href="#commission-options"
+                href="/portfolio/semi-realism"
                 className="
                   inline-flex
                   items-center
