@@ -217,10 +217,7 @@ export default function Navbar({
             alt="Fefierys"
             width={360}
             height={97}
-            sizes="
-              (max-width: 767px) 120px,
-              180px
-            "
+            sizes="(max-width: 767px) 120px, 180px"
             className="
               h-auto
               w-[120px]

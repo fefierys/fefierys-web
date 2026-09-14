@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   useEffect,
+  useRef,
   useState,
 } from "react";
 
@@ -349,7 +350,9 @@ function Service({
 }: {
   service: PublicCommissionService;
   open: boolean;
-  onToggle: () => void;
+  onToggle: (
+    trigger: HTMLButtonElement,
+  ) => void;
   selectedStyle: PublicCommissionStyle;
   onStyleChange: (
     style: PublicCommissionStyle,
@@ -429,7 +432,9 @@ function Service({
 
       <button
         type="button"
-        onClick={onToggle}
+        onClick={(event) =>
+          onToggle(event.currentTarget)
+        }
         aria-expanded={open}
         className="
           group
@@ -1179,6 +1184,124 @@ export default function CommissionCatalog({
 
   /*
    * ============================================================
+   * ACCORDION SCROLL ANCHOR
+   * ============================================================
+   *
+   * When a tall group/service closes above the item the user
+   * just clicked, the document can become much shorter. Near
+   * the bottom of the page the browser then clamps scrollY to
+   * the new maximum, which makes the viewport jump toward the
+   * FAQ/footer.
+   *
+   * Keep the clicked header at the same viewport position while
+   * the 300ms accordion transition is running. This preserves
+   * the one-open-at-a-time behavior without the visual jump.
+   */
+
+  const layoutAnchorFrameRef =
+    useRef<number | null>(null);
+
+  const previousScrollBehaviorRef =
+    useRef<string | null>(null);
+
+  const finishLayoutAnchor = () => {
+    if (
+      previousScrollBehaviorRef.current !== null
+    ) {
+      document.documentElement.style.scrollBehavior =
+        previousScrollBehaviorRef.current;
+      previousScrollBehaviorRef.current = null;
+    }
+
+    layoutAnchorFrameRef.current = null;
+  };
+
+  const preserveTriggerPosition = (
+    trigger: HTMLButtonElement,
+  ) => {
+    if (
+      layoutAnchorFrameRef.current !== null
+    ) {
+      window.cancelAnimationFrame(
+        layoutAnchorFrameRef.current,
+      );
+    } else {
+      previousScrollBehaviorRef.current =
+        document.documentElement.style.scrollBehavior;
+    }
+
+    /*
+     * globals.css uses scroll-behavior: smooth. The per-frame
+     * correction must be immediate or dozens of smooth-scroll
+     * animations would stack while the accordion is moving.
+     */
+    document.documentElement.style.scrollBehavior =
+      "auto";
+
+    const anchorTop =
+      trigger.getBoundingClientRect().top;
+    const startedAt = performance.now();
+    const duration = 360;
+
+    const keepAnchored = (now: number) => {
+      if (!trigger.isConnected) {
+        finishLayoutAnchor();
+        return;
+      }
+
+      const currentTop =
+        trigger.getBoundingClientRect().top;
+      const delta = currentTop - anchorTop;
+
+      if (Math.abs(delta) > 0.5) {
+        window.scrollBy({
+          top: delta,
+          left: 0,
+          behavior: "auto",
+        });
+      }
+
+      if (now - startedAt < duration) {
+        layoutAnchorFrameRef.current =
+          window.requestAnimationFrame(
+            keepAnchored,
+          );
+        return;
+      }
+
+      finishLayoutAnchor();
+    };
+
+    layoutAnchorFrameRef.current =
+      window.requestAnimationFrame(
+        keepAnchored,
+      );
+  };
+
+  useEffect(() => {
+    return () => {
+      if (
+        layoutAnchorFrameRef.current !== null
+      ) {
+        window.cancelAnimationFrame(
+          layoutAnchorFrameRef.current,
+        );
+      }
+
+      if (
+        previousScrollBehaviorRef.current !== null
+      ) {
+        document.documentElement.style.scrollBehavior =
+          previousScrollBehaviorRef.current;
+        previousScrollBehaviorRef.current = null;
+      }
+
+      layoutAnchorFrameRef.current = null;
+    };
+  }, []);
+
+  /*
+   * ============================================================
    * HASH + STYLE SUPPORT
    * ============================================================
    *
@@ -1370,7 +1493,10 @@ export default function CommissionCatalog({
 
   const toggleGroup = (
     groupId: string,
+    trigger: HTMLButtonElement,
   ) => {
+    preserveTriggerPosition(trigger);
+
     setOpenGroups((current) =>
       current.includes(groupId)
         ? []
@@ -1386,7 +1512,10 @@ export default function CommissionCatalog({
 
   const toggleService = (
     serviceId: string,
+    trigger: HTMLButtonElement,
   ) => {
+    preserveTriggerPosition(trigger);
+
     setOpenServices((current) =>
       current.includes(serviceId)
         ? []
@@ -1413,6 +1542,7 @@ export default function CommissionCatalog({
         className="
           order-2
           space-y-4
+          [overflow-anchor:none]
           lg:order-1
         "
       >
@@ -1441,8 +1571,11 @@ export default function CommissionCatalog({
 
               <button
                 type="button"
-                onClick={() =>
-                  toggleGroup(group.id)
+                onClick={(event) =>
+                  toggleGroup(
+                    group.id,
+                    event.currentTarget,
+                  )
                 }
                 aria-expanded={
                   groupOpen
@@ -1606,9 +1739,12 @@ export default function CommissionCatalog({
                             open={openServices.includes(
                               service.id,
                             )}
-                            onToggle={() =>
+                            onToggle={(
+                              trigger,
+                            ) =>
                               toggleService(
                                 service.id,
+                                trigger,
                               )
                             }
                             selectedStyle={
