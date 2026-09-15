@@ -1,9 +1,15 @@
 import {
   claimCommissionEmailMessageForSending,
   getCommissionEmailMessageById,
+  getCommissionEmailThreadById,
   markCommissionEmailMessageFailed,
   markCommissionEmailMessageSent,
+  setCommissionEmailThreadRootMessageId,
+  setCommissionEmailThreadRootProvider,
 } from "../repositories/commissionEmailRepository";
+import type {
+  CommissionEmailMessage,
+} from "../repositories/commissionEmails/commissionEmailTypes";
 import {
   resendCommissionEmailProvider,
   type CommissionEmailBody,
@@ -73,6 +79,122 @@ function validateBody(
   }
 }
 
+async function persistClientThreadRootAfterSend(
+  sentMessage: CommissionEmailMessage,
+  providerEmailId: string,
+  providerMessageId: string | null,
+): Promise<void> {
+  if (
+    sentMessage.scope !== "client_thread" ||
+    !sentMessage.threadId
+  ) {
+    return;
+  }
+
+  const thread =
+    await getCommissionEmailThreadById(
+      sentMessage.threadId,
+    );
+
+  if (!thread) {
+    throw new Error(
+      "Sent client email references a missing commission email thread.",
+    );
+  }
+
+  /*
+   * A completed root belongs to the first sent message forever. Later
+   * messages must never attempt to replace it with their provider IDs.
+   */
+  if (thread.rootMessageId !== null) {
+    return;
+  }
+
+  let rootProviderEmailId =
+    thread.rootProviderEmailId;
+
+  if (rootProviderEmailId === null) {
+    const providerRootResult =
+      await setCommissionEmailThreadRootProvider({
+        threadId: sentMessage.threadId,
+        providerEmailId,
+      });
+
+    if (
+      providerRootResult.outcome ===
+      "not_found"
+    ) {
+      throw new Error(
+        "Commission email thread disappeared while establishing its root provider identity.",
+      );
+    }
+
+    if (
+      providerRootResult.outcome ===
+      "conflict"
+    ) {
+      throw new Error(
+        "Commission email thread already has a different root provider identity.",
+      );
+    }
+
+    rootProviderEmailId =
+      providerRootResult.thread
+        .rootProviderEmailId;
+  }
+
+  if (
+    rootProviderEmailId !==
+    providerEmailId
+  ) {
+    /*
+     * With FIFO claiming, a thread whose RFC root is still incomplete can
+     * only retry its original first message. A different provider ID here
+     * therefore indicates an integrity problem rather than a normal later
+     * message.
+     */
+    throw new Error(
+      "Commission email thread root provider does not match the sent root message.",
+    );
+  }
+
+  if (!providerMessageId) {
+    /*
+     * Provider identity is still useful even if the RFC Message-ID is not yet
+     * available. Later client messages remain queued until reconciliation
+     * completes rootMessageId.
+     */
+    return;
+  }
+
+  const messageRootResult =
+    await setCommissionEmailThreadRootMessageId({
+      threadId: sentMessage.threadId,
+      providerEmailId:
+        rootProviderEmailId,
+      rootMessageId:
+        providerMessageId,
+    });
+
+  if (
+    messageRootResult.outcome ===
+    "not_found"
+  ) {
+    throw new Error(
+      "Commission email thread disappeared while completing its RFC root identity.",
+    );
+  }
+
+  if (
+    messageRootResult.outcome ===
+    "conflict"
+  ) {
+    throw new Error(
+      "Commission email thread already has a different RFC root Message-ID.",
+    );
+  }
+}
+
 export async function deliverCommissionEmailMessage(
   input: DeliverCommissionEmailMessageInput,
   provider: CommissionEmailProvider =
@@ -136,7 +258,10 @@ export async function deliverCommissionEmailMessage(
     };
   }
 
-  if (providerResult.outcome === "failed") {
+  if (
+    providerResult.outcome ===
+    "failed"
+  ) {
     const failedMessage =
       await markCommissionEmailMessageFailed(
         claimedMessage.id,
@@ -157,6 +282,10 @@ export async function deliverCommissionEmailMessage(
     };
   }
 
+  /*
+   * Record the delivery truth first. If root bookkeeping later fails, the
+   * database still correctly says that the provider accepted this message.
+   */
   const sentMessage =
     await markCommissionEmailMessageSent({
       messageId:
@@ -172,6 +301,12 @@ export async function deliverCommissionEmailMessage(
       "Commission email provider accepted the message but the database record could not transition from sending to sent.",
     );
   }
+
+  await persistClientThreadRootAfterSend(
+    sentMessage,
+    providerResult.providerEmailId,
+    providerResult.providerMessageId,
+  );
 
   return {
     outcome: "sent",

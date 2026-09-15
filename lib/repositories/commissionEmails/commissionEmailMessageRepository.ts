@@ -308,6 +308,78 @@ export async function claimCommissionEmailMessageForSending(
   );
   const claimedAt = new Date();
 
+  /*
+   * Client-thread delivery is FIFO.
+   *
+   * A client message may be claimed only when there is no older unsent
+   * outbound message in the same thread. This prevents two workers from
+   * sending different messages in the same conversation out of order.
+   *
+   * Before the RFC root Message-ID exists, only the first outbound message
+   * in the thread may be claimed. If that first message was accepted by the
+   * provider but the RFC Message-ID is still unavailable, later messages
+   * remain queued until the root identity is completed.
+   *
+   * Internal notifications do not belong to a client thread and therefore
+   * keep the original independent claim behavior.
+   */
+  const threadEligibility = sql`
+    (
+      ${commissionEmailMessages.scope} = 'internal_notification'
+      OR
+      (
+        ${commissionEmailMessages.scope} = 'client_thread'
+        AND ${commissionEmailMessages.threadId} IS NOT NULL
+        AND EXISTS (
+          SELECT 1
+          FROM commission_email_threads AS thread
+          WHERE thread.id = ${commissionEmailMessages.threadId}
+            AND (
+              thread.root_message_id IS NOT NULL
+              OR NOT EXISTS (
+                SELECT 1
+                FROM commission_email_messages AS prior_root_message
+                WHERE prior_root_message.thread_id = ${commissionEmailMessages.threadId}
+                  AND prior_root_message.scope = 'client_thread'
+                  AND prior_root_message.direction = 'outbound'
+                  AND (
+                    prior_root_message.created_at < ${commissionEmailMessages.createdAt}
+                    OR (
+                      prior_root_message.created_at = ${commissionEmailMessages.createdAt}
+                      AND prior_root_message.id::text < ${commissionEmailMessages.id}::text
+                    )
+                  )
+              )
+            )
+        )
+        AND NOT EXISTS (
+          SELECT 1
+          FROM commission_email_messages AS earlier_message
+          WHERE earlier_message.thread_id = ${commissionEmailMessages.threadId}
+            AND earlier_message.scope = 'client_thread'
+            AND earlier_message.direction = 'outbound'
+            AND earlier_message.delivery_status IN ('queued', 'sending', 'failed')
+            AND (
+              earlier_message.created_at < ${commissionEmailMessages.createdAt}
+              OR (
+                earlier_message.created_at = ${commissionEmailMessages.createdAt}
+                AND earlier_message.id::text < ${commissionEmailMessages.id}::text
+              )
+            )
+        )
+      )
+    )
+  `;
+
+  const rootMessageId = sql`
+    (
+      SELECT thread.root_message_id
+      FROM commission_email_threads AS thread
+      WHERE thread.id = ${commissionEmailMessages.threadId}
+      LIMIT 1
+    )
+  `;
+
   try {
     const rows = await db
       .update(commissionEmailMessages)
@@ -317,6 +389,27 @@ export async function claimCommissionEmailMessageForSending(
         lastAttemptAt: claimedAt,
         failedAt: null,
         failureMessage: null,
+        /*
+         * Once a thread has a root RFC Message-ID, that immutable root is
+         * persisted on every subsequent logical message before provider send.
+         * Retrying the same row therefore reproduces the same thread headers.
+         */
+        inReplyToMessageId: sql`
+          CASE
+            WHEN ${commissionEmailMessages.scope} = 'client_thread'
+              AND ${rootMessageId} IS NOT NULL
+            THEN ${rootMessageId}
+            ELSE ${commissionEmailMessages.inReplyToMessageId}
+          END
+        `,
+        referencesHeader: sql`
+          CASE
+            WHEN ${commissionEmailMessages.scope} = 'client_thread'
+              AND ${rootMessageId} IS NOT NULL
+            THEN ${rootMessageId}
+            ELSE ${commissionEmailMessages.referencesHeader}
+          END
+        `,
         updatedAt: claimedAt,
       })
       .where(
@@ -329,6 +422,7 @@ export async function claimCommissionEmailMessageForSending(
             commissionEmailMessages.deliveryStatus,
             ["queued", "failed"],
           ),
+          threadEligibility,
         ),
       )
       .returning();
