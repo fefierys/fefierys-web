@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 
 import {
-  sendClientInquiryConfirmationEmail,
   sendOwnerInquiryEmail,
   type ContactEmailData,
 } from "@/lib/email/contactEmail";
+import {
+  createAndDeliverClientInquiryConfirmation,
+} from "@/lib/email/commissionInquiryCommunicationService";
 import { createCommission } from "@/lib/repositories/commissionRepository";
 
 /*
@@ -479,8 +481,9 @@ export async function POST(request: Request) {
     });
 
     /*
-     * The original request already sent its emails. A retry only
-     * confirms the existing persisted commission.
+     * Only the request that actually created the commission creates
+     * its initial email side effects. A browser retry with the same
+     * submissionId only confirms the existing persisted commission.
      */
 
     if (!commission.wasCreated) {
@@ -497,7 +500,8 @@ export async function POST(request: Request) {
      */
 
     const emailData: ContactEmailData = {
-      reference: commission.reference,
+      reference:
+        commission.reference,
       name,
       email,
       message,
@@ -512,8 +516,10 @@ export async function POST(request: Request) {
      * EMAIL SIDE EFFECTS
      * ============================================================
      *
-     * The persisted commission remains successful even if one or
-     * both email deliveries fail. Each delivery is independent.
+     * The persisted commission remains successful even if an email
+     * delivery fails. The owner notification is still sent directly.
+     * The client confirmation is now persisted as a commission email
+     * message before delivery and can remain failed for later retry.
      */
 
     try {
@@ -534,15 +540,30 @@ export async function POST(request: Request) {
     }
 
     try {
-      const clientResult =
-        await sendClientInquiryConfirmationEmail(
-          emailData,
+      const clientCommunication =
+        await createAndDeliverClientInquiryConfirmation(
+          {
+            commissionId:
+              commission.id,
+            emailData,
+          },
         );
 
-      if (clientResult.error) {
+      if (
+        clientCommunication.delivery.outcome ===
+        "failed"
+      ) {
         console.error(
           "Client confirmation email failed:",
-          clientResult.error,
+          clientCommunication.delivery.failureMessage,
+        );
+      } else if (
+        clientCommunication.delivery.outcome !==
+        "sent"
+      ) {
+        console.error(
+          "Client confirmation email was not delivered:",
+          clientCommunication.delivery.outcome,
         );
       }
     } catch (error) {

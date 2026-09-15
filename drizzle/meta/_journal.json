@@ -99,6 +99,13 @@
       "when": 1789446004238,
       "tag": "0013_lyrical_stick",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1789493485290,
+      "tag": "0014_high_mandroid",
+      "breakpoints": true
     }
   ]
 }

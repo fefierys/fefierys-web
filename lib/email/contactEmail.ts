@@ -283,9 +283,15 @@ export async function sendOwnerInquiryEmail(
   });
 }
 
-export async function sendClientInquiryConfirmationEmail(
+export interface ClientInquiryConfirmationEmailContent {
+  subject: string;
+  text: string;
+  html: string;
+}
+
+export function buildClientInquiryConfirmationEmail(
   data: ContactEmailData,
-) {
+): ClientInquiryConfirmationEmailContent {
   const reference = escapeEmailHtml(
     data.reference,
   );
@@ -310,13 +316,7 @@ export async function sendClientInquiryConfirmationEmail(
     data.option,
   );
 
-  return resend.emails.send({
-    from: `Fefierys Art <${senderEmail}>`,
-
-    to: data.email,
-
-    replyTo: ownerEmail,
-
+  return {
     subject: buildClientProjectSubject(
       data.reference,
     ),
@@ -508,5 +508,5 @@ export async function sendClientInquiryConfirmationEmail(
         </p>
       `,
     }),
-  });
+  };
 }
