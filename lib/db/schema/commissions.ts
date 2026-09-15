@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
   boolean,
   check,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -240,6 +241,56 @@ export const documentStatusEnum = pgEnum("document_status", [
   "send_failed",
   "voided",
 ]);
+
+export const commissionEmailScopeEnum = pgEnum(
+  "commission_email_scope",
+  [
+    "client_thread",
+    "internal_notification",
+  ],
+);
+
+export const commissionEmailDirectionEnum = pgEnum(
+  "commission_email_direction",
+  [
+    "outbound",
+    "inbound",
+  ],
+);
+
+export const commissionEmailDeliveryStatusEnum = pgEnum(
+  "commission_email_delivery_status",
+  [
+    "queued",
+    "sending",
+    "sent",
+    "failed",
+  ],
+);
+
+export const commissionEmailKindEnum = pgEnum(
+  "commission_email_kind",
+  [
+    "inquiry_confirmation",
+    "internal_inquiry_notification",
+
+    "client_details_request",
+    "general_message",
+
+    "quote_ready",
+
+    "agreement_ready",
+
+    "payment_request",
+    "payment_confirmation",
+
+    "sketch_review",
+    "final_review",
+    "final_delivery",
+
+    "commission_completed",
+  ],
+);
 
 /*
  * ============================================================
@@ -682,6 +733,11 @@ export const commissionQuotes = pgTable(
     uniqueIndex("commission_quotes_commission_version_unique").on(
       table.commissionId,
       table.version,
+    ),
+
+    uniqueIndex("commission_quotes_commission_id_id_unique").on(
+      table.commissionId,
+      table.id,
     ),
 
     uniqueIndex("commission_quotes_public_token_hash_unique").on(
@@ -1866,6 +1922,476 @@ export const commissionEvents = pgTable(
     ),
 
     index("commission_events_type_idx").on(table.type),
+  ],
+);
+
+/*
+ * ============================================================
+ * COMMISSION EMAIL THREADS
+ * ============================================================
+ *
+ * One client-facing email thread belongs to one commission.
+ *
+ * The thread stores only the stable root identity. We
+ * intentionally do not store a "latest message" pointer because
+ * replies may happen directly between the client and artist
+ * outside the application.
+ */
+
+export const commissionEmailThreads = pgTable(
+  "commission_email_threads",
+  {
+    id: uuid("id")
+      .defaultRandom()
+      .primaryKey(),
+
+    commissionId: uuid("commission_id")
+      .notNull()
+      .references(() => commissions.id, {
+        onDelete: "restrict",
+      }),
+
+    /*
+     * Stable subject used for the client conversation.
+     *
+     * Example:
+     * Fefierys Art — Your project — COM-20260915-ABC123
+     */
+    subject: varchar("subject", {
+      length: 350,
+    }).notNull(),
+
+    /*
+     * Provider identifier returned for the email that created
+     * the client thread.
+     *
+     * This is not the RFC Message-ID header.
+     */
+    rootProviderEmailId: varchar(
+      "root_provider_email_id",
+      {
+        length: 255,
+      },
+    ),
+
+    /*
+     * RFC Message-ID of the first client-facing email.
+     *
+     * Future messages use this value when building
+     * In-Reply-To / References headers.
+     */
+    rootMessageId: text("root_message_id"),
+
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex(
+      "commission_email_threads_commission_unique",
+    ).on(
+      table.commissionId,
+    ),
+
+    uniqueIndex(
+      "commission_email_threads_commission_id_id_unique",
+    ).on(
+      table.commissionId,
+      table.id,
+    ),
+
+    uniqueIndex(
+      "commission_email_threads_root_provider_email_unique",
+    ).on(
+      table.rootProviderEmailId,
+    ),
+
+    uniqueIndex(
+      "commission_email_threads_root_message_unique",
+    ).on(
+      table.rootMessageId,
+    ),
+
+    check(
+      "commission_email_threads_subject_check",
+      sql`
+        char_length(
+          btrim(${table.subject})
+        ) > 0
+      `,
+    ),
+
+    check(
+      "commission_email_threads_root_state_check",
+      sql`
+        (
+          ${table.rootProviderEmailId} IS NULL
+          AND ${table.rootMessageId} IS NULL
+        )
+        OR
+        (
+          ${table.rootProviderEmailId} IS NOT NULL
+        )
+      `,
+    ),
+  ],
+);
+
+/*
+ * ============================================================
+ * COMMISSION EMAIL MESSAGES
+ * ============================================================
+ *
+ * Persistent record of commission-related email communication.
+ *
+ * Client-thread messages belong to commissionEmailThreads.
+ * Internal artist notifications intentionally do not.
+ *
+ * The table stores delivery state so failed messages can later
+ * be retried without losing the original business action.
+ */
+
+export const commissionEmailMessages = pgTable(
+  "commission_email_messages",
+  {
+    id: uuid("id")
+      .defaultRandom()
+      .primaryKey(),
+
+    commissionId: uuid("commission_id")
+      .notNull()
+      .references(() => commissions.id, {
+        onDelete: "restrict",
+      }),
+
+    threadId: uuid("thread_id"),
+
+    /*
+     * Present for quote-related messages.
+     *
+     * Other communication types may not belong to a quote.
+     */
+    quoteId: uuid("quote_id"),
+
+    scope:
+      commissionEmailScopeEnum(
+        "scope",
+      ).notNull(),
+
+    direction:
+      commissionEmailDirectionEnum(
+        "direction",
+      )
+        .notNull()
+        .default("outbound"),
+
+    kind:
+      commissionEmailKindEnum(
+        "kind",
+      ).notNull(),
+
+    actor:
+      commissionActorEnum(
+        "actor",
+      ).notNull(),
+
+    deliveryStatus:
+      commissionEmailDeliveryStatusEnum(
+        "delivery_status",
+      )
+        .notNull()
+        .default("queued"),
+
+    senderEmail: varchar(
+      "sender_email",
+      {
+        length: 320,
+      },
+    ).notNull(),
+
+    recipientEmail: varchar(
+      "recipient_email",
+      {
+        length: 320,
+      },
+    ).notNull(),
+
+    replyToEmail: varchar(
+      "reply_to_email",
+      {
+        length: 320,
+      },
+    ),
+
+    subject: varchar("subject", {
+      length: 350,
+    }).notNull(),
+
+    /*
+     * Human-readable communication body or summary.
+     *
+     * We do not need to persist the generated HTML template.
+     * This field gives Admin an auditable representation of
+     * what was communicated.
+     */
+    messageText: text(
+      "message_text",
+    ),
+
+    /*
+     * Provider-specific email identifier.
+     *
+     * Example: the identifier returned by Resend.
+     */
+    providerEmailId: varchar(
+      "provider_email_id",
+      {
+        length: 255,
+      },
+    ),
+
+    /*
+     * RFC Message-ID returned by the email provider.
+     */
+    providerMessageId: text(
+      "provider_message_id",
+    ),
+
+    /*
+     * RFC threading headers used for this message.
+     */
+    inReplyToMessageId: text(
+      "in_reply_to_message_id",
+    ),
+
+    referencesHeader: text(
+      "references_header",
+    ),
+
+    /*
+     * Delivery attempt information.
+     *
+     * The message row itself is the stable logical message.
+     * Retrying delivery does not create a second business
+     * communication record.
+     */
+    attemptCount: integer(
+      "attempt_count",
+    )
+      .notNull()
+      .default(0),
+
+    lastAttemptAt: timestamp(
+      "last_attempt_at",
+      {
+        withTimezone: true,
+      },
+    ),
+
+    sentAt: timestamp("sent_at", {
+      withTimezone: true,
+    }),
+
+    failedAt: timestamp(
+      "failed_at",
+      {
+        withTimezone: true,
+      },
+    ),
+
+    /*
+     * Safe diagnostic text only.
+     *
+     * Tokens, secure URLs, credentials and complete provider
+     * payloads must never be persisted here.
+     */
+    failureMessage: text(
+      "failure_message",
+    ),
+
+    createdByAdminUserId: varchar(
+      "created_by_admin_user_id",
+      {
+        length: 255,
+      },
+    ),
+
+    createdAt: timestamp(
+      "created_at",
+      {
+        withTimezone: true,
+      },
+    )
+      .notNull()
+      .defaultNow(),
+
+    updatedAt: timestamp(
+      "updated_at",
+      {
+        withTimezone: true,
+      },
+    )
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    foreignKey({
+      columns: [
+        table.commissionId,
+        table.threadId,
+      ],
+      foreignColumns: [
+        commissionEmailThreads.commissionId,
+        commissionEmailThreads.id,
+      ],
+      name: "commission_email_messages_commission_thread_fk",
+    }).onDelete("restrict"),
+
+    foreignKey({
+      columns: [
+        table.commissionId,
+        table.quoteId,
+      ],
+      foreignColumns: [
+        commissionQuotes.commissionId,
+        commissionQuotes.id,
+      ],
+      name: "commission_email_messages_commission_quote_fk",
+    }).onDelete("restrict"),
+
+    index(
+      "commission_email_messages_commission_created_idx",
+    ).on(
+      table.commissionId,
+      table.createdAt,
+    ),
+
+    index(
+      "commission_email_messages_thread_created_idx",
+    ).on(
+      table.threadId,
+      table.createdAt,
+    ),
+
+    index(
+      "commission_email_messages_delivery_status_idx",
+    ).on(
+      table.deliveryStatus,
+    ),
+
+    index(
+      "commission_email_messages_quote_idx",
+    ).on(
+      table.quoteId,
+    ),
+
+    uniqueIndex(
+      "commission_email_messages_provider_email_unique",
+    ).on(
+      table.providerEmailId,
+    ),
+
+    uniqueIndex(
+      "commission_email_messages_provider_message_unique",
+    ).on(
+      table.providerMessageId,
+    ),
+
+    check(
+      "commission_email_messages_attempt_count_check",
+      sql`
+        ${table.attemptCount} >= 0
+      `,
+    ),
+
+    check(
+      "commission_email_messages_subject_check",
+      sql`
+        char_length(
+          btrim(${table.subject})
+        ) > 0
+      `,
+    ),
+
+    /*
+     * Client conversation messages must belong to the
+     * commission's email thread.
+     *
+     * Internal notifications must never accidentally join
+     * the client's conversation.
+     */
+    check(
+      "commission_email_messages_scope_thread_check",
+      sql`
+        (
+          ${table.scope} = 'client_thread'
+          AND ${table.threadId} IS NOT NULL
+        )
+        OR
+        (
+          ${table.scope} = 'internal_notification'
+          AND ${table.threadId} IS NULL
+        )
+      `,
+    ),
+
+    check(
+      "commission_email_messages_delivery_state_check",
+      sql`
+        (
+          ${table.deliveryStatus} = 'queued'
+          AND ${table.sentAt} IS NULL
+          AND ${table.failedAt} IS NULL
+        )
+        OR
+        (
+          ${table.deliveryStatus} = 'sending'
+          AND ${table.sentAt} IS NULL
+          AND ${table.failedAt} IS NULL
+          AND ${table.attemptCount} > 0
+          AND ${table.lastAttemptAt} IS NOT NULL
+        )
+        OR
+        (
+          ${table.deliveryStatus} = 'sent'
+          AND ${table.sentAt} IS NOT NULL
+          AND ${table.failedAt} IS NULL
+          AND ${table.attemptCount} > 0
+          AND ${table.lastAttemptAt} IS NOT NULL
+        )
+        OR
+        (
+          ${table.deliveryStatus} = 'failed'
+          AND ${table.sentAt} IS NULL
+          AND ${table.failedAt} IS NOT NULL
+          AND ${table.attemptCount} > 0
+          AND ${table.lastAttemptAt} IS NOT NULL
+        )
+      `,
+    ),
+
+    /*
+     * Internal notifications are never threaded with the
+     * client conversation.
+     */
+    check(
+      "commission_email_messages_internal_thread_headers_check",
+      sql`
+        ${table.scope} != 'internal_notification'
+        OR (
+          ${table.inReplyToMessageId} IS NULL
+          AND ${table.referencesHeader} IS NULL
+        )
+      `,
+    ),
   ],
 );
 
