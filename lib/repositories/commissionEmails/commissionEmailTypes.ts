@@ -104,3 +104,32 @@ export interface MarkCommissionEmailMessageSentInput {
   providerEmailId: string;
   providerMessageId?: string | null;
 }
+
+
+export interface ReconcileCommissionEmailMessageSentFromProviderInput {
+  messageId: string;
+  providerEmailId: string;
+  providerMessageId: string;
+  sentAt: Date;
+}
+
+export type ReconcileCommissionEmailMessageSentFromProviderResult =
+  | {
+      outcome: "reconciled";
+      message: CommissionEmailMessage;
+    }
+  | {
+      outcome: "already_reconciled";
+      message: CommissionEmailMessage;
+    }
+  | {
+      outcome: "conflict";
+      message: CommissionEmailMessage;
+    }
+  | {
+      outcome: "invalid_state";
+      message: CommissionEmailMessage;
+    }
+  | {
+      outcome: "not_found";
+    };

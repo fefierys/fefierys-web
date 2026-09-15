@@ -4,6 +4,9 @@ import {
   and,
   eq,
   inArray,
+  isNull,
+  ne,
+  or,
   sql,
 } from "drizzle-orm";
 
@@ -15,6 +18,8 @@ import type {
   CommissionEmailMessage,
   CreateQueuedCommissionEmailMessageInput,
   MarkCommissionEmailMessageSentInput,
+  ReconcileCommissionEmailMessageSentFromProviderInput,
+  ReconcileCommissionEmailMessageSentFromProviderResult,
 } from "./commissionEmailTypes";
 
 const MAX_EMAIL_LENGTH = 320;
@@ -496,7 +501,42 @@ export async function markCommissionEmailMessageSent(
       )
       .returning();
 
-    return rows[0] ?? null;
+    const sentMessage =
+      rows[0];
+
+    if (sentMessage) {
+      return sentMessage;
+    }
+
+    /*
+     * email.sent can race ahead of the send() response. In that case the
+     * verified webhook may already have transitioned this row to sent and
+     * persisted the RFC Message-ID before this request reaches its local
+     * delivery-finalization step.
+     *
+     * A provider result with providerMessageId = null is intentionally less
+     * complete than a verified webhook result, so it must never erase or
+     * reject the richer persisted identity.
+     */
+    const reconciledMessage =
+      await getCommissionEmailMessageById(
+        messageId,
+      );
+
+    if (
+      reconciledMessage?.deliveryStatus === "sent" &&
+      reconciledMessage.providerEmailId ===
+        providerEmailId &&
+      (
+        providerMessageId === null ||
+        reconciledMessage.providerMessageId ===
+          providerMessageId
+      )
+    ) {
+      return reconciledMessage;
+    }
+
+    return null;
   } catch (error) {
     try {
       const reconciledMessage =
@@ -506,8 +546,11 @@ export async function markCommissionEmailMessageSent(
         reconciledMessage?.deliveryStatus === "sent" &&
         reconciledMessage.providerEmailId ===
           providerEmailId &&
-        reconciledMessage.providerMessageId ===
-          providerMessageId
+        (
+          providerMessageId === null ||
+          reconciledMessage.providerMessageId ===
+            providerMessageId
+        )
       ) {
         return reconciledMessage;
       }
@@ -580,4 +623,198 @@ export async function markCommissionEmailMessageFailed(
 
     throw error;
   }
+}
+
+
+export async function reconcileCommissionEmailMessageSentFromProvider(
+  input: ReconcileCommissionEmailMessageSentFromProviderInput,
+): Promise<ReconcileCommissionEmailMessageSentFromProviderResult> {
+  const messageId = normalizeRequiredId(
+    input.messageId,
+    "messageId",
+  );
+  const providerEmailId = normalizeRequiredId(
+    input.providerEmailId,
+    "providerEmailId",
+  );
+  const providerMessageId = normalizeOptionalHeader(
+    input.providerMessageId,
+    "providerMessageId",
+  );
+
+  if (!providerMessageId) {
+    throw new Error(
+      "providerMessageId is required.",
+    );
+  }
+
+  if (
+    !(input.sentAt instanceof Date) ||
+    Number.isNaN(input.sentAt.getTime())
+  ) {
+    throw new Error(
+      "sentAt must be a valid Date.",
+    );
+  }
+
+  const updatedAt = new Date();
+
+  try {
+    const rows = await db
+      .update(commissionEmailMessages)
+      .set({
+        deliveryStatus: "sent",
+        providerEmailId,
+        providerMessageId,
+        sentAt: sql`
+          COALESCE(
+            ${commissionEmailMessages.sentAt},
+            ${input.sentAt}
+          )
+        `,
+        failedAt: null,
+        failureMessage: null,
+        updatedAt,
+      })
+      .where(
+        and(
+          eq(
+            commissionEmailMessages.id,
+            messageId,
+          ),
+          inArray(
+            commissionEmailMessages.deliveryStatus,
+            ["sending", "sent"],
+          ),
+          or(
+            isNull(
+              commissionEmailMessages.providerEmailId,
+            ),
+            eq(
+              commissionEmailMessages.providerEmailId,
+              providerEmailId,
+            ),
+          ),
+          or(
+            isNull(
+              commissionEmailMessages.providerMessageId,
+            ),
+            eq(
+              commissionEmailMessages.providerMessageId,
+              providerMessageId,
+            ),
+          ),
+          or(
+            ne(
+              commissionEmailMessages.deliveryStatus,
+              "sent",
+            ),
+            isNull(
+              commissionEmailMessages.providerEmailId,
+            ),
+            isNull(
+              commissionEmailMessages.providerMessageId,
+            ),
+          ),
+        ),
+      )
+      .returning();
+
+    const reconciledMessage =
+      rows[0];
+
+    if (reconciledMessage) {
+      return {
+        outcome: "reconciled",
+        message:
+          reconciledMessage,
+      };
+    }
+  } catch (error) {
+    /*
+     * If Neon committed the reconciliation but the response was lost, the
+     * exact provider identities let us classify the final state safely.
+     */
+    try {
+      const reconciledMessage =
+        await getCommissionEmailMessageById(
+          messageId,
+        );
+
+      if (
+        reconciledMessage?.deliveryStatus === "sent" &&
+        reconciledMessage.providerEmailId ===
+          providerEmailId &&
+        reconciledMessage.providerMessageId ===
+          providerMessageId
+      ) {
+        return {
+          outcome: "already_reconciled",
+          message:
+            reconciledMessage,
+        };
+      }
+    } catch {
+      /*
+       * Preserve the original database error if reconciliation also fails.
+       */
+    }
+
+    throw error;
+  }
+
+  const currentMessage =
+    await getCommissionEmailMessageById(
+      messageId,
+    );
+
+  if (!currentMessage) {
+    return {
+      outcome: "not_found",
+    };
+  }
+
+  if (
+    currentMessage.providerEmailId !== null &&
+    currentMessage.providerEmailId !==
+      providerEmailId
+  ) {
+    return {
+      outcome: "conflict",
+      message:
+        currentMessage,
+    };
+  }
+
+  if (
+    currentMessage.providerMessageId !== null &&
+    currentMessage.providerMessageId !==
+      providerMessageId
+  ) {
+    return {
+      outcome: "conflict",
+      message:
+        currentMessage,
+    };
+  }
+
+  if (
+    currentMessage.deliveryStatus === "sent" &&
+    currentMessage.providerEmailId ===
+      providerEmailId &&
+    currentMessage.providerMessageId ===
+      providerMessageId
+  ) {
+    return {
+      outcome: "already_reconciled",
+      message:
+        currentMessage,
+    };
+  }
+
+  return {
+    outcome: "invalid_state",
+    message:
+      currentMessage,
+  };
 }

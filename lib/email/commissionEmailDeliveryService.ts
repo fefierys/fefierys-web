@@ -236,6 +236,8 @@ export async function deliverCommissionEmailMessage(
           getCommissionEmailIdempotencyKey(
             claimedMessage.id,
           ),
+        trackingMessageId:
+          claimedMessage.id,
         senderEmail:
           claimedMessage.senderEmail,
         recipientEmail:

@@ -12,6 +12,7 @@ export type CommissionEmailBody =
 
 export interface CommissionEmailProviderSendInput {
   idempotencyKey: string;
+  trackingMessageId: string;
   senderEmail: string;
   recipientEmail: string;
   replyToEmail: string | null;
@@ -184,7 +185,7 @@ export const resendCommissionEmailProvider:
         await resend.emails.send(
           {
             from:
-              `Fefierys <${input.senderEmail}>`,
+              `Fefierys Art <${input.senderEmail}>`,
             to: input.recipientEmail,
             ...(input.replyToEmail
               ? {
@@ -193,6 +194,14 @@ export const resendCommissionEmailProvider:
                 }
               : {}),
             subject: input.subject,
+            tags: [
+              {
+                name:
+                  "fefierys_comm_message_id",
+                value:
+                  input.trackingMessageId,
+              },
+            ],
             ...getRenderOptions(input.body),
             ...(getThreadHeaders(input)
               ? {
@@ -229,34 +238,10 @@ export const resendCommissionEmailProvider:
       }
 
       /*
-       * Resend exposes the RFC Message-ID through GET /emails/:id.
-       *
-       * A failure here does not mean the email failed to send, so the
-       * provider email ID is still enough to mark delivery as sent.
-       * Message-ID can be reconciled later from the provider ID.
+       * The application intentionally uses a send-only Resend API key.
+       * RFC Message-ID is completed asynchronously from the verified
+       * email.sent webhook instead of GET /emails/:id.
        */
-      try {
-        const getResult =
-          await resend.emails.get(
-            providerEmailId,
-          );
-
-        if (!getResult.error) {
-          return {
-            outcome: "sent",
-            providerEmailId,
-            providerMessageId:
-              getResult.data?.message_id ??
-              null,
-          };
-        }
-      } catch {
-        /*
-         * Do not turn a successfully accepted email into a failed delivery
-         * just because Message-ID retrieval was temporarily unavailable.
-         */
-      }
-
       return {
         outcome: "sent",
         providerEmailId,
