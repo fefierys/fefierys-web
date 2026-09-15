@@ -11,6 +11,9 @@ interface ContactFormProps {
   collection?: string;
   category?: string;
   option?: string;
+  pricingVersionId?: string;
+  pricingServiceId?: string;
+  pricingOptionId?: string;
   onSuccess?: () => void;
 }
 
@@ -19,6 +22,9 @@ export default function ContactForm({
   collection,
   category,
   option,
+  pricingVersionId,
+  pricingServiceId,
+  pricingOptionId,
   onSuccess,
 }: ContactFormProps) {
   const [name, setName] =
@@ -208,6 +214,10 @@ export default function ContactForm({
               collection,
               category,
               option,
+
+              pricingVersionId,
+              pricingServiceId,
+              pricingOptionId,
 
               /*
                * Honeypot.

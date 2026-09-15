@@ -33,7 +33,7 @@ interface CommissionClassificationPanelProps {
   hasQuotes: boolean;
   pricingOptionId: string | null;
   pricingServiceId: string | null;
-  requestSource: "contact" | "portfolio" | "admin";
+  requestSource: "contact" | "commissions" | "admin";
   services: PricingServiceSummary[];
 }
 

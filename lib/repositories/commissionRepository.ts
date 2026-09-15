@@ -9,17 +9,15 @@ import {
   commissions,
   commissionStatusHistory,
 } from "../db/schema/commissions";
+import {
+  getActiveCommissionPricingCatalog,
+  type CommissionPricingOption,
+  type CommissionPricingService,
+  type CommissionPricingVersion,
+} from "./commissionPricingRepository";
 import { resolveActiveCommissionPricingSnapshot } from "./commissionPricingSnapshotMatcherRepository";
 
 export type Commission = typeof commissions.$inferSelect;
-
-function hasRequestedPortfolioOption(
-  value: string | null | undefined,
-): boolean {
-  const normalizedValue = value?.trim().toLowerCase();
-
-  return Boolean(normalizedValue && normalizedValue !== "not specified");
-}
 
 export interface CreateCommissionInput {
   submissionId: string;
@@ -31,10 +29,72 @@ export interface CreateCommissionInput {
   collectionSnapshot?: string | null;
   categorySnapshot?: string | null;
   optionSnapshot?: string | null;
+  pricingVersionId?: string | null;
+  pricingServiceId?: string | null;
+  pricingOptionId?: string | null;
   initialMessage: string;
   termsVersion?: string | null;
   agreementVersion?: string | null;
   requestSource?: Commission["requestSource"];
+}
+
+interface MatchedClientPricing {
+  option: CommissionPricingOption;
+  service: CommissionPricingService;
+  version: CommissionPricingVersion;
+}
+
+type ClientPricingMatchSource =
+  | "commissions_catalog_selection"
+  | "commissions_snapshot_fallback";
+
+async function resolveSubmittedCatalogSelection(
+  input: CreateCommissionInput,
+): Promise<MatchedClientPricing | null> {
+  if (
+    !input.pricingVersionId ||
+    !input.pricingServiceId ||
+    !input.pricingOptionId
+  ) {
+    return null;
+  }
+
+  const catalog =
+    await getActiveCommissionPricingCatalog({
+      audience: "public",
+    });
+
+  if (
+    !catalog ||
+    catalog.version.id !==
+      input.pricingVersionId
+  ) {
+    return null;
+  }
+
+  const serviceEntry =
+    catalog.services.find(
+      (entry) =>
+        entry.service.id ===
+        input.pricingServiceId,
+    );
+
+  const optionEntry =
+    serviceEntry?.options.find(
+      (entry) =>
+        entry.option.id ===
+        input.pricingOptionId,
+    );
+
+  if (!serviceEntry || !optionEntry) {
+    return null;
+  }
+
+  return {
+    option: optionEntry.option,
+    service: serviceEntry.service,
+    version: catalog.version,
+  };
 }
 
 export interface CreatedCommission {
@@ -84,21 +144,69 @@ export async function createCommission(
   const submittedAt = new Date();
   const requestSource =
     input.requestSource ??
-    (hasRequestedPortfolioOption(input.optionSnapshot)
-      ? "portfolio"
+    (input.pricingVersionId &&
+    input.pricingServiceId &&
+    input.pricingOptionId
+      ? "commissions"
       : "contact");
+
   try {
-    const snapshotMatch =
-      requestSource === "portfolio"
-        ? await resolveActiveCommissionPricingSnapshot({
-            category: input.categorySnapshot,
-            collection: input.collectionSnapshot,
-            option: input.optionSnapshot,
-            style: input.styleSnapshot,
-          })
-        : null;
-    const matchedPricing =
-      snapshotMatch?.outcome === "matched" ? snapshotMatch : null;
+    let matchedPricing:
+      | MatchedClientPricing
+      | null = null;
+
+    let matchSource:
+      | ClientPricingMatchSource
+      | null = null;
+
+    if (requestSource === "commissions") {
+      matchedPricing =
+        await resolveSubmittedCatalogSelection(
+          input,
+        );
+
+      if (matchedPricing) {
+        matchSource =
+          "commissions_catalog_selection";
+      } else {
+        const snapshotMatch =
+          await resolveActiveCommissionPricingSnapshot(
+            {
+              category:
+                input.categorySnapshot,
+              collection:
+                input.collectionSnapshot,
+              option:
+                input.optionSnapshot,
+              style:
+                input.styleSnapshot,
+            },
+            {
+              audience: "public",
+            },
+          );
+
+        if (
+          snapshotMatch.outcome ===
+          "matched"
+        ) {
+          matchedPricing =
+            snapshotMatch;
+
+          matchSource =
+            "commissions_snapshot_fallback";
+        }
+      }
+    }
+
+    const classificationNote =
+      matchSource ===
+      "commissions_catalog_selection"
+        ? "Automatically validated from the submitted public commissions catalog selection."
+        : matchSource ===
+            "commissions_snapshot_fallback"
+          ? "Automatically matched from the submitted public commissions snapshots."
+          : null;
 
     const createCommissionQuery = db
       .insert(commissions)
@@ -120,9 +228,7 @@ export async function createCommission(
         pricingOptionId: matchedPricing?.option.id ?? null,
         classifiedAt: matchedPricing ? submittedAt : null,
         classifiedBy: matchedPricing ? "client" : null,
-        classificationNote: matchedPricing
-          ? "Automatically matched from the submitted portfolio selection."
-          : null,
+        classificationNote,
         initialMessage: input.initialMessage,
         status: "received",
         termsVersion: input.termsVersion ?? null,
@@ -164,10 +270,10 @@ export async function createCommission(
             actor: "client",
             title: `Commission classified as ${matchedPricing.option.quoteLabel}`,
             description:
-              "Automatically matched from the submitted portfolio selection.",
+              classificationNote,
             metadata: {
               classification: "catalog",
-              matchSource: "portfolio_submission",
+              matchSource,
               pricingOptionId: matchedPricing.option.id,
               pricingServiceId: matchedPricing.service.id,
               pricingVersionId: matchedPricing.version.id,

@@ -359,8 +359,8 @@ function Service({
   ) => void;
 }) {
   const [
-    selectedOption,
-    setSelectedOption,
+    selectedOptionId,
+    setSelectedOptionId,
   ] = useState<string | null>(null);
 
   const selectedVariant =
@@ -375,6 +375,12 @@ function Service({
 
   const commission =
     selectedVariant.data;
+
+  const selectedOption =
+    commission.options.find(
+      (option) =>
+        option.id === selectedOptionId,
+    ) ?? null;
 
   const firstPrice =
     commission.options[0]?.price ?? null;
@@ -406,7 +412,13 @@ function Service({
             classification.collection,
           category:
             classification.category,
-          option: selectedOption,
+          option: selectedOption.title,
+          pricingVersionId:
+            commission.pricingVersionId,
+          pricingServiceId:
+            commission.pricingServiceId,
+          pricingOptionId:
+            selectedOption.id,
         },
       }
     : null;
@@ -623,7 +635,7 @@ function Service({
                                   variant.style !==
                                   selectedVariant.style
                                 ) {
-                                  setSelectedOption(
+                                  setSelectedOptionId(
                                     null,
                                   );
                                 }
@@ -748,19 +760,19 @@ function Service({
               {commission.options.map(
                 (option) => {
                   const selected =
-                    selectedOption ===
-                    option.title;
+                    selectedOptionId ===
+                    option.id;
 
                   return (
                     <button
-                      key={option.title}
+                      key={option.id}
                       type="button"
                       aria-pressed={
                         selected
                       }
                       onClick={() =>
-                        setSelectedOption(
-                          option.title,
+                        setSelectedOptionId(
+                          option.id,
                         )
                       }
                       className={`
@@ -920,7 +932,7 @@ function Service({
                           text-white
                         "
                       >
-                        {selectedOption}
+                        {selectedOption.title}
                       </p>
                     </div>
 

@@ -13,40 +13,40 @@ async function main(): Promise<void> {
   const { createCommission, getCommissionById } =
     await import("../lib/repositories/commissionRepository");
 
-  const portfolioSubmissionId = randomUUID();
+  const commissionsSubmissionId = randomUUID();
   const contactSubmissionId = randomUUID();
   const unmatchedSubmissionId = randomUUID();
   const commissionIds: string[] = [];
 
   try {
-    const portfolioResult = await createCommission({
+    const commissionsResult = await createCommission({
       categorySnapshot: "COVERS",
-      clientEmail: "automatic-portfolio@example.com",
-      clientName: "Automatic Portfolio Classification",
+      clientEmail: "automatic-commissions@example.com",
+      clientName: "Automatic Commissions Classification",
       collectionSnapshot: "BOOK ART",
-      initialMessage: "Temporary automatic portfolio fixture",
+      initialMessage: "Temporary automatic commissions fixture",
       optionSnapshot: "Full Wrap",
-      requestSource: "portfolio",
+      requestSource: "commissions",
       styleSnapshot: "SEMIREALISM",
-      submissionId: portfolioSubmissionId,
+      submissionId: commissionsSubmissionId,
     });
-    commissionIds.push(portfolioResult.id);
+    commissionIds.push(commissionsResult.id);
 
-    const portfolioCommission = await getCommissionById(portfolioResult.id);
-    ok(portfolioCommission);
-    equal(portfolioCommission.requestSource, "portfolio");
-    equal(portfolioCommission.serviceClassification, "catalog");
-    ok(portfolioCommission.pricingServiceId);
-    ok(portfolioCommission.pricingOptionId);
-    ok(portfolioCommission.classifiedAt);
-    equal(portfolioCommission.classifiedBy, "client");
-    equal(portfolioCommission.classifiedByAdminUserId, null);
+    const commissionsCommission = await getCommissionById(commissionsResult.id);
+    ok(commissionsCommission);
+    equal(commissionsCommission.requestSource, "commissions");
+    equal(commissionsCommission.serviceClassification, "catalog");
+    ok(commissionsCommission.pricingServiceId);
+    ok(commissionsCommission.pricingOptionId);
+    ok(commissionsCommission.classifiedAt);
+    equal(commissionsCommission.classifiedBy, "client");
+    equal(commissionsCommission.classifiedByAdminUserId, null);
     equal(
-      portfolioCommission.classificationNote,
-      "Automatically matched from the submitted portfolio selection.",
+      commissionsCommission.classificationNote,
+      "Automatically matched from the submitted public commissions snapshots.",
     );
     console.log(
-      "[OK] Portfolio submission was classified from the active catalog",
+      "[OK] Commissions catalog submission was classified from the active catalog",
     );
 
     const classificationEvents = await db
@@ -54,7 +54,7 @@ async function main(): Promise<void> {
       .from(commissionEvents)
       .where(
         and(
-          eq(commissionEvents.commissionId, portfolioResult.id),
+          eq(commissionEvents.commissionId, commissionsResult.id),
           eq(commissionEvents.type, "commission_service_classified"),
         ),
       );
@@ -64,28 +64,28 @@ async function main(): Promise<void> {
     const metadata = classificationEvents[0]?.metadata;
     ok(metadata && typeof metadata === "object" && !Array.isArray(metadata));
     const metadataRecord = metadata as Record<string, unknown>;
-    equal(metadataRecord.matchSource, "portfolio_submission");
+    equal(metadataRecord.matchSource, "commissions_snapshot_fallback");
     equal(
       metadataRecord.pricingServiceId,
-      portfolioCommission.pricingServiceId,
+      commissionsCommission.pricingServiceId,
     );
-    equal(metadataRecord.pricingOptionId, portfolioCommission.pricingOptionId);
+    equal(metadataRecord.pricingOptionId, commissionsCommission.pricingOptionId);
     console.log(
       "[OK] Automatic classification event contains stable catalog IDs",
     );
 
     const retryResult = await createCommission({
       categorySnapshot: "COVERS",
-      clientEmail: "automatic-portfolio@example.com",
-      clientName: "Automatic Portfolio Classification",
+      clientEmail: "automatic-commissions@example.com",
+      clientName: "Automatic Commissions Classification",
       collectionSnapshot: "BOOK ART",
-      initialMessage: "Temporary automatic portfolio fixture",
+      initialMessage: "Temporary automatic commissions fixture",
       optionSnapshot: "Full Wrap",
-      requestSource: "portfolio",
+      requestSource: "commissions",
       styleSnapshot: "SEMIREALISM",
-      submissionId: portfolioSubmissionId,
+      submissionId: commissionsSubmissionId,
     });
-    equal(retryResult.id, portfolioResult.id);
+    equal(retryResult.id, commissionsResult.id);
     equal(retryResult.wasCreated, false);
 
     const eventsAfterRetry = await db
@@ -93,7 +93,7 @@ async function main(): Promise<void> {
       .from(commissionEvents)
       .where(
         and(
-          eq(commissionEvents.commissionId, portfolioResult.id),
+          eq(commissionEvents.commissionId, commissionsResult.id),
           eq(commissionEvents.type, "commission_service_classified"),
         ),
       );
@@ -129,9 +129,9 @@ async function main(): Promise<void> {
       clientEmail: "automatic-unmatched@example.com",
       clientName: "Automatic Unmatched Classification",
       collectionSnapshot: "GENERAL",
-      initialMessage: "Temporary unmatched portfolio fixture",
+      initialMessage: "Temporary unmatched commissions fixture",
       optionSnapshot: "Unknown Historical Option",
-      requestSource: "portfolio",
+      requestSource: "commissions",
       styleSnapshot: "SEMIREALISM",
       submissionId: unmatchedSubmissionId,
     });
@@ -139,12 +139,12 @@ async function main(): Promise<void> {
 
     const unmatchedCommission = await getCommissionById(unmatchedResult.id);
     ok(unmatchedCommission);
-    equal(unmatchedCommission.requestSource, "portfolio");
+    equal(unmatchedCommission.requestSource, "commissions");
     equal(unmatchedCommission.serviceClassification, "unclassified");
     equal(unmatchedCommission.pricingServiceId, null);
     equal(unmatchedCommission.pricingOptionId, null);
     console.log(
-      "[OK] Unmatched portfolio submission remains safe for manual review",
+      "[OK] Unmatched commissions submission remains safe for manual review",
     );
 
     console.log("[OK] Automatic commission classification verification passed");

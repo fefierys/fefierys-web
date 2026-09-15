@@ -29,6 +29,9 @@ interface ContactPageProps {
     collection?: string;
     category?: string;
     option?: string;
+    pricingVersionId?: string;
+    pricingServiceId?: string;
+    pricingOptionId?: string;
   }>;
 }
 
@@ -40,6 +43,9 @@ export default async function ContactPage({
     collection,
     category,
     option,
+    pricingVersionId,
+    pricingServiceId,
+    pricingOptionId,
   } = await searchParams;
 
   /*
@@ -69,6 +75,36 @@ export default async function ContactPage({
 
   const selectedOption =
     hasSelection ? option : undefined;
+
+
+  /*
+   * Canonical pricing identifiers are transported only when
+   * the public catalog supplied the complete set. If an old
+   * link contains only the human-readable snapshots, Contact
+   * continues to work through the legacy snapshot matcher.
+   */
+
+  const hasCanonicalSelection = Boolean(
+    hasSelection &&
+      pricingVersionId &&
+      pricingServiceId &&
+      pricingOptionId,
+  );
+
+  const selectedPricingVersionId =
+    hasCanonicalSelection
+      ? pricingVersionId
+      : undefined;
+
+  const selectedPricingServiceId =
+    hasCanonicalSelection
+      ? pricingServiceId
+      : undefined;
+
+  const selectedPricingOptionId =
+    hasCanonicalSelection
+      ? pricingOptionId
+      : undefined;
 
   return (
     <main
@@ -366,6 +402,15 @@ export default async function ContactPage({
             collection={selectedCollection}
             category={selectedCategory}
             option={selectedOption}
+            pricingVersionId={
+              selectedPricingVersionId
+            }
+            pricingServiceId={
+              selectedPricingServiceId
+            }
+            pricingOptionId={
+              selectedPricingOptionId
+            }
           />
         </section>
       </div>

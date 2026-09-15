@@ -62,6 +62,10 @@ interface ContactBody {
   category?: unknown;
   option?: unknown;
 
+  pricingVersionId?: unknown;
+  pricingServiceId?: unknown;
+  pricingOptionId?: unknown;
+
   website?: unknown;
 }
 
@@ -380,6 +384,96 @@ export async function POST(request: Request) {
 
     /*
      * ============================================================
+     * CANONICAL PRICING SELECTION
+     * ============================================================
+     *
+     * /commissions sends the real pricing version/service/option
+     * identifiers together with the human-readable snapshots.
+     *
+     * The client is never trusted as the source of truth. These
+     * identifiers are validated again by createCommission() against
+     * the current public pricing catalog before they can classify
+     * the inquiry.
+     *
+     * An API caller may omit the entire canonical set for a
+     * generic Contact inquiry, but partial sets are rejected.
+     */
+
+    const canonicalPricingValues = [
+      body.pricingVersionId,
+      body.pricingServiceId,
+      body.pricingOptionId,
+    ];
+
+    const hasAnyCanonicalPricingValue =
+      canonicalPricingValues.some(
+        (value) =>
+          value !== undefined &&
+          value !== null &&
+          value !== "",
+      );
+
+    let pricingVersionId: string | null = null;
+    let pricingServiceId: string | null = null;
+    let pricingOptionId: string | null = null;
+
+    if (hasAnyCanonicalPricingValue) {
+      if (
+        typeof body.pricingVersionId !== "string" ||
+        typeof body.pricingServiceId !== "string" ||
+        typeof body.pricingOptionId !== "string"
+      ) {
+        return NextResponse.json(
+          {
+            error: "Invalid pricing selection",
+          },
+          {
+            status: 400,
+          },
+        );
+      }
+
+      pricingVersionId =
+        body.pricingVersionId.trim().toLowerCase();
+
+      pricingServiceId =
+        body.pricingServiceId.trim().toLowerCase();
+
+      pricingOptionId =
+        body.pricingOptionId.trim().toLowerCase();
+
+      const uuidRegex =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+      if (
+        !uuidRegex.test(pricingVersionId) ||
+        !uuidRegex.test(pricingServiceId) ||
+        !uuidRegex.test(pricingOptionId) ||
+        style === "Not specified" ||
+        collection === "Not specified" ||
+        category === "Not specified" ||
+        option === "Not specified"
+      ) {
+        return NextResponse.json(
+          {
+            error: "Invalid pricing selection",
+          },
+          {
+            status: 400,
+          },
+        );
+      }
+    }
+
+    const requestSource =
+      pricingVersionId &&
+      pricingServiceId &&
+      pricingOptionId
+        ? "commissions"
+        : "contact";
+
+    /*
+     * ============================================================
      * PERSIST COMMISSION
      * ============================================================
      *
@@ -402,7 +496,11 @@ export async function POST(request: Request) {
 
       optionSnapshot: option || null,
 
-      requestSource: option === "Not specified" ? "contact" : "portfolio",
+      pricingVersionId,
+      pricingServiceId,
+      pricingOptionId,
+
+      requestSource,
 
       initialMessage: message,
 

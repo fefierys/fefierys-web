@@ -75,9 +75,12 @@ async function main(): Promise<void> {
     const normalizedOption = normalizeCommissionPricingSnapshot(
       candidate.optionSnapshot ?? "",
     );
-    const hasPortfolioOption =
+    const hasCatalogSelectionSnapshot =
       normalizedOption !== "" && normalizedOption !== "notspecified";
-    const desiredSource = hasPortfolioOption ? "portfolio" : "contact";
+
+    const desiredSource = hasCatalogSelectionSnapshot
+      ? "commissions"
+      : "contact";
     const needsSourceCorrection = candidate.requestSource !== desiredSource;
     const result = matcher({
       category: candidate.categorySnapshot,
@@ -105,14 +108,14 @@ async function main(): Promise<void> {
         WITH updated_commission AS (
           UPDATE ${commissions}
           SET
-            "request_source" = 'portfolio',
+            "request_source" = 'commissions',
             "service_classification" = 'catalog',
             "pricing_service_id" = ${result.service.id},
             "pricing_option_id" = ${result.option.id},
             "classified_at" = ${classifiedAt},
             "classified_by" = 'system',
             "classified_by_admin_user_id" = NULL,
-            "classification_note" = 'Automatically matched from the historical portfolio snapshot.',
+            "classification_note" = 'Automatically matched from the historical commissions request snapshot.',
             "updated_at" = ${classifiedAt}
           WHERE ${commissions.id} = ${candidate.id}
             AND ${commissions.serviceClassification} = 'unclassified'
@@ -135,7 +138,7 @@ async function main(): Promise<void> {
             'commission_service_classified',
             'system',
             ${`Commission classified as ${result.option.quoteLabel}`},
-            'Automatically matched from the historical portfolio snapshot.',
+            'Automatically matched from the historical commission request snapshot.',
             jsonb_build_object(
               'classification', 'catalog',
               'matchSource', 'historical_snapshot_backfill',
@@ -189,7 +192,7 @@ async function main(): Promise<void> {
     switch (result.outcome) {
       case "incomplete":
         totals.incomplete += 1;
-        console.log(`[SKIP] ${candidate.reference}: incomplete portfolio path`);
+        console.log(`[SKIP] ${candidate.reference}: incomplete catalog snapshot path`);
         break;
       case "no_match":
         totals.noMatch += 1;

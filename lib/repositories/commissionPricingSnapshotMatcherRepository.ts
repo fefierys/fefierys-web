@@ -8,6 +8,7 @@ import {
 } from "@/lib/db/schema/portfolio";
 import {
   getActiveCommissionPricingCatalog,
+  type CommissionPricingAudience,
   type CommissionPricingCatalog,
   type CommissionPricingOption,
   type CommissionPricingService,
@@ -184,9 +185,15 @@ function resolveLoadedCommissionPricingSnapshot(
   };
 }
 
-export async function createActiveCommissionPricingSnapshotMatcher(): Promise<CommissionPricingSnapshotMatcher | null> {
+export interface CreateCommissionPricingSnapshotMatcherInput {
+  audience?: CommissionPricingAudience;
+}
+
+export async function createActiveCommissionPricingSnapshotMatcher(
+  input: CreateCommissionPricingSnapshotMatcherInput = {},
+): Promise<CommissionPricingSnapshotMatcher | null> {
   const catalog = await getActiveCommissionPricingCatalog({
-    audience: "admin",
+    audience: input.audience ?? "admin",
   });
 
   if (!catalog) {
@@ -233,8 +240,12 @@ export async function createActiveCommissionPricingSnapshotMatcher(): Promise<Co
 
 export async function resolveActiveCommissionPricingSnapshot(
   input: CommissionPricingSnapshotPath,
+  matcherInput: CreateCommissionPricingSnapshotMatcherInput = {},
 ): Promise<CommissionPricingSnapshotMatchResult> {
-  const matcher = await createActiveCommissionPricingSnapshotMatcher();
+  const matcher =
+    await createActiveCommissionPricingSnapshotMatcher(
+      matcherInput,
+    );
 
   return matcher ? matcher(input) : { outcome: "catalog_unavailable" };
 }

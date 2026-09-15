@@ -57,7 +57,7 @@ export const commissionActorEnum = pgEnum("commission_actor", [
 
 export const commissionRequestSourceEnum = pgEnum("commission_request_source", [
   "contact",
-  "portfolio",
+  "commissions",
   "admin",
 ]);
 

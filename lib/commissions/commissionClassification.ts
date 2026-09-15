@@ -10,7 +10,7 @@ export type CommissionServiceClassification =
 
 export const COMMISSION_REQUEST_SOURCES = [
   "contact",
-  "portfolio",
+  "commissions",
   "admin",
 ] as const satisfies readonly CommissionRequestSource[];
 
