@@ -134,6 +134,14 @@ export type SendCommissionQuoteResult =
       items: CommissionQuoteItem[];
       transition: CommissionStatusHistoryEntry;
       event: CommissionQuoteEvent;
+
+      /*
+      * Plaintext bearer token for this quote version.
+      *
+      * Server-side only. It must never be persisted, logged,
+      * included in events, or serialized to the browser.
+      */
+      publicToken: string;
     }
   | {
       outcome: "invalid";

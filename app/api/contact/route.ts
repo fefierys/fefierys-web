@@ -1,31 +1,11 @@
 import { NextResponse } from "next/server";
-import { Resend } from "resend";
 
-import { createCommission } from "../../../lib/repositories/commissionRepository";
-
-/*
- * ============================================================
- * ENVIRONMENT VARIABLES
- * ============================================================
- */
-
-function getRequiredEnv(name: string): string {
-  const value = process.env[name];
-
-  if (!value) {
-    throw new Error(`${name} environment variable is not configured`);
-  }
-
-  return value;
-}
-
-const resendApiKey = getRequiredEnv("RESEND_API_KEY");
-
-const ownerEmail = getRequiredEnv("OWNER_EMAIL");
-
-const senderEmail = getRequiredEnv("SENDER_EMAIL");
-
-const resend = new Resend(resendApiKey);
+import {
+  sendClientInquiryConfirmationEmail,
+  sendOwnerInquiryEmail,
+  type ContactEmailData,
+} from "@/lib/email/contactEmail";
+import { createCommission } from "@/lib/repositories/commissionRepository";
 
 /*
  * ============================================================
@@ -67,17 +47,6 @@ interface ContactBody {
   pricingOptionId?: unknown;
 
   website?: unknown;
-}
-
-interface SafeEmailData {
-  name: string;
-  email: string;
-  message: string;
-
-  style: string;
-  collection: string;
-  category: string;
-  option: string;
 }
 
 /*
@@ -527,34 +496,15 @@ export async function POST(request: Request) {
      * ============================================================
      */
 
-    const safeData: SafeEmailData = {
-      name: escapeHtml(name),
-
-      /*
-       * NO escapamos el email aquí.
-       *
-       * Tiene que seguir siendo una
-       * dirección válida para to/replyTo.
-       */
-
+    const emailData: ContactEmailData = {
+      reference: commission.reference,
+      name,
       email,
-
-      /*
-       * Message puede contener URLs porque
-       * solamente aparece en TU correo.
-       *
-       * El HTML sí queda neutralizado.
-       */
-
-      message: escapeHtml(message),
-
-      style: escapeHtml(style),
-
-      collection: escapeHtml(collection),
-
-      category: escapeHtml(category),
-
-      option: escapeHtml(option),
+      message,
+      style,
+      collection,
+      category,
+      option,
     };
 
     /*
@@ -567,23 +517,39 @@ export async function POST(request: Request) {
      */
 
     try {
-      const ownerResult = await sendOwnerEmail(safeData);
+      const ownerResult =
+        await sendOwnerInquiryEmail(emailData);
 
       if (ownerResult.error) {
-        console.error("Owner email failed:", ownerResult.error);
+        console.error(
+          "Owner email failed:",
+          ownerResult.error,
+        );
       }
     } catch (error) {
-      console.error("Owner email failed:", error);
+      console.error(
+        "Owner email failed:",
+        error,
+      );
     }
 
     try {
-      const clientResult = await sendClientConfirmationEmail(safeData);
+      const clientResult =
+        await sendClientInquiryConfirmationEmail(
+          emailData,
+        );
 
       if (clientResult.error) {
-        console.error("Client confirmation email failed:", clientResult.error);
+        console.error(
+          "Client confirmation email failed:",
+          clientResult.error,
+        );
       }
     } catch (error) {
-      console.error("Client confirmation email failed:", error);
+      console.error(
+        "Client confirmation email failed:",
+        error,
+      );
     }
 
     return NextResponse.json({
@@ -602,270 +568,6 @@ export async function POST(request: Request) {
       },
     );
   }
-}
-
-/*
- * ============================================================
- * OWNER EMAIL
- * ============================================================
- */
-
-async function sendOwnerEmail(data: SafeEmailData) {
-  return resend.emails.send({
-    from: `Fefierys <${senderEmail}>`,
-
-    to: ownerEmail,
-
-    replyTo: data.email,
-
-    subject: "✨ New Project Inquiry - Fefierys",
-
-    html: `
-      <div style="font-family: Arial, Helvetica, sans-serif; background:#f4f4f8; padding:40px;">
-
-        <div style="max-width:640px; margin:0 auto; background:#ffffff; border-radius:16px; padding:32px; border:1px solid #e5e7eb;">
-
-          <h1 style="margin:0 0 8px; color:#2f3558; font-size:28px; font-weight:400;">
-            New Project Inquiry
-          </h1>
-
-          <p style="margin:0 0 24px; color:#6b7280;">
-            A new project inquiry has been submitted through the Fefierys website.
-          </p>
-
-
-          <h2 style="margin:0 0 12px; color:#374151; font-size:18px;">
-            Inquiry Summary
-          </h2>
-
-
-          <table style="width:100%; border-collapse:collapse; margin-bottom:24px;">
-
-            <tr>
-              <td style="padding:10px 0; color:#6b7280;">
-                Style
-              </td>
-
-              <td style="padding:10px 0; color:#111827; font-weight:600;">
-                ${data.style}
-              </td>
-            </tr>
-
-
-            <tr>
-              <td style="padding:10px 0; color:#6b7280;">
-                Collection
-              </td>
-
-              <td style="padding:10px 0; color:#111827; font-weight:600;">
-                ${data.collection}
-              </td>
-            </tr>
-
-
-            <tr>
-              <td style="padding:10px 0; color:#6b7280;">
-                Category
-              </td>
-
-              <td style="padding:10px 0; color:#111827; font-weight:600;">
-                ${data.category}
-              </td>
-            </tr>
-
-
-            <tr>
-              <td style="padding:10px 0; color:#6b7280;">
-                Selected Option
-              </td>
-
-              <td style="padding:10px 0; color:#111827; font-weight:600;">
-                ${data.option}
-              </td>
-            </tr>
-
-          </table>
-
-
-          <h2 style="margin:0 0 12px; color:#374151; font-size:18px;">
-            Client Information
-          </h2>
-
-
-          <table style="width:100%; border-collapse:collapse; margin-bottom:24px;">
-
-            <tr>
-              <td style="padding:10px 0; color:#6b7280;">
-                Name
-              </td>
-
-              <td style="padding:10px 0; color:#111827; font-weight:600;">
-                ${data.name}
-              </td>
-            </tr>
-
-
-            <tr>
-              <td style="padding:10px 0; color:#6b7280;">
-                Email
-              </td>
-
-              <td style="padding:10px 0; color:#111827; font-weight:600;">
-                ${escapeHtml(data.email)}
-              </td>
-            </tr>
-
-          </table>
-
-
-          <h2 style="margin:0 0 12px; color:#374151; font-size:18px;">
-            Project Message
-          </h2>
-
-
-          <div style="background:#f8fafc; border:1px solid #e5e7eb; border-radius:12px; padding:18px; color:#111827; white-space:pre-wrap; line-height:1.6;">
-            ${data.message}
-          </div>
-
-
-          <p style="margin:28px 0 0; color:#9ca3af; font-size:13px;">
-            This message was sent from the Fefierys contact form.
-          </p>
-
-          <p style="margin:8px 0 0; color:#9ca3af; font-size:12px;">
-            User-submitted content may contain untrusted links. Verify links before opening them.
-          </p>
-
-        </div>
-
-      </div>
-    `,
-  });
-}
-
-/*
- * ============================================================
- * CLIENT CONFIRMATION EMAIL
- * ============================================================
- */
-
-async function sendClientConfirmationEmail(data: SafeEmailData) {
-  return resend.emails.send({
-    from: `Fefierys <${senderEmail}>`,
-
-    to: data.email,
-
-    replyTo: ownerEmail,
-
-    subject: "✨ Your Fefierys inquiry has been received",
-
-    html: `
-      <div style="font-family: Arial, Helvetica, sans-serif; background:#f4f4f8; padding:40px;">
-
-        <div style="max-width:640px; margin:0 auto; background:#ffffff; border-radius:16px; padding:32px; border:1px solid #e5e7eb;">
-
-
-          <h1 style="color:#2f3558; font-size:28px; font-weight:400;">
-            Thank you for reaching out ✨
-          </h1>
-
-
-          <p style="color:#374151; line-height:1.6;">
-            Hello ${data.name},
-          </p>
-
-
-          <p style="color:#374151; line-height:1.6;">
-            Your project inquiry has been successfully received through the Fefierys website.
-          </p>
-
-
-          <p style="color:#374151; line-height:1.6;">
-            I will personally review your project details and get back to you with the next steps.
-          </p>
-
-
-          <h2 style="margin-top:28px; margin-bottom:12px; color:#374151; font-size:18px;">
-            Inquiry Summary
-          </h2>
-
-
-          <table style="width:100%; border-collapse:collapse; margin-bottom:24px;">
-
-            <tr>
-              <td style="padding:10px 0; color:#6b7280;">
-                Style
-              </td>
-
-              <td style="padding:10px 0; color:#111827; font-weight:600;">
-                ${data.style}
-              </td>
-            </tr>
-
-
-            <tr>
-              <td style="padding:10px 0; color:#6b7280;">
-                Collection
-              </td>
-
-              <td style="padding:10px 0; color:#111827; font-weight:600;">
-                ${data.collection}
-              </td>
-            </tr>
-
-
-            <tr>
-              <td style="padding:10px 0; color:#6b7280;">
-                Category
-              </td>
-
-              <td style="padding:10px 0; color:#111827; font-weight:600;">
-                ${data.category}
-              </td>
-            </tr>
-
-
-            <tr>
-              <td style="padding:10px 0; color:#6b7280;">
-                Selected Option
-              </td>
-
-              <td style="padding:10px 0; color:#111827; font-weight:600;">
-                ${data.option}
-              </td>
-            </tr>
-
-          </table>
-
-
-          <div style="background:#f8fafc; border:1px solid #e5e7eb; border-radius:12px; padding:18px;">
-
-            <strong style="color:#2f3558;">
-              Current status:
-            </strong>
-
-
-            <p style="margin:8px 0 0; color:#374151;">
-              🟡 Inquiry Received - Under Review
-            </p>
-
-          </div>
-
-
-          <p style="margin-top:32px; color:#6b7280;">
-            Thank you for trusting me with your idea!
-          </p>
-
-
-          <p style="color:#2f3558;">
-            Fefierys
-          </p>
-
-        </div>
-
-      </div>
-    `,
-  });
 }
 
 /*
@@ -1024,19 +726,4 @@ async function readBodyWithLimit(
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-/*
- * ============================================================
- * HTML ESCAPING
- * ============================================================
- */
-
-function escapeHtml(value: string) {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
 }

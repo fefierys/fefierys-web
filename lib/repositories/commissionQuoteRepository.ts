@@ -7,3 +7,5 @@ export * from "./commissionQuotes/commissionQuoteDraftRepository";
 export * from "./commissionQuotes/commissionQuoteSendRepository";
 export * from "./commissionQuotes/commissionQuoteResponseRepository";
 export * from "./commissionQuotes/commissionQuoteRevisionRepository";
+export * from "./commissionQuotes/commissionQuoteAccessRepository";
+export * from "./commissionQuotes/commissionQuotePublicResponseRepository";

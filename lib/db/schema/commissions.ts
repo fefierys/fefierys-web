@@ -579,6 +579,24 @@ export const commissionQuotes = pgTable(
     status: quoteStatusEnum("status").notNull().default("draft"),
 
     /*
+    * Public quote access uses an opaque bearer token.
+    *
+    * Only the SHA-256 hash is persisted. The plaintext token is
+    * generated server-side and must never be stored in the database.
+    *
+    * One token belongs to one specific quote version.
+    */
+    publicTokenHash: varchar("public_token_hash", { length: 64 }),
+
+    publicTokenCreatedAt: timestamp("public_token_created_at", {
+      withTimezone: true,
+    }),
+
+    publicTokenRevokedAt: timestamp("public_token_revoked_at", {
+      withTimezone: true,
+    }),
+
+    /*
      * Legacy quotes predate the versioned pricing catalog. Catalog and
      * custom quotes store immutable totals calculated when the draft is
      * created or updated.
@@ -666,6 +684,10 @@ export const commissionQuotes = pgTable(
       table.version,
     ),
 
+    uniqueIndex("commission_quotes_public_token_hash_unique").on(
+      table.publicTokenHash,
+    ),
+
     uniqueIndex("commission_quotes_commission_active_unique")
       .on(table.commissionId)
       .where(
@@ -744,6 +766,23 @@ export const commissionQuotes = pgTable(
           AND ${table.discountTotal} >= 0
           AND ${table.totalAmount}
             = ${table.preDiscountSubtotal} - ${table.discountTotal}
+        )
+      `,
+    ),
+
+    check(
+      "commission_quotes_public_token_state_check",
+      sql`
+        (
+          ${table.publicTokenHash} IS NULL
+          AND ${table.publicTokenCreatedAt} IS NULL
+          AND ${table.publicTokenRevokedAt} IS NULL
+        )
+        OR
+        (
+          ${table.publicTokenHash} IS NOT NULL
+          AND ${table.publicTokenCreatedAt} IS NOT NULL
+          AND char_length(${table.publicTokenHash}) = 64
         )
       `,
     ),

@@ -35,7 +35,15 @@ async function main(): Promise<void> {
     sendCommissionQuote,
     supersedeCommissionQuote,
     updateCommissionQuoteDraft,
+    getPublicCommissionQuoteByToken,
+    acceptCommissionQuotePublicly,
+    declineCommissionQuotePublicly,
   } = await import("../lib/repositories/commissionQuoteRepository");
+
+  const {
+    hashPublicQuoteToken,
+    isValidPublicQuoteToken,
+  } = await import("../lib/commissions/commissionQuoteAccessToken");
 
   const { transitionCommissionStatus } =
     await import("../lib/repositories/commissionWorkflowRepository");
@@ -815,6 +823,51 @@ async function main(): Promise<void> {
       throw new Error("Expected the quote to be sent.");
     }
 
+    ok(isValidPublicQuoteToken(sentResult.publicToken));
+
+    equal(
+      sentResult.quote.publicTokenHash,
+      hashPublicQuoteToken(sentResult.publicToken),
+    );
+
+    ok(sentResult.quote.publicTokenCreatedAt instanceof Date);
+    equal(sentResult.quote.publicTokenRevokedAt, null);
+
+    const publiclyResolvedQuote = await getPublicCommissionQuoteByToken(
+      sentResult.publicToken,
+    );
+
+    ok(publiclyResolvedQuote);
+
+    equal(publiclyResolvedQuote.version, sentResult.quote.version);
+    equal(publiclyResolvedQuote.status, "sent");
+    equal(publiclyResolvedQuote.currency, sentResult.quote.currency);
+    equal(publiclyResolvedQuote.totalAmount, sentResult.quote.totalAmount);
+    equal(publiclyResolvedQuote.items.length, sentResult.items.length);
+
+    equal(
+      publiclyResolvedQuote.items[0]?.label,
+      sentResult.items[0]?.label,
+    );
+
+    console.log(
+      "[OK] Sent quote public token resolves to a client-safe quote projection",
+    );
+
+    equal(
+      await getPublicCommissionQuoteByToken("invalid"),
+      null,
+    );
+
+    const logicallyExpiredPublicQuote =
+      await getPublicCommissionQuoteByToken(
+        sentResult.publicToken,
+        new Date(sentResult.quote.validUntil!.getTime() + 1),
+      );
+
+    ok(logicallyExpiredPublicQuote);
+    equal(logicallyExpiredPublicQuote.status, "expired");
+
     equal(sentResult.quote.id, draftToSend.quote.id);
     equal(sentResult.quote.commissionId, sendCommissionId);
     equal(sentResult.quote.version, 1);
@@ -1332,6 +1385,482 @@ async function main(): Promise<void> {
 
     console.log(
       "[OK] Concurrent quote send produced one send without duplicates",
+    );
+
+    const publicAcceptanceCommissionId =
+      await createTemporaryCommission("Public Acceptance");
+
+    await moveCommissionToQuoting(publicAcceptanceCommissionId);
+
+    const publicAcceptanceDraft = await createCommissionQuoteDraft({
+      commissionId: publicAcceptanceCommissionId,
+      currency: "USD",
+      description: "Public acceptance verification quote",
+      validUntil: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+      items: [
+        {
+          label: "Public acceptance illustration",
+          quantity: 1,
+          unitAmount: "450",
+        },
+      ],
+      createdByAdminUserId: "public-acceptance-verifier",
+    });
+
+    equal(publicAcceptanceDraft.outcome, "created");
+
+    if (publicAcceptanceDraft.outcome !== "created") {
+      throw new Error(
+        "Expected the public acceptance quote draft to be created.",
+      );
+    }
+
+    const publicAcceptanceSent = await sendCommissionQuote({
+      quoteId: publicAcceptanceDraft.quote.id,
+      expectedUpdatedAt: publicAcceptanceDraft.quote.updatedAt,
+      sentByAdminUserId: "public-acceptance-verifier",
+    });
+
+    equal(publicAcceptanceSent.outcome, "sent");
+
+    if (publicAcceptanceSent.outcome !== "sent") {
+      throw new Error(
+        "Expected the public acceptance quote to be sent.",
+      );
+    }
+
+    const publicAcceptanceResult =
+      await acceptCommissionQuotePublicly(
+        publicAcceptanceSent.publicToken,
+      );
+
+    equal(publicAcceptanceResult.outcome, "accepted");
+
+    const storedPublicAcceptedQuote = await getCommissionQuoteById(
+      publicAcceptanceSent.quote.id,
+    );
+
+    ok(storedPublicAcceptedQuote);
+
+    equal(
+      storedPublicAcceptedQuote.quote.status,
+      "accepted",
+    );
+
+    ok(
+      storedPublicAcceptedQuote.quote.acceptedAt instanceof Date,
+    );
+
+    equal(
+      storedPublicAcceptedQuote.quote.declinedAt,
+      null,
+    );
+
+    equal(
+      storedPublicAcceptedQuote.quote.expiredAt,
+      null,
+    );
+
+    const publicAcceptanceCommissionRows = await db
+      .select({
+        status: commissions.status,
+      })
+      .from(commissions)
+      .where(
+        eq(
+          commissions.id,
+          publicAcceptanceCommissionId,
+        ),
+      )
+      .limit(1);
+
+    equal(
+      publicAcceptanceCommissionRows[0]?.status,
+      "awaiting_payment",
+    );
+
+    const publicAcceptanceTransitionRows = await db
+      .select()
+      .from(commissionStatusHistory)
+      .where(
+        and(
+          eq(
+            commissionStatusHistory.commissionId,
+            publicAcceptanceCommissionId,
+          ),
+          eq(
+            commissionStatusHistory.fromStatus,
+            "awaiting_quote_response",
+          ),
+          eq(
+            commissionStatusHistory.toStatus,
+            "awaiting_payment",
+          ),
+        ),
+      );
+
+    equal(publicAcceptanceTransitionRows.length, 1);
+
+    const publicAcceptanceTransition =
+      publicAcceptanceTransitionRows[0];
+
+    ok(publicAcceptanceTransition);
+
+    equal(
+      publicAcceptanceTransition.initiatedBy,
+      "client",
+    );
+
+    equal(
+      publicAcceptanceTransition.reason,
+      "quote_accepted",
+    );
+
+    equal(
+      publicAcceptanceTransition.changedByAdminUserId,
+      null,
+    );
+
+    const publicAcceptanceEventRows = await db
+      .select()
+      .from(commissionEvents)
+      .where(
+        and(
+          eq(
+            commissionEvents.commissionId,
+            publicAcceptanceCommissionId,
+          ),
+          eq(
+            commissionEvents.type,
+            "quote_accepted",
+          ),
+        ),
+      );
+
+    equal(publicAcceptanceEventRows.length, 1);
+
+    const publicAcceptanceEvent =
+      publicAcceptanceEventRows[0];
+
+    ok(publicAcceptanceEvent);
+
+    equal(
+      publicAcceptanceEvent.actor,
+      "client",
+    );
+
+    equal(
+      publicAcceptanceEvent.createdByAdminUserId,
+      null,
+    );
+
+    const publicAcceptanceTokenRows = await db
+      .select({
+        publicTokenHash:
+          commissionQuotes.publicTokenHash,
+        publicTokenRevokedAt:
+          commissionQuotes.publicTokenRevokedAt,
+      })
+      .from(commissionQuotes)
+      .where(
+        eq(
+          commissionQuotes.id,
+          publicAcceptanceSent.quote.id,
+        ),
+      )
+      .limit(1);
+
+    ok(publicAcceptanceTokenRows[0]?.publicTokenHash);
+
+    equal(
+      publicAcceptanceTokenRows[0]?.publicTokenRevokedAt,
+      null,
+    );
+
+    /*
+    * Accepting does not invalidate the secure link.
+    * A second mutation through the same link is simply no longer actionable.
+    */
+    const repeatedPublicAcceptance =
+      await acceptCommissionQuotePublicly(
+        publicAcceptanceSent.publicToken,
+      );
+
+    equal(
+      repeatedPublicAcceptance.outcome,
+      "not_actionable",
+    );
+
+    /*
+    * Malformed tokens must not reveal whether any quote exists.
+    */
+    const invalidPublicAcceptance =
+      await acceptCommissionQuotePublicly(
+        "invalid-public-quote-token",
+      );
+
+    equal(
+      invalidPublicAcceptance.outcome,
+      "unavailable",
+    );
+
+    console.log(
+      "[OK] Public quote acceptance updated client state without admin attribution",
+    );
+
+    const publicDeclineCommissionId =
+      await createTemporaryCommission("Public Decline");
+
+    await moveCommissionToQuoting(
+      publicDeclineCommissionId,
+    );
+
+    const publicDeclineDraft =
+      await createCommissionQuoteDraft({
+        commissionId: publicDeclineCommissionId,
+        currency: "USD",
+        description:
+          "Public decline verification quote",
+        validUntil: new Date(
+          Date.now() +
+            14 * 24 * 60 * 60 * 1000,
+        ),
+        items: [
+          {
+            label: "Public decline illustration",
+            quantity: 1,
+            unitAmount: "450",
+          },
+        ],
+        createdByAdminUserId:
+          "public-decline-verifier",
+      });
+
+    equal(
+      publicDeclineDraft.outcome,
+      "created",
+    );
+
+    if (
+      publicDeclineDraft.outcome !== "created"
+    ) {
+      throw new Error(
+        "Expected the public decline quote draft to be created.",
+      );
+    }
+
+    const publicDeclineSent =
+      await sendCommissionQuote({
+        quoteId: publicDeclineDraft.quote.id,
+        expectedUpdatedAt:
+          publicDeclineDraft.quote.updatedAt,
+        sentByAdminUserId:
+          "public-decline-verifier",
+      });
+
+    equal(
+      publicDeclineSent.outcome,
+      "sent",
+    );
+
+    if (
+      publicDeclineSent.outcome !== "sent"
+    ) {
+      throw new Error(
+        "Expected the public decline quote to be sent.",
+      );
+    }
+
+    const publicDeclineResult =
+      await declineCommissionQuotePublicly(
+        publicDeclineSent.publicToken,
+      );
+
+    equal(
+      publicDeclineResult.outcome,
+      "declined",
+    );
+
+    const storedPublicDeclinedQuote =
+      await getCommissionQuoteById(
+        publicDeclineSent.quote.id,
+      );
+
+    ok(storedPublicDeclinedQuote);
+
+    equal(
+      storedPublicDeclinedQuote.quote.status,
+      "declined",
+    );
+
+    ok(
+      storedPublicDeclinedQuote.quote
+        .declinedAt instanceof Date,
+    );
+
+    equal(
+      storedPublicDeclinedQuote.quote.acceptedAt,
+      null,
+    );
+
+    equal(
+      storedPublicDeclinedQuote.quote.expiredAt,
+      null,
+    );
+
+    const publicDeclineCommissionRows =
+      await db
+        .select({
+          status: commissions.status,
+          closeReason: commissions.closeReason,
+          closedBy: commissions.closedBy,
+          closedAt: commissions.closedAt,
+          isOnHold: commissions.isOnHold,
+        })
+        .from(commissions)
+        .where(
+          eq(
+            commissions.id,
+            publicDeclineCommissionId,
+          ),
+        )
+        .limit(1);
+
+    const publicDeclineCommission =
+      publicDeclineCommissionRows[0];
+
+    ok(publicDeclineCommission);
+
+    equal(
+      publicDeclineCommission.status,
+      "declined",
+    );
+
+    equal(
+      publicDeclineCommission.closeReason,
+      "client_declined_quote",
+    );
+
+    equal(
+      publicDeclineCommission.closedBy,
+      "client",
+    );
+
+    ok(
+      publicDeclineCommission.closedAt
+        instanceof Date,
+    );
+
+    equal(
+      publicDeclineCommission.isOnHold,
+      false,
+    );
+
+    const publicDeclineTransitionRows =
+      await db
+        .select()
+        .from(commissionStatusHistory)
+        .where(
+          and(
+            eq(
+              commissionStatusHistory.commissionId,
+              publicDeclineCommissionId,
+            ),
+            eq(
+              commissionStatusHistory.fromStatus,
+              "awaiting_quote_response",
+            ),
+            eq(
+              commissionStatusHistory.toStatus,
+              "declined",
+            ),
+          ),
+        );
+
+    equal(
+      publicDeclineTransitionRows.length,
+      1,
+    );
+
+    const publicDeclineTransition =
+      publicDeclineTransitionRows[0];
+
+    ok(publicDeclineTransition);
+
+    equal(
+      publicDeclineTransition.initiatedBy,
+      "client",
+    );
+
+    equal(
+      publicDeclineTransition.reason,
+      "client_declined_quote",
+    );
+
+    equal(
+      publicDeclineTransition.changedByAdminUserId,
+      null,
+    );
+
+    const publicDeclineEventRows =
+      await db
+        .select()
+        .from(commissionEvents)
+        .where(
+          and(
+            eq(
+              commissionEvents.commissionId,
+              publicDeclineCommissionId,
+            ),
+            eq(
+              commissionEvents.type,
+              "quote_declined",
+            ),
+          ),
+        );
+
+    equal(
+      publicDeclineEventRows.length,
+      1,
+    );
+
+    const publicDeclineEvent =
+      publicDeclineEventRows[0];
+
+    ok(publicDeclineEvent);
+
+    equal(
+      publicDeclineEvent.actor,
+      "client",
+    );
+
+    equal(
+      publicDeclineEvent.createdByAdminUserId,
+      null,
+    );
+
+    const repeatedPublicDecline =
+      await declineCommissionQuotePublicly(
+        publicDeclineSent.publicToken,
+      );
+
+    equal(
+      repeatedPublicDecline.outcome,
+      "not_actionable",
+    );
+
+    const invalidPublicDecline =
+      await declineCommissionQuotePublicly(
+        "invalid-public-quote-token",
+      );
+
+    equal(
+      invalidPublicDecline.outcome,
+      "unavailable",
+    );
+
+    console.log(
+      "[OK] Public quote decline closed the commission without admin attribution",
     );
 
     const acceptedResult = await acceptCommissionQuote({

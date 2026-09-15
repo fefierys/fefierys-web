@@ -3,6 +3,10 @@ import { randomUUID } from "node:crypto";
 import { eq, sql } from "drizzle-orm";
 
 import { validateCommissionQuoteTransition } from "../../commissions/commissionQuote";
+import {
+  generatePublicQuoteToken,
+  hashPublicQuoteToken,
+} from "../../commissions/commissionQuoteAccessToken";
 import { db } from "../../db";
 import {
   commissionEvents,
@@ -163,6 +167,13 @@ export async function sendCommissionQuote(
     };
   }
 
+  /*
+  * The plaintext token exists only for this server-side send operation.
+  * Only its SHA-256 digest is persisted.
+  */
+  const publicToken = generatePublicQuoteToken();
+  const publicTokenHash = hashPublicQuoteToken(publicToken);
+
   const transitionId = randomUUID();
   const eventId = randomUUID();
 
@@ -203,6 +214,9 @@ export async function sendCommissionQuote(
             SET
               status = 'sent',
               sent_at = ${sentAt},
+              public_token_hash = ${publicTokenHash},
+              public_token_created_at = ${sentAt},
+              public_token_revoked_at = null,
               updated_at = ${sentAt}
             FROM locked_target
             WHERE
@@ -336,6 +350,7 @@ export async function sendCommissionQuote(
       items: sentQuote.items,
       transition,
       event,
+      publicToken
     };
   } catch (error) {
     /*
@@ -369,6 +384,7 @@ export async function sendCommissionQuote(
           items: sentQuote.items,
           transition,
           event,
+          publicToken
         };
       }
 

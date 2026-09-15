@@ -43,6 +43,9 @@ import {
   type ResolveCommissionQuotePricingResult,
 } from "@/lib/repositories/commissionQuotePricingResolver";
 
+import { sendCommissionQuoteEmail } from "@/lib/email/commissionQuoteEmail";
+import { getAdminCommissionDetail } from "@/lib/repositories/commissionAdminRepository";
+
 export interface CommissionStatusActionState {
   outcome: "idle" | "success" | "error" | "conflict";
   message: string | null;
@@ -954,18 +957,37 @@ export async function sendCommissionQuoteAction(
   formData: FormData,
 ): Promise<CommissionQuoteActionState> {
   const session = await requireAdmin();
-  const commissionId = getFormValue(formData, "commissionId");
-  const quoteId = getFormValue(formData, "quoteId");
-  const expectedUpdatedAt = parseRequiredDate(
-    getFormValue(formData, "expectedUpdatedAt"),
+
+  const commissionId = getFormValue(
+    formData,
+    "commissionId",
   );
 
-  if (!UUID_PATTERN.test(commissionId) || !UUID_PATTERN.test(quoteId)) {
-    return quoteError("The commission or quote identifier is invalid.");
+  const quoteId = getFormValue(
+    formData,
+    "quoteId",
+  );
+
+  const expectedUpdatedAt = parseRequiredDate(
+    getFormValue(
+      formData,
+      "expectedUpdatedAt",
+    ),
+  );
+
+  if (
+    !UUID_PATTERN.test(commissionId) ||
+    !UUID_PATTERN.test(quoteId)
+  ) {
+    return quoteError(
+      "The commission or quote identifier is invalid.",
+    );
   }
 
   if (!expectedUpdatedAt) {
-    return quoteError("The quote version timestamp is invalid.");
+    return quoteError(
+      "The quote version timestamp is invalid.",
+    );
   }
 
   try {
@@ -976,34 +998,149 @@ export async function sendCommissionQuoteAction(
     });
 
     switch (result.outcome) {
-      case "sent":
-        revalidateCommissionActivityPaths(commissionId);
-        return { outcome: "success", message: "Quote sent successfully." };
+      case "sent": {
+        /*
+         * Never trust the commissionId submitted by the browser
+         * for email delivery. The persisted quote is the source
+         * of truth for the commission relationship.
+         */
+        const persistedCommissionId =
+          result.quote.commissionId;
+
+        const detail =
+          await getAdminCommissionDetail(
+            persistedCommissionId,
+          );
+
+        if (!detail) {
+          revalidateCommissionActivityPaths(
+            persistedCommissionId,
+          );
+
+          return quoteError(
+            "The quote was marked as sent, but the client details could not be loaded for email delivery.",
+          );
+        }
+
+        const validUntil =
+          result.quote.validUntil;
+
+        if (!validUntil) {
+          revalidateCommissionActivityPaths(
+            persistedCommissionId,
+          );
+
+          return quoteError(
+            "The quote was marked as sent, but its expiration date is unavailable for email delivery.",
+          );
+        }
+
+        const emailResult =
+          await sendCommissionQuoteEmail({
+            clientEmail:
+              detail.commission.clientEmail,
+
+            clientName:
+              detail.commission.clientName,
+
+            currency:
+              result.quote.currency,
+
+            publicToken:
+              result.publicToken,
+
+            reference:
+              detail.commission.reference,
+
+            totalAmount:
+              result.quote.totalAmount,
+
+            validUntil,
+
+            version:
+              result.quote.version,
+          });
+
+        if (emailResult.error) {
+          /*
+           * Never log the public token or the generated quote URL.
+           */
+          console.error(
+            "Commission quote email delivery failed:",
+            {
+              name:
+                emailResult.error.name,
+              message:
+                emailResult.error.message,
+            },
+          );
+
+          revalidateCommissionActivityPaths(
+            persistedCommissionId,
+          );
+
+          return quoteError(
+            "The quote was marked as sent, but the email could not be delivered. Refresh the page before taking further action.",
+          );
+        }
+
+        revalidateCommissionActivityPaths(
+          persistedCommissionId,
+        );
+
+        return {
+          outcome: "success",
+          message:
+            "Quote sent and emailed successfully.",
+        };
+      }
+
       case "invalid":
-        return quoteError(result.validation.message);
+        return quoteError(
+          result.validation.message,
+        );
+
       case "not_found":
-        return quoteError("The quote no longer exists.");
+        return quoteError(
+          "The quote no longer exists.",
+        );
+
       case "not_draft":
         return quoteConflict(
           commissionId,
           `Only a draft quote can be sent. This quote is ${result.currentStatus}.`,
         );
+
       case "wrong_commission_status":
         return quoteConflict(
           commissionId,
           `The quote cannot be sent while the commission is ${result.currentStatus}.`,
         );
+
       case "on_hold":
         return quoteConflict(
           commissionId,
           "This commission is on hold. Resume it before sending the quote.",
         );
+
       case "conflict":
-        return quoteConflict(commissionId);
+        return quoteConflict(
+          commissionId,
+        );
     }
   } catch (error) {
-    console.error("Failed to send commission quote:", error);
-    return quoteError("The quote could not be sent. Please try again.");
+    /*
+     * Do not include request payloads, tokens or quote URLs
+     * in this log.
+     */
+    console.error(
+      "Failed to send commission quote:",
+      error,
+    );
+
+    return quoteError(
+      "The quote could not be sent. Please try again.",
+    );
   }
 }
 

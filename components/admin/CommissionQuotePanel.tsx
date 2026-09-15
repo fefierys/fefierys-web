@@ -222,7 +222,9 @@ export default function CommissionQuotePanel({
           mode === "view"
             ? "Review this version and its recorded values."
             : mode === "send"
-              ? "Confirm the quote before moving it to Awaiting quote response."
+              ? selectedQuote?.quote.status === "draft"
+                ? "Review the quote before sending it to the client."
+                : "The quote has been sent and the client has been notified."
               : mode === "revise"
                 ? "Create a new draft version while preserving this sent quote in history."
                 : mode === "expire"
@@ -305,7 +307,7 @@ export default function CommissionQuotePanel({
           />
         )}
 
-        {mode === "send" && selectedQuote?.quote.status === "draft" && (
+        {mode === "send" && selectedQuote && (
           <CommissionQuoteSendConfirm
             commissionId={commissionId}
             onBack={() => setMode("view")}

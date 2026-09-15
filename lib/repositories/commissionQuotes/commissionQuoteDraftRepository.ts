@@ -178,6 +178,18 @@ export async function createCommissionQuoteDraft(
                   ${"draft"}::quote_status
                 `.as("status"),
 
+              publicTokenHash: sql<string | null>`
+                  null::varchar(64)
+                `.as("public_token_hash"),
+
+              publicTokenCreatedAt: sql<Date | null>`
+                  null::timestamptz
+                `.as("public_token_created_at"),
+
+              publicTokenRevokedAt: sql<Date | null>`
+                  null::timestamptz
+                `.as("public_token_revoked_at"),
+
               pricingMode: sql<CommissionQuote["pricingMode"]>`
                   ${pricingSnapshot?.pricingMode ?? "legacy"}::quote_pricing_mode
                 `.as("pricing_mode"),
