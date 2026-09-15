@@ -37,6 +37,51 @@ export interface CreateCommissionEmailThreadResult {
   thread: CommissionEmailThread;
 }
 
+export interface SetCommissionEmailThreadRootProviderInput {
+  threadId: string;
+  providerEmailId: string;
+}
+
+export type SetCommissionEmailThreadRootProviderResult =
+  | {
+      outcome: "set";
+      thread: CommissionEmailThread;
+    }
+  | {
+      outcome: "already_set";
+      thread: CommissionEmailThread;
+    }
+  | {
+      outcome: "conflict";
+      thread: CommissionEmailThread;
+    }
+  | {
+      outcome: "not_found";
+    };
+
+export interface SetCommissionEmailThreadRootMessageIdInput {
+  threadId: string;
+  providerEmailId: string;
+  rootMessageId: string;
+}
+
+export type SetCommissionEmailThreadRootMessageIdResult =
+  | {
+      outcome: "set";
+      thread: CommissionEmailThread;
+    }
+  | {
+      outcome: "already_set";
+      thread: CommissionEmailThread;
+    }
+  | {
+      outcome: "conflict";
+      thread: CommissionEmailThread;
+    }
+  | {
+      outcome: "not_found";
+    };
+
 export interface CreateQueuedCommissionEmailMessageInput {
   commissionId: string;
   threadId: string | null;
