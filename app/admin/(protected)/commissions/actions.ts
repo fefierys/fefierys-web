@@ -43,11 +43,17 @@ import {
   type ResolveCommissionQuotePricingResult,
 } from "@/lib/repositories/commissionQuotePricingResolver";
 
+import { requestCommissionClientDetails } from "@/lib/email/commissionClientDetailsRequestService";
 import { sendCommissionQuoteEmail } from "@/lib/email/commissionQuoteEmail";
 import { getAdminCommissionDetail } from "@/lib/repositories/commissionAdminRepository";
 
 export interface CommissionStatusActionState {
   outcome: "idle" | "success" | "error" | "conflict";
+  message: string | null;
+}
+
+export interface CommissionClientDetailsRequestActionState {
+  outcome: "idle" | "success" | "warning" | "error" | "conflict";
   message: string | null;
 }
 
@@ -315,6 +321,14 @@ export async function updateCommissionStatusAction(
     };
   }
 
+  if (toStatusValue === "awaiting_client_details") {
+    return {
+      outcome: "error",
+      message:
+        "Use Request client details to move a commission to Awaiting client details.",
+    };
+  }
+
   if (!isCommissionActor(initiatedByValue)) {
     return {
       outcome: "error",
@@ -416,6 +430,165 @@ function revalidateCommissionActivityPaths(commissionId: string): void {
   revalidatePath("/admin/commissions");
   revalidatePath("/admin/commissions/kanban");
   revalidatePath(`/admin/commissions/${commissionId}`);
+}
+
+export async function requestCommissionClientDetailsAction(
+  _previousState: CommissionClientDetailsRequestActionState,
+  formData: FormData,
+): Promise<CommissionClientDetailsRequestActionState> {
+  const session = await requireAdmin();
+
+  const commissionId = getFormValue(formData, "commissionId");
+  const messageText = getFormValue(formData, "messageText");
+
+  if (!UUID_PATTERN.test(commissionId)) {
+    return {
+      outcome: "error",
+      message: "The commission identifier is invalid.",
+    };
+  }
+
+  if (!messageText || messageText.length > MAX_NOTE_LENGTH) {
+    return {
+      outcome: "error",
+      message: `The request message must contain between 1 and ${MAX_NOTE_LENGTH} characters.`,
+    };
+  }
+
+  try {
+    const result = await requestCommissionClientDetails({
+      commissionId,
+      messageText,
+      requestedByAdminUserId: session.user.id,
+    });
+
+    switch (result.outcome) {
+      case "sent":
+        revalidateCommissionActivityPaths(commissionId);
+
+        return {
+          outcome: "success",
+          message: "Client details request sent successfully.",
+        };
+
+      case "delivery_failed":
+        console.error("Client details request email delivery failed:", {
+          messageId: result.messageId,
+          failureMessage: result.failureMessage,
+        });
+
+        revalidateCommissionActivityPaths(commissionId);
+
+        return {
+          outcome: "warning",
+          message:
+            "The request was saved and the commission moved to Awaiting client details, but the email could not be delivered. The message is preserved for retry.",
+        };
+
+      case "delivery_pending":
+        revalidateCommissionActivityPaths(commissionId);
+
+        if (result.currentStatus === "sent") {
+          return {
+            outcome: "success",
+            message: "Client details request sent successfully.",
+          };
+        }
+
+        if (result.currentStatus === "failed") {
+          return {
+            outcome: "warning",
+            message:
+              "The request was saved and the commission moved to Awaiting client details, but the email is currently failed and remains available for retry.",
+          };
+        }
+
+        return {
+          outcome: "success",
+          message:
+            "The client details request was saved and email delivery is being finalized.",
+        };
+
+      case "invalid":
+        return {
+          outcome: "error",
+          message: result.validation.message,
+        };
+
+      case "invalid_message":
+        return {
+          outcome: "error",
+          message: result.message,
+        };
+
+      case "not_found":
+        return {
+          outcome: "error",
+          message: "The commission no longer exists.",
+        };
+
+      case "wrong_status":
+        revalidateCommissionActivityPaths(commissionId);
+
+        return {
+          outcome: "conflict",
+          message:
+            "This commission is no longer under review. Refresh the page before requesting client details.",
+        };
+
+      case "on_hold":
+        revalidateCommissionActivityPaths(commissionId);
+
+        return {
+          outcome: "conflict",
+          message:
+            "This commission is on hold. Resume it before requesting client details.",
+        };
+
+      case "thread_not_found":
+        revalidateCommissionActivityPaths(commissionId);
+
+        return {
+          outcome: "error",
+          message:
+            "The client email conversation is unavailable for this commission.",
+        };
+
+      case "thread_not_ready":
+        revalidateCommissionActivityPaths(commissionId);
+
+        return {
+          outcome: "conflict",
+          message:
+            "The client email conversation is not ready yet. Wait for the inquiry email to finish syncing, then try again.",
+        };
+
+      case "thread_blocked":
+        revalidateCommissionActivityPaths(commissionId);
+
+        return {
+          outcome: "conflict",
+          message:
+            "An earlier client email is still queued, sending, or failed. Resolve or retry that message before sending another.",
+        };
+
+      case "conflict":
+        revalidateCommissionActivityPaths(commissionId);
+
+        return {
+          outcome: "conflict",
+          message:
+            "The commission changed before the request was saved. Refresh the page and try again.",
+        };
+    }
+  } catch (error) {
+    console.error("Failed to request commission client details:", error);
+
+    return {
+      outcome: "error",
+      message: "The client details request could not be saved. Please try again.",
+    };
+  }
 }
 
 export async function classifyCommissionAction(

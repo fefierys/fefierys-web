@@ -61,11 +61,16 @@ export default function CommissionStatusForm({
 }: CommissionStatusFormProps) {
   const workflowTransitions = getAllowedCommissionTransitions(currentStatus);
 
-  const holdFilteredTransitions = isOnHold
-    ? workflowTransitions.filter(isTerminalCommissionStatus)
-    : workflowTransitions;
+  const manualWorkflowTransitions: readonly CommissionStatus[] =
+    workflowTransitions.filter(
+      (status) => status !== "awaiting_client_details",
+    );
 
-  const allowedTransitions = availableStatuses
+  const holdFilteredTransitions: readonly CommissionStatus[] = isOnHold
+    ? manualWorkflowTransitions.filter(isTerminalCommissionStatus)
+    : manualWorkflowTransitions;
+
+  const allowedTransitions: readonly CommissionStatus[] = availableStatuses
     ? holdFilteredTransitions.filter((status) =>
         availableStatuses.includes(status),
       )
@@ -139,7 +144,9 @@ export default function CommissionStatusForm({
       <p className="mt-6 border-t border-white/10 pt-5 text-sm text-white/55">
         {isOnHold
           ? "This commission is on hold. Resume it before changing its workflow status."
-          : "This commission is closed and has no available transitions."}
+          : isTerminalCommissionStatus(currentStatus)
+            ? "This commission is closed and has no available transitions."
+            : "No manual status changes are available here."}
       </p>
     );
   }
