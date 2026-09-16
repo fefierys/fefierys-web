@@ -8,6 +8,7 @@ import type { CommissionStatus } from "@/lib/repositories/commissionAdminReposit
 import CommissionAdminModal from "./CommissionAdminModal";
 import CommissionAdminToast from "./CommissionAdminToast";
 import CommissionHoldForm from "./CommissionHoldForm";
+import CommissionRequestClientDetailsForm from "./CommissionRequestClientDetailsForm";
 import CommissionStatusForm from "./CommissionStatusForm";
 
 interface CommissionWorkflowActionsProps {
@@ -16,7 +17,7 @@ interface CommissionWorkflowActionsProps {
   isOnHold: boolean;
 }
 
-type WorkflowModal = "hold" | "status" | null;
+type WorkflowModal = "client-details" | "hold" | "status" | null;
 
 export default function CommissionWorkflowActions({
   commissionId,
@@ -45,6 +46,16 @@ export default function CommissionWorkflowActions({
   return (
     <>
       <div className="mt-6 grid gap-3 border-t border-white/10 pt-6">
+        {currentStatus === "under_review" && !isOnHold && (
+          <button
+            className="w-full rounded-xl border border-white/15 bg-white/10 px-4 py-3 text-sm transition hover:bg-white/15"
+            onClick={() => setModal("client-details")}
+            type="button"
+          >
+            Request client details
+          </button>
+        )}
+
         <button
           className={`w-full rounded-xl border px-4 py-3 text-sm transition ${
             isOnHold
@@ -65,6 +76,18 @@ export default function CommissionWorkflowActions({
           Update status
         </button>
       </div>
+
+      <CommissionAdminModal
+        description="Write the additional information you need from the client. The email stays in the existing project conversation."
+        onClose={closeModal}
+        open={modal === "client-details"}
+        title="Request client details"
+      >
+        <CommissionRequestClientDetailsForm
+          commissionId={commissionId}
+          onComplete={finishAction}
+        />
+      </CommissionAdminModal>
 
       <CommissionAdminModal
         description={
