@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import CommissionEventNoteButton from "@/components/admin/CommissionEventNoteButton";
+import CommissionActivityPanel from "@/components/admin/CommissionActivityPanel";
 import CommissionClassificationPanel from "@/components/admin/CommissionClassificationPanel";
 import CommissionQuotePanel from "@/components/admin/CommissionQuotePanel";
 import CommissionStatusBadge from "@/components/admin/CommissionStatusBadge";
 import CommissionWorkflowActions from "@/components/admin/CommissionWorkflowActions";
+import CommissionConversationPanel from "@/components/admin/CommissionConversationPanel";
 import { requireAdmin } from "@/lib/auth/admin";
 import { formatCommissionDate } from "@/lib/commissions/commissionDate";
 import { COMMISSION_STATUS_LABELS } from "@/lib/commissions/commissionStatus";
@@ -79,7 +80,12 @@ export default async function CommissionDetailPage({
     notFound();
   }
 
-  const { commission, events, statusHistory } = detail;
+  const {
+    commission,
+    conversation,
+    events,
+    statusHistory,
+  } = detail;
   const editableDraft =
     quotes.find(({ quote }) => quote.status === "draft") ?? null;
   let quotePricingCatalog = pricingCatalog;
@@ -230,81 +236,24 @@ export default async function CommissionDetailPage({
               </div>
             </section>
 
-            <section className="glass-card p-6">
-              <h2 className="text-xl font-light">Status history</h2>
-              <div className="mt-5 max-h-[26rem] space-y-4 overflow-y-auto overscroll-contain pr-2">
-                {statusHistory.length === 0 ? (
-                  <p className="text-sm text-white/60">
-                    No status transitions recorded.
-                  </p>
-                ) : (
-                  statusHistory.map((entry) => (
-                    <article
-                      className="rounded-2xl border border-white/10 bg-white/5 p-4"
-                      key={entry.id}
-                    >
-                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                        <p className="font-medium">
-                          {entry.fromStatus
-                            ? COMMISSION_STATUS_LABELS[entry.fromStatus]
-                            : "New inquiry"}{" "}
-                          <span className="text-white/40">→</span>{" "}
-                          {COMMISSION_STATUS_LABELS[entry.toStatus]}
-                        </p>
-                        <time className="text-xs text-white/50">
-                          {formatCommissionDate(entry.createdAt)}
-                        </time>
-                      </div>
-                      <p className="mt-2 text-sm text-white/60">
-                        Initiated by {humanize(entry.initiatedBy)}
-                        {entry.reason ? ` · ${humanize(entry.reason)}` : ""}
-                      </p>
-                      {entry.note && (
-                        <p className="mt-3 whitespace-pre-wrap text-sm text-white/80">
-                          {entry.note}
-                        </p>
-                      )}
-                    </article>
-                  ))
-                )}
-              </div>
-            </section>
-
-            <section className="glass-card p-6">
-              <div className="flex items-center justify-between gap-4">
-                <h2 className="text-xl font-light">Events</h2>
-                <CommissionEventNoteButton commissionId={commission.id} />
-              </div>
-              <div className="mt-5 max-h-[26rem] space-y-4 overflow-y-auto overscroll-contain pr-2">
-                {events.length === 0 ? (
-                  <p className="text-sm text-white/60">No events recorded.</p>
-                ) : (
-                  events.map((event) => (
-                    <article
-                      className="rounded-2xl border border-white/10 bg-white/5 p-4"
-                      key={event.id}
-                    >
-                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                        <div>
-                          <h3 className="font-medium">{event.title}</h3>
-                          <p className="mt-1 text-sm text-white/55">
-                            {humanize(event.type)} · {humanize(event.actor)}
-                          </p>
-                        </div>
-                        <time className="text-xs text-white/50">
-                          {formatCommissionDate(event.createdAt)}
-                        </time>
-                      </div>
-                      {event.description && (
-                        <p className="mt-3 whitespace-pre-wrap text-sm text-white/80">
-                          {event.description}
-                        </p>
-                      )}
-                    </article>
-                  ))
-                )}
-              </div>
-            </section>
+            <CommissionConversationPanel
+              commissionId={commission.id}
+              messages={conversation.messages.map((message) => ({
+                createdAt: message.createdAt,
+                deliveryStatus: message.deliveryStatus,
+                direction: message.direction,
+                failedAt: message.failedAt,
+                id: message.id,
+                kind: message.kind,
+                messageText: message.messageText,
+                sentAt: message.sentAt,
+              }))}
+              subject={conversation.thread?.subject ?? null}
+              threadExists={conversation.thread !== null}
+              threadReady={Boolean(
+                conversation.thread?.rootMessageId,
+              )}
+            />
           </div>
 
           <aside className="order-2 space-y-6 xl:order-3">
@@ -383,6 +332,13 @@ export default async function CommissionDetailPage({
           </aside>
 
           <aside className="order-3 flex flex-col gap-6 lg:col-span-2 lg:grid lg:grid-cols-3 xl:order-1 xl:col-span-1 xl:flex">
+            <div className="lg:col-span-3">
+              <CommissionActivityPanel
+                commissionId={commission.id}
+                events={events}
+                statusHistory={statusHistory}
+              />
+            </div>
             <section className="glass-card p-6">
               <h2 className="text-xl font-light">Dates</h2>
               <dl className="mt-5 space-y-5">

@@ -2,6 +2,8 @@ import { and, asc, count, desc, eq, inArray, lt, or } from "drizzle-orm";
 
 import { db } from "../db";
 import {
+  commissionEmailMessages,
+  commissionEmailThreads,
   commissionEvents,
   commissionQuotes,
   commissionStatusEnum,
@@ -9,28 +11,41 @@ import {
   commissionStatusHistory,
 } from "../db/schema/commissions";
 
-export type Commission = typeof commissions.$inferSelect;
-export type CommissionEvent = typeof commissionEvents.$inferSelect;
-export type CommissionStatus = Commission["status"];
+export type Commission =
+  typeof commissions.$inferSelect;
+
+export type CommissionEvent =
+  typeof commissionEvents.$inferSelect;
+
+export type CommissionStatus =
+  Commission["status"];
+
 export type CommissionStatusHistoryEntry =
   typeof commissionStatusHistory.$inferSelect;
 
-export type AdminCommissionSummary = Pick<
-  Commission,
-  | "id"
-  | "reference"
-  | "clientName"
-  | "styleSnapshot"
-  | "collectionSnapshot"
-  | "categorySnapshot"
-  | "optionSnapshot"
-  | "status"
-  | "isOnHold"
-  | "submittedAt"
-  | "updatedAt"
-> & {
-  hasPastDueQuote: boolean;
-};
+export type CommissionEmailThread =
+  typeof commissionEmailThreads.$inferSelect;
+
+export type CommissionEmailMessage =
+  typeof commissionEmailMessages.$inferSelect;
+
+export type AdminCommissionSummary =
+  Pick<
+    Commission,
+    | "id"
+    | "reference"
+    | "clientName"
+    | "styleSnapshot"
+    | "collectionSnapshot"
+    | "categorySnapshot"
+    | "optionSnapshot"
+    | "status"
+    | "isOnHold"
+    | "submittedAt"
+    | "updatedAt"
+  > & {
+    hasPastDueQuote: boolean;
+  };
 
 export interface AdminCommissionCursor {
   submittedAt: Date;
@@ -45,10 +60,38 @@ export interface AdminCommissionPageFilters {
 
 export interface AdminCommissionPage {
   items: AdminCommissionSummary[];
-  nextCursor: AdminCommissionCursor | null;
+  nextCursor:
+    | AdminCommissionCursor
+    | null;
 }
 
-export type CommissionStatusCounts = Record<CommissionStatus, number>;
+export type CommissionStatusCounts =
+  Record<
+    CommissionStatus,
+    number
+  >;
+
+export interface AdminCommissionConversation {
+  thread:
+    | CommissionEmailThread
+    | null;
+
+  messages:
+    CommissionEmailMessage[];
+}
+
+export interface AdminCommissionDetail {
+  commission: Commission;
+
+  statusHistory:
+    CommissionStatusHistoryEntry[];
+
+  events:
+    CommissionEvent[];
+
+  conversation:
+    AdminCommissionConversation;
+}
 
 export interface AdminCommissionDetail {
   commission: Commission;
@@ -209,30 +252,117 @@ export async function getAdminCommissionPage(
 }
 
 /*
- * Loads the complete commission and its two initial timeline sources in
- * one Neon HTTP batch. Authorization belongs to the protected caller.
+ * Loads the complete commission together with its workflow
+ * activity and client-facing email conversation.
+ *
+ * Internal notifications are intentionally excluded from the
+ * conversation projection.
+ *
+ * Authorization belongs to the protected caller.
  */
 export async function getAdminCommissionDetail(
   id: string,
 ): Promise<AdminCommissionDetail | null> {
-  const [commissionRows, statusHistory, events] = await db.batch([
-    db.select().from(commissions).where(eq(commissions.id, id)).limit(1),
+  const [
+    commissionRows,
+    statusHistory,
+    events,
+    threadRows,
+    messages,
+  ] = await db.batch([
     db
       .select()
-      .from(commissionStatusHistory)
-      .where(eq(commissionStatusHistory.commissionId, id))
+      .from(commissions)
+      .where(
+        eq(
+          commissions.id,
+          id,
+        ),
+      )
+      .limit(1),
+
+    db
+      .select()
+      .from(
+        commissionStatusHistory,
+      )
+      .where(
+        eq(
+          commissionStatusHistory.commissionId,
+          id,
+        ),
+      )
       .orderBy(
-        asc(commissionStatusHistory.createdAt),
-        asc(commissionStatusHistory.id),
+        asc(
+          commissionStatusHistory.createdAt,
+        ),
+        asc(
+          commissionStatusHistory.id,
+        ),
       ),
+
     db
       .select()
-      .from(commissionEvents)
-      .where(eq(commissionEvents.commissionId, id))
-      .orderBy(asc(commissionEvents.createdAt), asc(commissionEvents.id)),
+      .from(
+        commissionEvents,
+      )
+      .where(
+        eq(
+          commissionEvents.commissionId,
+          id,
+        ),
+      )
+      .orderBy(
+        asc(
+          commissionEvents.createdAt,
+        ),
+        asc(
+          commissionEvents.id,
+        ),
+      ),
+
+    db
+      .select()
+      .from(
+        commissionEmailThreads,
+      )
+      .where(
+        eq(
+          commissionEmailThreads.commissionId,
+          id,
+        ),
+      )
+      .limit(1),
+
+    db
+      .select()
+      .from(
+        commissionEmailMessages,
+      )
+      .where(
+        and(
+          eq(
+            commissionEmailMessages.commissionId,
+            id,
+          ),
+          eq(
+            commissionEmailMessages.scope,
+            "client_thread",
+          ),
+        ),
+      )
+      .orderBy(
+        asc(
+          commissionEmailMessages.createdAt,
+        ),
+        asc(
+          commissionEmailMessages.id,
+        ),
+      ),
   ]);
 
-  const commission = commissionRows[0];
+  const commission =
+    commissionRows[0];
 
   if (!commission) {
     return null;
@@ -242,5 +372,13 @@ export async function getAdminCommissionDetail(
     commission,
     statusHistory,
     events,
+
+    conversation: {
+      thread:
+        threadRows[0] ??
+        null,
+
+      messages,
+    },
   };
 }

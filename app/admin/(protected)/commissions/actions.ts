@@ -44,8 +44,14 @@ import {
 
 import { requestCommissionClientDetails } from "@/lib/email/commissionClientDetailsRequestService";
 import {
+  sendCommissionClientMessage,
+} from "@/lib/email/commissionClientMessageService";
+import {
   sendCommissionQuoteToClient,
 } from "@/lib/email/commissionQuoteSendService";
+import {
+  retryCommissionEmailMessage,
+} from "@/lib/email/commissionEmailRetryService";
 export interface CommissionStatusActionState {
   outcome: "idle" | "success" | "error" | "conflict";
   message: string | null;
@@ -53,6 +59,28 @@ export interface CommissionStatusActionState {
 
 export interface CommissionClientDetailsRequestActionState {
   outcome: "idle" | "success" | "warning" | "error" | "conflict";
+  message: string | null;
+}
+
+export interface CommissionClientMessageActionState {
+  outcome:
+    | "idle"
+    | "success"
+    | "warning"
+    | "error"
+    | "conflict";
+
+  message: string | null;
+}
+
+export interface CommissionEmailRetryActionState {
+  outcome:
+    | "idle"
+    | "success"
+    | "warning"
+    | "error"
+    | "conflict";
+
   message: string | null;
 }
 
@@ -429,6 +457,384 @@ function revalidateCommissionActivityPaths(commissionId: string): void {
   revalidatePath("/admin/commissions");
   revalidatePath("/admin/commissions/kanban");
   revalidatePath(`/admin/commissions/${commissionId}`);
+}
+
+export async function sendCommissionClientMessageAction(
+  _previousState: CommissionClientMessageActionState,
+  formData: FormData,
+): Promise<CommissionClientMessageActionState> {
+  const session =
+    await requireAdmin();
+
+  const commissionId =
+    getFormValue(
+      formData,
+      "commissionId",
+    );
+
+  const messageText =
+    getFormValue(
+      formData,
+      "messageText",
+    );
+
+  if (
+    !UUID_PATTERN.test(
+      commissionId,
+    )
+  ) {
+    return {
+      outcome: "error",
+      message:
+        "The commission identifier is invalid.",
+    };
+  }
+
+  if (
+    !messageText ||
+    messageText.length >
+      MAX_NOTE_LENGTH
+  ) {
+    return {
+      outcome: "error",
+      message:
+        `The message must contain between 1 and ${MAX_NOTE_LENGTH} characters.`,
+    };
+  }
+
+  try {
+    const result =
+      await sendCommissionClientMessage({
+        commissionId,
+
+        messageText,
+
+        createdByAdminUserId:
+          session.user.id,
+      });
+
+    switch (
+      result.outcome
+    ) {
+      case "sent":
+        revalidateCommissionActivityPaths(
+          commissionId,
+        );
+
+        return {
+          outcome: "success",
+          message:
+            "Message sent successfully.",
+        };
+
+      case "delivery_failed":
+        console.error(
+          "Commission client message email delivery failed:",
+          {
+            messageId:
+              result.messageId,
+
+            failureMessage:
+              result.failureMessage,
+          },
+        );
+
+        revalidateCommissionActivityPaths(
+          commissionId,
+        );
+
+        return {
+          outcome: "warning",
+          message:
+            "The message was saved, but the email could not be delivered. The failed message has been preserved for retry.",
+        };
+
+      case "delivery_pending":
+        revalidateCommissionActivityPaths(
+          commissionId,
+        );
+
+        if (
+          result.currentStatus ===
+          "sent"
+        ) {
+          return {
+            outcome: "success",
+            message:
+              "Message sent successfully.",
+          };
+        }
+
+        if (
+          result.currentStatus ===
+          "failed"
+        ) {
+          return {
+            outcome: "warning",
+            message:
+              "The message was saved, but email delivery is currently failed. The message remains available for retry.",
+          };
+        }
+
+        return {
+          outcome: "warning",
+          message:
+            "The message was saved and email delivery is still being finalized.",
+        };
+
+      case "invalid_message":
+        return {
+          outcome: "error",
+          message:
+            result.message,
+        };
+
+      case "not_found":
+        return {
+          outcome: "error",
+          message:
+            "The commission no longer exists.",
+        };
+
+      case "thread_not_found":
+        revalidateCommissionActivityPaths(
+          commissionId,
+        );
+
+        return {
+          outcome: "error",
+          message:
+            "The client email conversation is unavailable for this commission.",
+        };
+
+      case "thread_not_ready":
+        revalidateCommissionActivityPaths(
+          commissionId,
+        );
+
+        return {
+          outcome: "conflict",
+          message:
+            "The client email conversation is not ready yet. Wait for the inquiry email to finish syncing, then try again.",
+        };
+
+      case "thread_blocked":
+        revalidateCommissionActivityPaths(
+          commissionId,
+        );
+
+        return {
+          outcome: "conflict",
+          message:
+            "An earlier client email is still queued, sending, or failed. Resolve or retry that message before sending another.",
+        };
+
+      case "conflict":
+        revalidateCommissionActivityPaths(
+          commissionId,
+        );
+
+        return {
+          outcome: "conflict",
+          message:
+            "The client conversation changed before the message was saved. Refresh the page and try again.",
+        };
+    }
+  } catch (error) {
+    console.error(
+      "Failed to send commission client message:",
+      error,
+    );
+
+    return {
+      outcome: "error",
+      message:
+        "The client message could not be saved or delivered. Please try again.",
+    };
+  }
+}
+
+export async function retryCommissionEmailMessageAction(
+  _previousState: CommissionEmailRetryActionState,
+  formData: FormData,
+): Promise<CommissionEmailRetryActionState> {
+  await requireAdmin();
+
+  const commissionId =
+    getFormValue(
+      formData,
+      "commissionId",
+    );
+
+  const messageId =
+    getFormValue(
+      formData,
+      "messageId",
+    );
+
+  if (
+    !UUID_PATTERN.test(
+      commissionId,
+    )
+  ) {
+    return {
+      outcome: "error",
+      message:
+        "The commission identifier is invalid.",
+    };
+  }
+
+  if (
+    !UUID_PATTERN.test(
+      messageId,
+    )
+  ) {
+    return {
+      outcome: "error",
+      message:
+        "The email message identifier is invalid.",
+    };
+  }
+
+  try {
+    const result =
+      await retryCommissionEmailMessage({
+        commissionId,
+        messageId,
+      });
+
+    switch (
+      result.outcome
+    ) {
+      case "sent":
+        revalidateCommissionActivityPaths(
+          commissionId,
+        );
+
+        return {
+          outcome: "success",
+          message:
+            "Email sent successfully.",
+        };
+
+      case "delivery_failed":
+        console.error(
+          "Commission email retry delivery failed:",
+          {
+            messageId:
+              result.messageId,
+
+            failureMessage:
+              result.failureMessage,
+          },
+        );
+
+        revalidateCommissionActivityPaths(
+          commissionId,
+        );
+
+        return {
+          outcome: "warning",
+          message:
+            "The email could not be delivered. The same message remains available for another retry.",
+        };
+
+      case "delivery_pending":
+        revalidateCommissionActivityPaths(
+          commissionId,
+        );
+
+        if (
+          result.currentStatus ===
+          "sent"
+        ) {
+          return {
+            outcome: "success",
+            message:
+              "Email sent successfully.",
+          };
+        }
+
+        if (
+          result.currentStatus ===
+          "failed"
+        ) {
+          return {
+            outcome: "warning",
+            message:
+              "Email delivery is still failed. You can try again.",
+          };
+        }
+
+        return {
+          outcome: "warning",
+          message:
+            "Email delivery is still being finalized.",
+        };
+
+      case "not_found":
+        revalidateCommissionActivityPaths(
+          commissionId,
+        );
+
+        return {
+          outcome: "error",
+          message:
+            "The email message could not be found.",
+        };
+
+      case "not_retryable":
+        revalidateCommissionActivityPaths(
+          commissionId,
+        );
+
+        if (
+          result.currentStatus ===
+          "sent"
+        ) {
+          return {
+            outcome: "success",
+            message:
+              "This email has already been sent.",
+          };
+        }
+
+        return {
+          outcome: "conflict",
+          message:
+            `This email cannot be retried while its delivery status is ${result.currentStatus}.`,
+        };
+
+      case "unsupported_kind":
+        return {
+          outcome: "error",
+          message:
+            "Retry is not available for this email type yet.",
+        };
+
+      case "retry_unavailable":
+        revalidateCommissionActivityPaths(
+          commissionId,
+        );
+
+        return {
+          outcome: "error",
+          message:
+            result.message,
+        };
+    }
+  } catch (error) {
+    console.error(
+      "Failed to retry commission email:",
+      error,
+    );
+
+    return {
+      outcome: "error",
+      message:
+        "The email could not be retried. Please try again.",
+    };
+  }
 }
 
 export async function requestCommissionClientDetailsAction(
