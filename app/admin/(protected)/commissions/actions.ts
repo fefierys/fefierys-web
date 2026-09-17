@@ -31,7 +31,6 @@ import {
   createCommissionQuoteDraft,
   declineCommissionQuote,
   expireCommissionQuote,
-  sendCommissionQuote,
   supersedeCommissionQuote,
   updateCommissionQuoteDraft,
 } from "@/lib/repositories/commissionQuoteRepository";
@@ -44,9 +43,9 @@ import {
 } from "@/lib/repositories/commissionQuotePricingResolver";
 
 import { requestCommissionClientDetails } from "@/lib/email/commissionClientDetailsRequestService";
-import { sendCommissionQuoteEmail } from "@/lib/email/commissionQuoteEmail";
-import { getAdminCommissionDetail } from "@/lib/repositories/commissionAdminRepository";
-
+import {
+  sendCommissionQuoteToClient,
+} from "@/lib/email/commissionQuoteSendService";
 export interface CommissionStatusActionState {
   outcome: "idle" | "success" | "error" | "conflict";
   message: string | null;
@@ -1129,28 +1128,36 @@ export async function sendCommissionQuoteAction(
   _previousState: CommissionQuoteActionState,
   formData: FormData,
 ): Promise<CommissionQuoteActionState> {
-  const session = await requireAdmin();
+  const session =
+    await requireAdmin();
 
-  const commissionId = getFormValue(
-    formData,
-    "commissionId",
-  );
-
-  const quoteId = getFormValue(
-    formData,
-    "quoteId",
-  );
-
-  const expectedUpdatedAt = parseRequiredDate(
+  const commissionId =
     getFormValue(
       formData,
-      "expectedUpdatedAt",
-    ),
-  );
+      "commissionId",
+    );
+
+  const quoteId =
+    getFormValue(
+      formData,
+      "quoteId",
+    );
+
+  const expectedUpdatedAt =
+    parseRequiredDate(
+      getFormValue(
+        formData,
+        "expectedUpdatedAt",
+      ),
+    );
 
   if (
-    !UUID_PATTERN.test(commissionId) ||
-    !UUID_PATTERN.test(quoteId)
+    !UUID_PATTERN.test(
+      commissionId,
+    ) ||
+    !UUID_PATTERN.test(
+      quoteId,
+    )
   ) {
     return quoteError(
       "The commission or quote identifier is invalid.",
@@ -1164,101 +1171,23 @@ export async function sendCommissionQuoteAction(
   }
 
   try {
-    const result = await sendCommissionQuote({
-      quoteId,
-      expectedUpdatedAt,
-      sentByAdminUserId: session.user.id,
-    });
+    const result =
+      await sendCommissionQuoteToClient({
+        quoteId,
+        expectedUpdatedAt,
+        sentByAdminUserId:
+          session.user.id,
+      });
 
     switch (result.outcome) {
       case "sent": {
         /*
-         * Never trust the commissionId submitted by the browser
-         * for email delivery. The persisted quote is the source
-         * of truth for the commission relationship.
+         * The persisted quote relationship is the
+         * source of truth rather than the browser
+         * supplied commission ID.
          */
-        const persistedCommissionId =
-          result.quote.commissionId;
-
-        const detail =
-          await getAdminCommissionDetail(
-            persistedCommissionId,
-          );
-
-        if (!detail) {
-          revalidateCommissionActivityPaths(
-            persistedCommissionId,
-          );
-
-          return quoteError(
-            "The quote was marked as sent, but the client details could not be loaded for email delivery.",
-          );
-        }
-
-        const validUntil =
-          result.quote.validUntil;
-
-        if (!validUntil) {
-          revalidateCommissionActivityPaths(
-            persistedCommissionId,
-          );
-
-          return quoteError(
-            "The quote was marked as sent, but its expiration date is unavailable for email delivery.",
-          );
-        }
-
-        const emailResult =
-          await sendCommissionQuoteEmail({
-            clientEmail:
-              detail.commission.clientEmail,
-
-            clientName:
-              detail.commission.clientName,
-
-            currency:
-              result.quote.currency,
-
-            publicToken:
-              result.publicToken,
-
-            reference:
-              detail.commission.reference,
-
-            totalAmount:
-              result.quote.totalAmount,
-
-            validUntil,
-
-            version:
-              result.quote.version,
-          });
-
-        if (emailResult.error) {
-          /*
-           * Never log the public token or the generated quote URL.
-           */
-          console.error(
-            "Commission quote email delivery failed:",
-            {
-              name:
-                emailResult.error.name,
-              message:
-                emailResult.error.message,
-            },
-          );
-
-          revalidateCommissionActivityPaths(
-            persistedCommissionId,
-          );
-
-          return quoteError(
-            "The quote was marked as sent, but the email could not be delivered. Refresh the page before taking further action.",
-          );
-        }
-
         revalidateCommissionActivityPaths(
-          persistedCommissionId,
+          result.commissionId,
         );
 
         return {
@@ -1266,6 +1195,42 @@ export async function sendCommissionQuoteAction(
           message:
             "Quote sent and emailed successfully.",
         };
+      }
+
+      case "delivery_failed": {
+        /*
+         * The quote/workflow transition and logical
+         * email already exist atomically at this point.
+         * The failed message remains persisted for retry.
+         */
+        console.error(
+          "Commission quote email delivery failed:",
+          {
+            messageId:
+              result.messageId,
+
+            failureMessage:
+              result.failureMessage,
+          },
+        );
+
+        revalidateCommissionActivityPaths(
+          result.commissionId,
+        );
+
+        return quoteError(
+          "The quote was marked as sent, but the email could not be delivered. The failed email has been preserved for retry.",
+        );
+      }
+
+      case "delivery_pending": {
+        revalidateCommissionActivityPaths(
+          result.commissionId,
+        );
+
+        return quoteError(
+          "The quote was marked as sent, but email delivery is still pending. Refresh the page before taking further action.",
+        );
       }
 
       case "invalid":
@@ -1296,6 +1261,24 @@ export async function sendCommissionQuoteAction(
           "This commission is on hold. Resume it before sending the quote.",
         );
 
+      case "thread_not_found":
+        return quoteConflict(
+          commissionId,
+          "The client email thread is not available for this commission.",
+        );
+
+      case "thread_not_ready":
+        return quoteConflict(
+          commissionId,
+          "The client email thread is not ready yet. Its root email identity must be completed before sending the quote.",
+        );
+
+      case "thread_blocked":
+        return quoteConflict(
+          commissionId,
+          "A previous client email is still queued, sending, or failed. Resolve that message before sending the quote.",
+        );
+
       case "conflict":
         return quoteConflict(
           commissionId,
@@ -1303,8 +1286,8 @@ export async function sendCommissionQuoteAction(
     }
   } catch (error) {
     /*
-     * Do not include request payloads, tokens or quote URLs
-     * in this log.
+     * Do not include request payloads, public quote
+     * tokens or generated secure URLs in this log.
      */
     console.error(
       "Failed to send commission quote:",

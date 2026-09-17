@@ -1,9 +1,6 @@
 import {
   escapeEmailHtml,
   getRequiredEmailEnv,
-  ownerEmail,
-  resend,
-  senderEmail,
 } from "./emailClient";
 import {
   buildArtistSignatureText,
@@ -11,8 +8,7 @@ import {
   buildClientProjectSubject,
 } from "./emailLayout";
 
-interface SendCommissionQuoteEmailInput {
-  clientEmail: string;
+export interface BuildCommissionQuoteEmailInput {
   clientName: string;
   currency: string;
   publicToken: string;
@@ -71,8 +67,8 @@ function formatDate(
   ).format(date);
 }
 
-export async function sendCommissionQuoteEmail(
-  input: SendCommissionQuoteEmailInput,
+export function buildCommissionQuoteEmail(
+  input: BuildCommissionQuoteEmailInput,
 ) {
   const quoteUrl =
     buildPublicQuoteUrl(
@@ -115,22 +111,13 @@ export async function sendCommissionQuoteEmail(
       quoteUrl,
     );
 
-  return resend.emails.send({
-    from:
-      `Fefierys Art <${senderEmail}>`,
-
-    to:
-      input.clientEmail,
-
-    replyTo:
-      ownerEmail,
-
+  return {
     /*
-     * This subject intentionally remains stable across
-     * client-facing commission emails. A future email-thread
-     * implementation will add the corresponding threading
-     * headers without changing the visible subject.
-     */
+    * This subject remains stable across
+    * client-facing commission emails.
+    * Threading headers are handled by the
+    * commission email delivery infrastructure.
+    */
     subject:
       buildClientProjectSubject(
         input.reference,
@@ -329,5 +316,5 @@ export async function sendCommissionQuoteEmail(
           </p>
         `,
       }),
-  });
+  };
 }

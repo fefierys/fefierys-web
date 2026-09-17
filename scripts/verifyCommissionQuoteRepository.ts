@@ -15,6 +15,8 @@ async function main(): Promise<void> {
   const { db } = await import("../lib/db");
 
   const {
+    commissionEmailMessages,
+    commissionEmailThreads,
     commissionEvents,
     commissionQuoteItems,
     commissionQuotes,
@@ -41,6 +43,7 @@ async function main(): Promise<void> {
   } = await import("../lib/repositories/commissionQuoteRepository");
 
   const {
+    generatePublicQuoteToken,
     hashPublicQuoteToken,
     isValidPublicQuoteToken,
   } = await import("../lib/commissions/commissionQuoteAccessToken");
@@ -48,19 +51,144 @@ async function main(): Promise<void> {
   const { transitionCommissionStatus } =
     await import("../lib/repositories/commissionWorkflowRepository");
 
+  const {
+    createCommissionEmailThreadIfMissing,
+    setCommissionEmailThreadRootMessageId,
+    setCommissionEmailThreadRootProvider,
+  } = await import("../lib/repositories/commissionEmailRepository");
+
+  const { deliverCommissionEmailMessage } =
+    await import("../lib/email/commissionEmailDeliveryService");
+
   const verificationId = randomUUID();
   const createdCommissionIds: string[] = [];
 
-  async function createTemporaryCommission(label: string): Promise<string> {
-    const commission = await createCommission({
-      submissionId: randomUUID(),
-      clientName: `Quote ${label} Verification`,
-      clientEmail: `quote-${label.toLowerCase()}-${verificationId}@example.com`,
-      initialMessage: `Temporary quote ${label} verification ${verificationId}`,
-      termsVersion: "2026.1",
+  const verificationSenderEmail =
+    process.env.SENDER_EMAIL?.trim() ||
+    "quote-verifier-sender@example.com";
+
+  const verificationReplyToEmail =
+    process.env.OWNER_EMAIL?.trim() ||
+    "quote-verifier-owner@example.com";
+
+  async function sendCommissionQuoteForVerification(
+    input: Omit<
+      Parameters<typeof sendCommissionQuote>[0],
+      "senderEmail" | "replyToEmail"
+    >,
+  ) {
+    const result = await sendCommissionQuote({
+      ...input,
+      senderEmail: verificationSenderEmail,
+      replyToEmail: verificationReplyToEmail,
     });
 
-    createdCommissionIds.push(commission.id);
+    if (result.outcome !== "sent") {
+      return result;
+    }
+
+    const delivery = await deliverCommissionEmailMessage(
+      {
+        messageId: result.messageId,
+        body: {
+          text: "Synthetic quote repository verification delivery.",
+        },
+      },
+      {
+        async send() {
+          return {
+            outcome: "sent" as const,
+            providerEmailId: `quote-verifier-${result.messageId}`,
+            providerMessageId:
+              `<quote-verifier-${result.messageId}@email.fefierys.test>`,
+          };
+        },
+      },
+    );
+
+    equal(delivery.outcome, "sent");
+
+    return {
+      ...result,
+      publicToken: generatePublicQuoteToken(result.quote.id),
+    };
+  }
+
+  async function createTemporaryCommission(
+    label: string,
+  ): Promise<string> {
+    const commission =
+      await createCommission({
+        submissionId:
+          randomUUID(),
+
+        clientName:
+          `Quote ${label} Verification`,
+
+        clientEmail:
+          `quote-${label.toLowerCase()}-${verificationId}@example.com`,
+
+        initialMessage:
+          `Temporary quote ${label} verification ${verificationId}`,
+
+        termsVersion:
+          "2026.1",
+      });
+
+    createdCommissionIds.push(
+      commission.id,
+    );
+
+    const subject =
+      `Fefierys Art — Your project — ${commission.reference}`;
+
+    const thread =
+      await createCommissionEmailThreadIfMissing({
+        commissionId:
+          commission.id,
+
+        subject,
+      });
+
+    const rootProviderEmailId =
+      `quote-verifier-root-${commission.id}`;
+
+    const rootProviderResult =
+      await setCommissionEmailThreadRootProvider({
+        threadId:
+          thread.thread.id,
+
+        providerEmailId:
+          rootProviderEmailId,
+      });
+
+    ok(
+      rootProviderResult.outcome ===
+        "set" ||
+        rootProviderResult.outcome ===
+          "already_set",
+    );
+
+    const rootMessageId =
+      `<quote-verifier-root-${commission.id}@email.fefierys.test>`;
+
+    const rootMessageResult =
+      await setCommissionEmailThreadRootMessageId({
+        threadId:
+          thread.thread.id,
+
+        providerEmailId:
+          rootProviderEmailId,
+
+        rootMessageId,
+      });
+
+    ok(
+      rootMessageResult.outcome ===
+        "set" ||
+        rootMessageResult.outcome ===
+          "already_set",
+    );
 
     return commission.id;
   }
@@ -811,7 +939,7 @@ async function main(): Promise<void> {
       throw new Error("Expected the send quote draft to be created.");
     }
 
-    const sentResult = await sendCommissionQuote({
+    const sentResult = await sendCommissionQuoteForVerification({
       quoteId: draftToSend.quote.id,
       expectedUpdatedAt: draftToSend.quote.updatedAt,
       sentByAdminUserId: "quote-send-verifier",
@@ -964,7 +1092,7 @@ async function main(): Promise<void> {
       "[OK] Quote send updated quote, commission, history, and event atomically",
     );
 
-    const missingSend = await sendCommissionQuote({
+    const missingSend = await sendCommissionQuoteForVerification({
       quoteId: randomUUID(),
       expectedUpdatedAt: new Date(),
       sentByAdminUserId: "quote-send-verifier",
@@ -974,7 +1102,7 @@ async function main(): Promise<void> {
 
     console.log("[OK] Missing quote send returns not_found");
 
-    const repeatedSend = await sendCommissionQuote({
+    const repeatedSend = await sendCommissionQuoteForVerification({
       quoteId: sentResult.quote.id,
       expectedUpdatedAt: sentResult.quote.updatedAt,
       sentByAdminUserId: "quote-send-verifier",
@@ -1002,7 +1130,7 @@ async function main(): Promise<void> {
 
     console.log("[OK] Sent quote cannot be sent again");
 
-    const wrongStatusSend = await sendCommissionQuote({
+    const wrongStatusSend = await sendCommissionQuoteForVerification({
       quoteId: createdDraft.quote.id,
       expectedUpdatedAt: successfulConcurrentUpdate.quote.updatedAt,
       sentByAdminUserId: "quote-send-verifier",
@@ -1064,7 +1192,7 @@ async function main(): Promise<void> {
       throw new Error("Expected the invalid-send fixture draft to be created.");
     }
 
-    const invalidSendResult = await sendCommissionQuote({
+    const invalidSendResult = await sendCommissionQuoteForVerification({
       quoteId: invalidSendDraft.quote.id,
       expectedUpdatedAt: invalidSendDraft.quote.updatedAt,
       sentByAdminUserId: "quote-send-verifier",
@@ -1153,7 +1281,7 @@ async function main(): Promise<void> {
       throw new Error("Expected the stale-send fixture draft to be updated.");
     }
 
-    const staleSendResult = await sendCommissionQuote({
+    const staleSendResult = await sendCommissionQuoteForVerification({
       quoteId: staleSendDraft.quote.id,
 
       /*
@@ -1232,7 +1360,7 @@ async function main(): Promise<void> {
       })
       .where(eq(commissions.id, heldSendCommissionId));
 
-    const heldSendResult = await sendCommissionQuote({
+    const heldSendResult = await sendCommissionQuoteForVerification({
       quoteId: heldSendDraft.quote.id,
       expectedUpdatedAt: heldSendDraft.quote.updatedAt,
       sentByAdminUserId: "quote-send-verifier",
@@ -1310,13 +1438,13 @@ async function main(): Promise<void> {
     }
 
     const concurrentSendResults = await Promise.all([
-      sendCommissionQuote({
+      sendCommissionQuoteForVerification({
         quoteId: concurrentSendDraft.quote.id,
         expectedUpdatedAt: concurrentSendDraft.quote.updatedAt,
         sentByAdminUserId: "quote-send-verifier-a",
       }),
 
-      sendCommissionQuote({
+      sendCommissionQuoteForVerification({
         quoteId: concurrentSendDraft.quote.id,
         expectedUpdatedAt: concurrentSendDraft.quote.updatedAt,
         sentByAdminUserId: "quote-send-verifier-b",
@@ -1415,7 +1543,7 @@ async function main(): Promise<void> {
       );
     }
 
-    const publicAcceptanceSent = await sendCommissionQuote({
+    const publicAcceptanceSent = await sendCommissionQuoteForVerification({
       quoteId: publicAcceptanceDraft.quote.id,
       expectedUpdatedAt: publicAcceptanceDraft.quote.updatedAt,
       sentByAdminUserId: "public-acceptance-verifier",
@@ -1650,7 +1778,7 @@ async function main(): Promise<void> {
     }
 
     const publicDeclineSent =
-      await sendCommissionQuote({
+      await sendCommissionQuoteForVerification({
         quoteId: publicDeclineDraft.quote.id,
         expectedUpdatedAt:
           publicDeclineDraft.quote.updatedAt,
@@ -2159,7 +2287,7 @@ async function main(): Promise<void> {
       throw new Error("Expected the expiration fixture draft to be created.");
     }
 
-    const expiredAcceptanceSent = await sendCommissionQuote({
+    const expiredAcceptanceSent = await sendCommissionQuoteForVerification({
       quoteId: expiredAcceptanceDraft.quote.id,
       expectedUpdatedAt: expiredAcceptanceDraft.quote.updatedAt,
       sentByAdminUserId: "quote-accept-verifier",
@@ -2474,7 +2602,7 @@ async function main(): Promise<void> {
       throw new Error("Expected the stale acceptance draft to be created.");
     }
 
-    const staleAcceptanceSent = await sendCommissionQuote({
+    const staleAcceptanceSent = await sendCommissionQuoteForVerification({
       quoteId: staleAcceptanceDraft.quote.id,
       expectedUpdatedAt: staleAcceptanceDraft.quote.updatedAt,
       sentByAdminUserId: "quote-accept-verifier",
@@ -2850,7 +2978,7 @@ async function main(): Promise<void> {
       throw new Error("Expected the early expiration draft to be created.");
     }
 
-    const earlyExpirationSent = await sendCommissionQuote({
+    const earlyExpirationSent = await sendCommissionQuoteForVerification({
       quoteId: earlyExpirationDraft.quote.id,
       expectedUpdatedAt: earlyExpirationDraft.quote.updatedAt,
       sentByAdminUserId: "quote-expiration-verifier",
@@ -3173,7 +3301,7 @@ async function main(): Promise<void> {
       })
       .where(eq(commissionQuoteItems.quoteId, revisionDraft.quote.id));
 
-    const revisionSent = await sendCommissionQuote({
+    const revisionSent = await sendCommissionQuoteForVerification({
       quoteId: revisionDraft.quote.id,
       expectedUpdatedAt: revisionDraft.quote.updatedAt,
       sentByAdminUserId: "quote-revision-verifier",
@@ -3555,7 +3683,7 @@ async function main(): Promise<void> {
       throw new Error("Expected the concurrent revision draft to be created.");
     }
 
-    const concurrentRevisionSent = await sendCommissionQuote({
+    const concurrentRevisionSent = await sendCommissionQuoteForVerification({
       quoteId: concurrentRevisionDraft.quote.id,
       expectedUpdatedAt: concurrentRevisionDraft.quote.updatedAt,
       sentByAdminUserId: "quote-revision-verifier",
@@ -3878,7 +4006,7 @@ async function main(): Promise<void> {
       throw new Error("Expected the concurrent decline draft to be created.");
     }
 
-    const concurrentDeclineSent = await sendCommissionQuote({
+    const concurrentDeclineSent = await sendCommissionQuoteForVerification({
       quoteId: concurrentDeclineDraft.quote.id,
       expectedUpdatedAt: concurrentDeclineDraft.quote.updatedAt,
       sentByAdminUserId: "quote-decline-verifier",
@@ -4036,7 +4164,7 @@ async function main(): Promise<void> {
       );
     }
 
-    const concurrentAcceptanceSent = await sendCommissionQuote({
+    const concurrentAcceptanceSent = await sendCommissionQuoteForVerification({
       quoteId: concurrentAcceptanceDraft.quote.id,
       expectedUpdatedAt: concurrentAcceptanceDraft.quote.updatedAt,
       sentByAdminUserId: "quote-accept-verifier",
@@ -4147,6 +4275,15 @@ async function main(): Promise<void> {
     console.log("[OK] Commission quote repository verification passed");
   } finally {
     if (createdCommissionIds.length > 0) {
+      await db
+        .delete(commissionEmailMessages)
+        .where(
+          inArray(
+            commissionEmailMessages.commissionId,
+            createdCommissionIds,
+          ),
+        );
+
       const quoteRows = await db
         .select({
           id: commissionQuotes.id,
@@ -4178,11 +4315,20 @@ async function main(): Promise<void> {
           .where(
             inArray(commissionStatusHistory.commissionId, createdCommissionIds),
           ),
-
-        db
-          .delete(commissions)
-          .where(inArray(commissions.id, createdCommissionIds)),
       ]);
+
+      await db
+        .delete(commissionEmailThreads)
+        .where(
+          inArray(
+            commissionEmailThreads.commissionId,
+            createdCommissionIds,
+          ),
+        );
+
+      await db
+        .delete(commissions)
+        .where(inArray(commissions.id, createdCommissionIds));
 
       const remainingCommissionRows = await db
         .select({
