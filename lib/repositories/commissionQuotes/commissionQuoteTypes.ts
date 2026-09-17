@@ -125,6 +125,8 @@ export interface SendCommissionQuoteInput {
   quoteId: string;
   expectedUpdatedAt: Date;
   sentByAdminUserId: string;
+  senderEmail: string;
+  replyToEmail: string;
 }
 
 export type SendCommissionQuoteResult =
@@ -136,12 +138,20 @@ export type SendCommissionQuoteResult =
       event: CommissionQuoteEvent;
 
       /*
-      * Plaintext bearer token for this quote version.
-      *
-      * Server-side only. It must never be persisted, logged,
-      * included in events, or serialized to the browser.
-      */
-      publicToken: string;
+       * Logical client-thread email created atomically with
+       * the quote send operation.
+       */
+      messageId: string;
+
+      /*
+       * Safe data required to build the client email body.
+       *
+       * The public quote bearer token is intentionally not
+       * returned here because it can now be reproduced
+       * server-side from quote.id when delivery is attempted.
+       */
+      clientName: string;
+      reference: string;
     }
   | {
       outcome: "invalid";
@@ -160,6 +170,15 @@ export type SendCommissionQuoteResult =
     }
   | {
       outcome: "on_hold";
+    }
+  | {
+      outcome: "thread_not_found";
+    }
+  | {
+      outcome: "thread_not_ready";
+    }
+  | {
+      outcome: "thread_blocked";
     }
   | {
       outcome: "conflict";

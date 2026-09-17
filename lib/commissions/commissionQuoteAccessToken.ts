@@ -1,26 +1,71 @@
-import { createHash, randomBytes } from "node:crypto";
+import {
+  createHash,
+  createHmac,
+} from "node:crypto";
 
 const PUBLIC_QUOTE_TOKEN_PREFIX = "qt_";
-const PUBLIC_QUOTE_TOKEN_BYTES = 32;
 const PUBLIC_QUOTE_TOKEN_RANDOM_LENGTH = 43;
 
 const PUBLIC_QUOTE_TOKEN_PATTERN = new RegExp(
   `^${PUBLIC_QUOTE_TOKEN_PREFIX}[A-Za-z0-9_-]{${PUBLIC_QUOTE_TOKEN_RANDOM_LENGTH}}$`,
 );
 
-/*
- * 32 cryptographically-random bytes provide 256 bits of entropy.
- *
- * base64url keeps the resulting token safe to place directly in a URL
- * path without additional encoding.
- *
- * Example:
- * qt_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
- */
-export function generatePublicQuoteToken(): string {
-  const randomPart = randomBytes(PUBLIC_QUOTE_TOKEN_BYTES).toString("base64url");
+const PUBLIC_QUOTE_TOKEN_SECRET_ENV =
+  "PUBLIC_QUOTE_TOKEN_SECRET";
 
-  return `${PUBLIC_QUOTE_TOKEN_PREFIX}${randomPart}`;
+const PUBLIC_QUOTE_TOKEN_CONTEXT =
+  "fefierys-public-quote-v1";
+
+function getPublicQuoteTokenSecret(): string {
+  const secret =
+    process.env[
+      PUBLIC_QUOTE_TOKEN_SECRET_ENV
+    ]?.trim();
+
+  if (!secret) {
+    throw new Error(
+      `${PUBLIC_QUOTE_TOKEN_SECRET_ENV} is required.`,
+    );
+  }
+
+  if (
+    Buffer.byteLength(
+      secret,
+      "utf8",
+    ) < 32
+  ) {
+    throw new Error(
+      `${PUBLIC_QUOTE_TOKEN_SECRET_ENV} must contain at least 32 bytes.`,
+    );
+  }
+
+  return secret;
+}
+
+export function generatePublicQuoteToken(
+  quoteId: string,
+): string {
+  const normalizedQuoteId =
+    quoteId.trim();
+
+  if (!normalizedQuoteId) {
+    throw new Error(
+      "quoteId is required to generate a public quote token.",
+    );
+  }
+
+  const tokenPart =
+    createHmac(
+      "sha256",
+      getPublicQuoteTokenSecret(),
+    )
+      .update(
+        `${PUBLIC_QUOTE_TOKEN_CONTEXT}:${normalizedQuoteId}`,
+        "utf8",
+      )
+      .digest("base64url");
+
+  return `${PUBLIC_QUOTE_TOKEN_PREFIX}${tokenPart}`;
 }
 
 export function isValidPublicQuoteToken(token: string): boolean {
