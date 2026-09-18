@@ -244,14 +244,27 @@ export default function CommissionConversationPanel({
 
   useEffect(() => {
     if (
-      state.outcome ===
-        "success" ||
-      state.outcome ===
+      state.outcome !==
+        "success" &&
+      state.outcome !==
         "warning"
     ) {
-      setMessageText("");
+      return;
     }
-  }, [state.outcome]);
+
+    const frame =
+      window.requestAnimationFrame(
+        () => {
+          setMessageText("");
+        },
+      );
+
+    return () => {
+      window.cancelAnimationFrame(
+        frame,
+      );
+    };
+  }, [state]);
 
   let composerMessage:
     | string

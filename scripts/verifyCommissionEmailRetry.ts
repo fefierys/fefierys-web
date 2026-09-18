@@ -20,7 +20,6 @@ config({
 
 async function main(): Promise<void> {
   const {
-    eq,
     inArray,
   } = await import(
     "drizzle-orm"

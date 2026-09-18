@@ -108,36 +108,6 @@ function normalizePortfolioForComparison(
   };
 }
 
-function normalizeRepositoryPortfolio(
-  data: PortfolioData
-): PortfolioData {
-  return {
-    ...data,
-
-    groups: data.groups.map(
-      (group) => ({
-        ...group,
-
-        subcategories:
-          group.subcategories.map(
-            (category) => ({
-              ...category,
-
-              artworks:
-                category.artworks.map(
-                  ({
-                    storageKey:
-                      _storageKey,
-                    ...artwork
-                  }) => artwork
-                ),
-            })
-          ),
-      })
-    ),
-  };
-}
-
 async function main() {
   /*
    * Dynamic import is intentional.

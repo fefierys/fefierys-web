@@ -583,7 +583,7 @@ async function serveRawObject(
  * ============================================================
  */
 
-export default {
+const portfolioMediaWorker = {
   async fetch(
     request,
     env,
@@ -727,3 +727,5 @@ export default {
     }
   },
 };
+
+export default portfolioMediaWorker;

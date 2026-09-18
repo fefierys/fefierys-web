@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 
 import {
-  eq,
   sql,
 } from "drizzle-orm";
 
