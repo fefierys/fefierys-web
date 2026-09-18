@@ -219,6 +219,17 @@ export async function deliverCommissionEmailMessage(
       };
     }
 
+    if (
+      currentMessage.direction !==
+        "outbound" ||
+      currentMessage.deliveryStatus ===
+        "received"
+    ) {
+      throw new Error(
+        "Inbound commission email messages cannot be delivered through the outbound delivery service.",
+      );
+    }
+
     return {
       outcome: "not_claimed",
       messageId: currentMessage.id,

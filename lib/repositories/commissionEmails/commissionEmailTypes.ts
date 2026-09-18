@@ -133,3 +133,38 @@ export type ReconcileCommissionEmailMessageSentFromProviderResult =
   | {
       outcome: "not_found";
     };
+
+export interface CreateReceivedCommissionEmailMessageInput {
+  commissionId: string;
+  threadId: string;
+  senderEmail: string;
+  recipientEmail: string;
+  subject: string;
+  messageText: string;
+  providerEmailId: string;
+  providerMessageId: string;
+  inReplyToMessageId?: string | null;
+  referencesHeader?: string | null;
+  receivedAt: Date;
+}
+
+export type CreateReceivedCommissionEmailMessageResult =
+  | {
+      outcome: "created";
+      message: CommissionEmailMessage;
+    }
+  | {
+      outcome: "already_received";
+      message: CommissionEmailMessage;
+    }
+  | {
+      outcome: "thread_not_found";
+    }
+  | {
+      outcome: "thread_mismatch";
+      thread: CommissionEmailThread;
+    }
+  | {
+      outcome: "conflict";
+      messages: CommissionEmailMessage[];
+    };

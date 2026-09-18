@@ -9,6 +9,9 @@ import {
 import {
   processCommissionEmailSentEvent,
 } from "@/lib/email/commissionEmailSentWebhookService";
+import {
+  processCommissionEmailReceivedEvent,
+} from "@/lib/email/commissionEmailReceivedWebhookService";
 
 const TRACKING_TAG_NAME =
   "fefierys_comm_message_id";
@@ -199,9 +202,17 @@ export async function POST(
     );
   }
 
+  const eventType =
+  getRequiredString(
+    verifiedEvent,
+    "type",
+  );
+
   if (
-    verifiedEvent.type !==
-    "email.sent"
+    eventType !==
+      "email.sent" &&
+    eventType !==
+      "email.received"
   ) {
     return NextResponse.json({
       ok: true,
@@ -213,16 +224,106 @@ export async function POST(
     verifiedEvent.data;
 
   if (!isRecord(data)) {
+  return NextResponse.json(
+    {
+      error:
+        `Invalid ${eventType} payload.`,
+    },
+    {
+      status: 400,
+    },
+  );
+}
+
+if (
+  eventType ===
+  "email.received"
+) {
+  const providerEmailId =
+    getRequiredString(
+      data,
+      "email_id",
+    );
+
+  if (!providerEmailId) {
     return NextResponse.json(
       {
         error:
-          "Invalid email.sent payload.",
+          "email.received event is missing email_id.",
       },
       {
         status: 400,
       },
     );
   }
+
+  const commissionReplyEmail =
+    process.env.COMMISSION_REPLY_EMAIL?.trim();
+
+  if (!commissionReplyEmail) {
+    return NextResponse.json(
+      {
+        error:
+          "Commission inbound email is not configured.",
+      },
+      {
+        status: 503,
+      },
+    );
+  }
+
+  const result =
+    await processCommissionEmailReceivedEvent({
+      providerEmailId,
+      expectedRecipientEmail:
+        commissionReplyEmail,
+    });
+
+  switch (
+    result.outcome
+  ) {
+    case "processed":
+    case "already_processed":
+      return NextResponse.json({
+        ok: true,
+        outcome:
+          result.outcome,
+      });
+
+    case "recipient_mismatch":
+    case "no_thread_evidence":
+    case "not_found":
+    case "sender_mismatch":
+      /*
+       * These are permanent non-matches, not transient delivery failures.
+       * Acknowledge the signed webhook so Resend does not retry an email that
+       * intentionally does not belong to a commission conversation.
+       */
+      return NextResponse.json({
+        ok: true,
+        ignored: true,
+        outcome:
+          result.outcome,
+      });
+
+    case "ambiguous":
+    case "conflict":
+      /*
+       * Do not guess when provider/thread identity is inconsistent.
+       * Returning a conflict also makes the condition visible in webhook
+       * delivery diagnostics rather than silently acknowledging it.
+       */
+      return NextResponse.json(
+        {
+          error:
+            "Received email conflicts with persisted commission email state.",
+        },
+        {
+          status: 409,
+        },
+      );
+  }
+}
 
   /*
    * Only emails sent through the persisted commission-email pipeline carry

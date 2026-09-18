@@ -6,9 +6,15 @@ import {
   randomUUID,
 } from "node:crypto";
 
+import { config } from "dotenv";
+
 import {
   inArray,
 } from "drizzle-orm";
+
+config({
+  path: ".env.local",
+});
 
 async function main(): Promise<void> {
   if (!process.env.DATABASE_URL) {

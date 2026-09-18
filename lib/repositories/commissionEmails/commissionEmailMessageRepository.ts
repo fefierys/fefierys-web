@@ -423,6 +423,10 @@ export async function claimCommissionEmailMessageForSending(
             commissionEmailMessages.id,
             normalizedMessageId,
           ),
+          eq(
+            commissionEmailMessages.direction,
+            "outbound",
+          ),
           inArray(
             commissionEmailMessages.deliveryStatus,
             ["queued", "failed"],

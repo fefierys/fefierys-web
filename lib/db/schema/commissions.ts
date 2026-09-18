@@ -265,6 +265,7 @@ export const commissionEmailDeliveryStatusEnum = pgEnum(
     "sending",
     "sent",
     "failed",
+    "received",
   ],
 );
 
@@ -2347,33 +2348,49 @@ export const commissionEmailMessages = pgTable(
       "commission_email_messages_delivery_state_check",
       sql`
         (
-          ${table.deliveryStatus} = 'queued'
-          AND ${table.sentAt} IS NULL
-          AND ${table.failedAt} IS NULL
+          ${table.direction} = 'outbound'
+          AND (
+            (
+              ${table.deliveryStatus} = 'queued'
+              AND ${table.sentAt} IS NULL
+              AND ${table.failedAt} IS NULL
+              AND ${table.attemptCount} = 0
+              AND ${table.lastAttemptAt} IS NULL
+            )
+            OR
+            (
+              ${table.deliveryStatus} = 'sending'
+              AND ${table.sentAt} IS NULL
+              AND ${table.failedAt} IS NULL
+              AND ${table.attemptCount} > 0
+              AND ${table.lastAttemptAt} IS NOT NULL
+            )
+            OR
+            (
+              ${table.deliveryStatus} = 'sent'
+              AND ${table.sentAt} IS NOT NULL
+              AND ${table.failedAt} IS NULL
+              AND ${table.attemptCount} > 0
+              AND ${table.lastAttemptAt} IS NOT NULL
+            )
+            OR
+            (
+              ${table.deliveryStatus} = 'failed'
+              AND ${table.sentAt} IS NULL
+              AND ${table.failedAt} IS NOT NULL
+              AND ${table.attemptCount} > 0
+              AND ${table.lastAttemptAt} IS NOT NULL
+            )
+          )
         )
         OR
         (
-          ${table.deliveryStatus} = 'sending'
+          ${table.direction} = 'inbound'
+          AND ${table.deliveryStatus} = 'received'
           AND ${table.sentAt} IS NULL
           AND ${table.failedAt} IS NULL
-          AND ${table.attemptCount} > 0
-          AND ${table.lastAttemptAt} IS NOT NULL
-        )
-        OR
-        (
-          ${table.deliveryStatus} = 'sent'
-          AND ${table.sentAt} IS NOT NULL
-          AND ${table.failedAt} IS NULL
-          AND ${table.attemptCount} > 0
-          AND ${table.lastAttemptAt} IS NOT NULL
-        )
-        OR
-        (
-          ${table.deliveryStatus} = 'failed'
-          AND ${table.sentAt} IS NULL
-          AND ${table.failedAt} IS NOT NULL
-          AND ${table.attemptCount} > 0
-          AND ${table.lastAttemptAt} IS NOT NULL
+          AND ${table.attemptCount} = 0
+          AND ${table.lastAttemptAt} IS NULL
         )
       `,
     ),
