@@ -1557,6 +1557,69 @@ async function main(): Promise<void> {
       );
     }
 
+    const historyBeforeBlockedQuoteAgreement = await db
+      .select({
+        id: commissionStatusHistory.id,
+      })
+      .from(commissionStatusHistory)
+      .where(
+        eq(
+          commissionStatusHistory.commissionId,
+          publicAcceptanceCommissionId,
+        ),
+      );
+
+    const blockedQuoteAgreement = await transitionCommissionStatus({
+      commissionId: publicAcceptanceCommissionId,
+      fromStatus: "awaiting_quote_response",
+      toStatus: "awaiting_agreement",
+      initiatedBy: "artist",
+      changedByAdminUserId: "quote-verifier",
+    });
+
+    equal(blockedQuoteAgreement.outcome, "invalid");
+
+    if (blockedQuoteAgreement.outcome === "invalid") {
+      equal(
+        blockedQuoteAgreement.validation.code,
+        "transition_not_allowed",
+      );
+    }
+
+    const commissionAfterBlockedQuoteAgreement = await db
+      .select({
+        status: commissions.status,
+      })
+      .from(commissions)
+      .where(eq(commissions.id, publicAcceptanceCommissionId))
+      .limit(1);
+
+    equal(
+      commissionAfterBlockedQuoteAgreement[0]?.status,
+      "awaiting_quote_response",
+    );
+
+    const historyAfterBlockedQuoteAgreement = await db
+      .select({
+        id: commissionStatusHistory.id,
+      })
+      .from(commissionStatusHistory)
+      .where(
+        eq(
+          commissionStatusHistory.commissionId,
+          publicAcceptanceCommissionId,
+        ),
+      );
+
+    equal(
+      historyAfterBlockedQuoteAgreement.length,
+      historyBeforeBlockedQuoteAgreement.length,
+    );
+
+    console.log(
+      "[OK] Generic transition cannot bypass quote acceptance",
+    );
+
     const publicAcceptanceResult =
       await acceptCommissionQuotePublicly(
         publicAcceptanceSent.publicToken,
@@ -1604,7 +1667,70 @@ async function main(): Promise<void> {
 
     equal(
       publicAcceptanceCommissionRows[0]?.status,
-      "awaiting_payment",
+      "awaiting_agreement",
+    );
+
+    const historyBeforeBlockedAgreementPayment = await db
+      .select({
+        id: commissionStatusHistory.id,
+      })
+      .from(commissionStatusHistory)
+      .where(
+        eq(
+          commissionStatusHistory.commissionId,
+          publicAcceptanceCommissionId,
+        ),
+      );
+
+    const blockedAgreementPayment = await transitionCommissionStatus({
+      commissionId: publicAcceptanceCommissionId,
+      fromStatus: "awaiting_agreement",
+      toStatus: "awaiting_payment",
+      initiatedBy: "artist",
+      changedByAdminUserId: "quote-verifier",
+    });
+
+    equal(blockedAgreementPayment.outcome, "invalid");
+
+    if (blockedAgreementPayment.outcome === "invalid") {
+      equal(
+        blockedAgreementPayment.validation.code,
+        "transition_not_allowed",
+      );
+    }
+
+    const commissionAfterBlockedAgreementPayment = await db
+      .select({
+        status: commissions.status,
+      })
+      .from(commissions)
+      .where(eq(commissions.id, publicAcceptanceCommissionId))
+      .limit(1);
+
+    equal(
+      commissionAfterBlockedAgreementPayment[0]?.status,
+      "awaiting_agreement",
+    );
+
+    const historyAfterBlockedAgreementPayment = await db
+      .select({
+        id: commissionStatusHistory.id,
+      })
+      .from(commissionStatusHistory)
+      .where(
+        eq(
+          commissionStatusHistory.commissionId,
+          publicAcceptanceCommissionId,
+        ),
+      );
+
+    equal(
+      historyAfterBlockedAgreementPayment.length,
+      historyBeforeBlockedAgreementPayment.length,
+    );
+
+    console.log(
+      "[OK] Generic transition cannot bypass agreement acceptance",
     );
 
     const publicAcceptanceTransitionRows = await db
@@ -1622,7 +1748,7 @@ async function main(): Promise<void> {
           ),
           eq(
             commissionStatusHistory.toStatus,
-            "awaiting_payment",
+            "awaiting_agreement",
           ),
         ),
       );
@@ -1680,6 +1806,15 @@ async function main(): Promise<void> {
     equal(
       publicAcceptanceEvent.createdByAdminUserId,
       null,
+    );
+
+    equal(
+      (
+        publicAcceptanceEvent.metadata as {
+          acceptanceSource?: string;
+        } | null
+      )?.acceptanceSource,
+      "secure_web",
     );
 
     const publicAcceptanceTokenRows = await db
@@ -2035,7 +2170,7 @@ async function main(): Promise<void> {
 
     equal(acceptedResult.transition.fromStatus, "awaiting_quote_response");
 
-    equal(acceptedResult.transition.toStatus, "awaiting_payment");
+    equal(acceptedResult.transition.toStatus, "awaiting_agreement");
 
     equal(acceptedResult.transition.initiatedBy, "client");
 
@@ -2053,6 +2188,15 @@ async function main(): Promise<void> {
 
     equal(acceptedResult.event.createdByAdminUserId, "quote-accept-verifier");
 
+    equal(
+      (
+        acceptedResult.event.metadata as {
+          acceptanceSource?: string;
+        } | null
+      )?.acceptanceSource,
+      "admin_recorded",
+    );
+
     const acceptedCommissionRows = await db
       .select({
         status: commissions.status,
@@ -2065,7 +2209,7 @@ async function main(): Promise<void> {
     const acceptedCommission = acceptedCommissionRows[0];
 
     ok(acceptedCommission);
-    equal(acceptedCommission.status, "awaiting_payment");
+    equal(acceptedCommission.status, "awaiting_agreement");
 
     equal(
       acceptedCommission.updatedAt.getTime(),
@@ -2093,7 +2237,7 @@ async function main(): Promise<void> {
         and(
           eq(commissionStatusHistory.commissionId, sendCommissionId),
           eq(commissionStatusHistory.fromStatus, "awaiting_quote_response"),
-          eq(commissionStatusHistory.toStatus, "awaiting_payment"),
+          eq(commissionStatusHistory.toStatus, "awaiting_agreement"),
         ),
       );
 
@@ -4222,7 +4366,7 @@ async function main(): Promise<void> {
       .where(eq(commissions.id, concurrentAcceptanceCommissionId))
       .limit(1);
 
-    equal(concurrentAcceptanceCommissionRows[0]?.status, "awaiting_payment");
+    equal(concurrentAcceptanceCommissionRows[0]?.status, "awaiting_agreement");
 
     const concurrentAcceptanceTransitionRows = await db
       .select({
@@ -4236,7 +4380,7 @@ async function main(): Promise<void> {
             concurrentAcceptanceCommissionId,
           ),
           eq(commissionStatusHistory.fromStatus, "awaiting_quote_response"),
-          eq(commissionStatusHistory.toStatus, "awaiting_payment"),
+          eq(commissionStatusHistory.toStatus, "awaiting_agreement"),
         ),
       );
 

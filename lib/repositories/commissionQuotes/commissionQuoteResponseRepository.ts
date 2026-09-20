@@ -170,6 +170,7 @@ export async function acceptCommissionQuote(
   const eventMetadata = JSON.stringify({
     quoteId: input.quoteId,
     acceptedAt: acceptedAt.toISOString(),
+    acceptanceSource: "admin_recorded",
   });
 
   try {
@@ -217,7 +218,7 @@ export async function acceptCommissionQuote(
           updated_commission AS (
             UPDATE commissions AS commission
             SET
-              status = 'awaiting_payment',
+              status = 'awaiting_agreement',
               updated_at = ${acceptedAt}
             FROM locked_target
             WHERE
@@ -242,7 +243,7 @@ export async function acceptCommissionQuote(
               ${transitionId}::uuid,
               updated_quote.commission_id,
               'awaiting_quote_response'::commission_status,
-              'awaiting_payment'::commission_status,
+              'awaiting_agreement'::commission_status,
               'client'::commission_actor,
               'quote_accepted',
               null,

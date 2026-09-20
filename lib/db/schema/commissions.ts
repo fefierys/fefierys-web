@@ -37,6 +37,7 @@ export const commissionStatusEnum = pgEnum("commission_status", [
   "awaiting_client_details",
   "quoting",
   "awaiting_quote_response",
+  "awaiting_agreement",
   "awaiting_payment",
   "in_progress",
   "sketch_review",
@@ -225,6 +226,7 @@ export const commissionEventTypeEnum = pgEnum("commission_event_type", [
 export const documentTypeEnum = pgEnum("document_type", [
   "quote",
   "commission_agreement",
+  "commission_agreement_executed",
   "commission_confirmation",
   "payment_acknowledgement",
   "commission_amendment",
@@ -265,6 +267,7 @@ export const commissionEmailDeliveryStatusEnum = pgEnum(
     "sending",
     "sent",
     "failed",
+    "received",
   ],
 );
 
@@ -1632,6 +1635,13 @@ export const commissionAgreements = pgTable(
       onDelete: "restrict",
     }),
 
+    executedDocumentId: uuid("executed_document_id").references(
+      () => commissionDocuments.id,
+      {
+        onDelete: "restrict",
+      },
+    ),
+
     /*
      * Internal revision sequence for this commission.
      *
@@ -1652,13 +1662,34 @@ export const commissionAgreements = pgTable(
 
     agreementVersion: varchar("agreement_version", { length: 50 }).notNull(),
 
+    agreementData: jsonb("agreement_data"),
+
     status: agreementStatusEnum("status").notNull().default("draft"),
+
+    publicTokenHash: varchar("public_token_hash", {
+      length: 64,
+    }),
+
+    publicTokenCreatedAt: timestamp("public_token_created_at", {
+      withTimezone: true,
+    }),
+
+    publicTokenRevokedAt: timestamp("public_token_revoked_at", {
+      withTimezone: true,
+    }),
 
     acceptedByName: varchar("accepted_by_name", { length: 200 }),
 
     acceptedByEmail: varchar("accepted_by_email", { length: 320 }),
 
     acceptanceMethod: acceptanceMethodEnum("acceptance_method"),
+
+    acceptanceStatementVersion: varchar(
+      "acceptance_statement_version",
+      {
+        length: 50,
+      },
+    ),
 
     sentAt: timestamp("sent_at", {
       withTimezone: true,
@@ -1686,17 +1717,52 @@ export const commissionAgreements = pgTable(
       table.version,
     ),
 
+    uniqueIndex("commission_agreements_commission_active_unique")
+      .on(table.commissionId)
+      .where(
+        sql`
+          ${table.status} IN ('draft', 'sent')
+        `,
+      ),
+
     index("commission_agreements_commission_id_idx").on(table.commissionId),
 
     index("commission_agreements_quote_id_idx").on(table.quoteId),
 
     index("commission_agreements_status_idx").on(table.status),
 
+    uniqueIndex(
+      "commission_agreements_public_token_hash_unique",
+    ).on(table.publicTokenHash),
+
+    uniqueIndex(
+      "commission_agreements_executed_document_id_unique",
+    )
+      .on(table.executedDocumentId)
+      .where(sql`${table.executedDocumentId} IS NOT NULL`),
+
     check(
       "commission_agreements_version_check",
       sql`
           ${table.version} >= 1
         `,
+    ),
+
+    check(
+      "commission_agreements_public_token_state_check",
+      sql`
+        (
+          ${table.publicTokenHash} IS NULL
+          AND ${table.publicTokenCreatedAt} IS NULL
+          AND ${table.publicTokenRevokedAt} IS NULL
+        )
+        OR
+        (
+          ${table.publicTokenHash} IS NOT NULL
+          AND ${table.publicTokenCreatedAt} IS NOT NULL
+          AND char_length(${table.publicTokenHash}) = 64
+        )
+      `,
     ),
 
     /*
@@ -1706,14 +1772,18 @@ export const commissionAgreements = pgTable(
     check(
       "commission_agreements_acceptance_check",
       sql`
-          ${table.status} != 'accepted'
-          OR (
-            ${table.acceptedByName} IS NOT NULL
-            AND ${table.acceptedByEmail} IS NOT NULL
-            AND ${table.acceptanceMethod} IS NOT NULL
-            AND ${table.acceptedAt} IS NOT NULL
+        ${table.status} != 'accepted'
+        OR (
+          ${table.acceptedByName} IS NOT NULL
+          AND ${table.acceptedByEmail} IS NOT NULL
+          AND ${table.acceptanceMethod} IS NOT NULL
+          AND ${table.acceptedAt} IS NOT NULL
+          AND (
+            ${table.acceptanceMethod} != 'electronic'
+            OR ${table.acceptanceStatementVersion} IS NOT NULL
           )
-        `,
+        )
+      `,
     ),
   ],
 );
@@ -2347,33 +2417,49 @@ export const commissionEmailMessages = pgTable(
       "commission_email_messages_delivery_state_check",
       sql`
         (
-          ${table.deliveryStatus} = 'queued'
-          AND ${table.sentAt} IS NULL
-          AND ${table.failedAt} IS NULL
+          ${table.direction} = 'outbound'
+          AND (
+            (
+              ${table.deliveryStatus} = 'queued'
+              AND ${table.sentAt} IS NULL
+              AND ${table.failedAt} IS NULL
+              AND ${table.attemptCount} = 0
+              AND ${table.lastAttemptAt} IS NULL
+            )
+            OR
+            (
+              ${table.deliveryStatus} = 'sending'
+              AND ${table.sentAt} IS NULL
+              AND ${table.failedAt} IS NULL
+              AND ${table.attemptCount} > 0
+              AND ${table.lastAttemptAt} IS NOT NULL
+            )
+            OR
+            (
+              ${table.deliveryStatus} = 'sent'
+              AND ${table.sentAt} IS NOT NULL
+              AND ${table.failedAt} IS NULL
+              AND ${table.attemptCount} > 0
+              AND ${table.lastAttemptAt} IS NOT NULL
+            )
+            OR
+            (
+              ${table.deliveryStatus} = 'failed'
+              AND ${table.sentAt} IS NULL
+              AND ${table.failedAt} IS NOT NULL
+              AND ${table.attemptCount} > 0
+              AND ${table.lastAttemptAt} IS NOT NULL
+            )
+          )
         )
         OR
         (
-          ${table.deliveryStatus} = 'sending'
+          ${table.direction} = 'inbound'
+          AND ${table.deliveryStatus} = 'received'
           AND ${table.sentAt} IS NULL
           AND ${table.failedAt} IS NULL
-          AND ${table.attemptCount} > 0
-          AND ${table.lastAttemptAt} IS NOT NULL
-        )
-        OR
-        (
-          ${table.deliveryStatus} = 'sent'
-          AND ${table.sentAt} IS NOT NULL
-          AND ${table.failedAt} IS NULL
-          AND ${table.attemptCount} > 0
-          AND ${table.lastAttemptAt} IS NOT NULL
-        )
-        OR
-        (
-          ${table.deliveryStatus} = 'failed'
-          AND ${table.sentAt} IS NULL
-          AND ${table.failedAt} IS NOT NULL
-          AND ${table.attemptCount} > 0
-          AND ${table.lastAttemptAt} IS NOT NULL
+          AND ${table.attemptCount} = 0
+          AND ${table.lastAttemptAt} IS NULL
         )
       `,
     ),
