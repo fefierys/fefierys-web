@@ -8,10 +8,17 @@ import {
   type CommissionPaymentStageInput,
 } from "../../commissions/commissionPaymentPlan";
 
+import {
+  validateCommissionGroupedPaymentPlan,
+  type CommissionGroupedPaymentPlanInput,
+  type CommissionGroupedPaymentPlanValidation,
+} from "../../commissions/commissionGroupedPaymentPlan";
+
 import { db } from "../../db";
 
 import {
   commissionAgreements,
+  commissionDeliverables,
   commissionPaymentInstallments,
   commissionPayments,
   commissionQuotes,
@@ -21,12 +28,38 @@ import {
 type CommissionPaymentInstallment =
   typeof commissionPaymentInstallments.$inferSelect;
 
+type CommissionDeliverable =
+  typeof commissionDeliverables.$inferSelect;
+
 type CommissionStatus = typeof commissions.$inferSelect.status;
 
 type InvalidPaymentPlanValidation = Extract<
   CommissionPaymentPlanValidation,
   { valid: false }
 >;
+
+export interface CreateCommissionGroupedPaymentPlanInput
+  extends Omit<CreateCommissionPaymentPlanInput, "stages"> {
+  plan: CommissionGroupedPaymentPlanInput;
+}
+
+export type CreateCommissionGroupedPaymentPlanResult =
+  | {
+      outcome: "created";
+      deliverables: CommissionDeliverable[];
+      installments: CommissionPaymentInstallment[];
+    }
+  | {
+      outcome: "invalid";
+      validation: Extract<
+        CommissionGroupedPaymentPlanValidation,
+        { valid: false }
+      >;
+    }
+  | Exclude<
+      CreateCommissionPaymentPlanResult,
+      { outcome: "created" | "invalid" }
+    >;
 
 export interface CreateCommissionPaymentPlanInput {
   commissionId: string;
@@ -123,8 +156,13 @@ async function getCommissionPaymentPlanPreparationState(
     "commissionId" | "quoteId" | "agreementId"
   >,
 ) {
-  const [commissionRows, quoteRows, agreementRows, existingInstallmentRows] =
-    await db.batch([
+  const [
+    commissionRows,
+    quoteRows,
+    agreementRows,
+    existingInstallmentRows,
+    existingDeliverableRows,
+  ] = await db.batch([
       db
         .select({
           status: commissions.status,
@@ -175,13 +213,28 @@ async function getCommissionPaymentPlanPreparationState(
           ),
         )
         .limit(1),
+
+        db
+        .select({
+          id: commissionDeliverables.id,
+        })
+        .from(commissionDeliverables)
+        .where(
+          and(
+            eq(commissionDeliverables.commissionId, input.commissionId),
+            eq(commissionDeliverables.quoteId, input.quoteId),
+          ),
+        )
+        .limit(1),      
     ]);
 
   return {
     commission: commissionRows[0] ?? null,
     quote: quoteRows[0] ?? null,
     agreement: agreementRows[0] ?? null,
-    planAlreadyExists: existingInstallmentRows.length > 0,
+    planAlreadyExists:
+      existingInstallmentRows.length > 0 ||
+      existingDeliverableRows.length > 0,
   };
 }
 
@@ -252,6 +305,164 @@ async function prepareCommissionPaymentPlan(
   const validation = validateCommissionPaymentPlan(
     state.quote.totalAmount,
     input.stages,
+  );
+
+  if (!validation.valid) {
+    return {
+      outcome: "invalid",
+      validation,
+    };
+  }
+
+  return {
+    outcome: "ready",
+    plan: validation,
+    currency: state.quote.currency,
+  };
+}
+
+type ValidGroupedPaymentPlan = Extract<
+  CommissionGroupedPaymentPlanValidation,
+  { valid: true }
+>;
+
+interface GroupedDeliverableWriteData {
+  id: string;
+  sequence: number;
+  title: string;
+  description: string | null;
+  quantity: number;
+}
+
+interface GroupedPaymentStageWriteData {
+  id: string;
+  sequence: number;
+  deliverableId: string | null;
+  label: string;
+  amount: string;
+  trigger: string;
+  customTriggerNote: string | null;
+}
+
+interface GroupedPaymentPlanWriteData {
+  deliverables: GroupedDeliverableWriteData[];
+  stages: GroupedPaymentStageWriteData[];
+}
+
+function buildGroupedPaymentPlanWriteData(
+  plan: ValidGroupedPaymentPlan,
+): GroupedPaymentPlanWriteData {
+  const deliverables = plan.deliverables.map((deliverable) => ({
+    id: randomUUID(),
+    sequence: deliverable.sequence,
+    title: deliverable.title,
+    description: deliverable.description,
+    quantity: deliverable.quantity,
+  }));
+
+  const deliverableIdsBySequence = new Map(
+    deliverables.map((deliverable) => [
+      deliverable.sequence,
+      deliverable.id,
+    ]),
+  );
+
+  const stages = plan.stages.map((stage) => {
+    let deliverableId: string | null = null;
+
+    if (stage.deliverableSequence !== null) {
+      const associatedDeliverableId = deliverableIdsBySequence.get(
+        stage.deliverableSequence,
+      );
+
+      if (!associatedDeliverableId) {
+        throw new Error(
+          "A payment stage references an unknown deliverable.",
+        );
+      }
+
+      deliverableId = associatedDeliverableId;
+    }
+
+    return {
+      id: randomUUID(),
+      sequence: stage.sequence,
+      deliverableId,
+      label: stage.label,
+      amount: stage.amount,
+      trigger: stage.trigger,
+      customTriggerNote: stage.customTriggerNote,
+    };
+  });
+
+  return {
+    deliverables,
+    stages,
+  };
+}
+
+type GroupedPaymentPlanPreparationResult =
+  | {
+      outcome: "ready";
+      plan: ValidGroupedPaymentPlan;
+      currency: string;
+    }
+  | Exclude<
+      CreateCommissionGroupedPaymentPlanResult,
+      { outcome: "created" | "conflict" }
+    >;
+
+async function prepareCommissionGroupedPaymentPlan(
+  input: CreateCommissionGroupedPaymentPlanInput,
+): Promise<GroupedPaymentPlanPreparationResult> {
+  const createdByAdminUserId = input.createdByAdminUserId.trim();
+
+  if (!createdByAdminUserId) {
+    throw new Error("createdByAdminUserId is required.");
+  }
+
+  const state = await getCommissionPaymentPlanPreparationState(input);
+
+  if (!state.commission) {
+    return {
+      outcome: "not_found",
+    };
+  }
+
+  if (state.commission.status !== "awaiting_agreement") {
+    return {
+      outcome: "wrong_status",
+      currentStatus: state.commission.status,
+    };
+  }
+
+  if (state.commission.isOnHold) {
+    return {
+      outcome: "on_hold",
+    };
+  }
+
+  if (state.quote?.status !== "accepted") {
+    return {
+      outcome: "quote_not_accepted",
+    };
+  }
+
+  if (state.agreement?.status !== "draft") {
+    return {
+      outcome: "agreement_not_draft",
+    };
+  }
+
+  if (state.planAlreadyExists) {
+    return {
+      outcome: "plan_already_exists",
+    };
+  }
+
+  const validation = validateCommissionGroupedPaymentPlan(
+    state.quote.totalAmount,
+    input.plan,
   );
 
   if (!validation.valid) {
@@ -533,6 +744,25 @@ export async function getCommissionPaymentPlan(
     .orderBy(
       asc(commissionPaymentInstallments.sequence),
       asc(commissionPaymentInstallments.id),
+    );
+}
+
+export async function getCommissionDeliverables(
+  commissionId: string,
+  quoteId: string,
+): Promise<CommissionDeliverable[]> {
+  return db
+    .select()
+    .from(commissionDeliverables)
+    .where(
+      and(
+        eq(commissionDeliverables.commissionId, commissionId),
+        eq(commissionDeliverables.quoteId, quoteId),
+      ),
+    )
+    .orderBy(
+      asc(commissionDeliverables.sequence),
+      asc(commissionDeliverables.id),
     );
 }
 
@@ -1118,4 +1348,380 @@ export async function updateCommissionPaymentPlan(
   return {
     outcome: "conflict",
   };
+}
+
+interface CreateCommissionGroupedPaymentPlanWriteRow
+  extends Record<string, unknown> {
+  writeComplete: number;
+}
+
+export async function createCommissionGroupedPaymentPlan(
+  input: CreateCommissionGroupedPaymentPlanInput,
+): Promise<CreateCommissionGroupedPaymentPlanResult> {
+  const preparation = await prepareCommissionGroupedPaymentPlan(input);
+
+  if (preparation.outcome !== "ready") {
+    return preparation;
+  }
+
+  const { plan, currency } = preparation;
+
+  const writeData = buildGroupedPaymentPlanWriteData(plan);
+
+  const deliverableIds = writeData.deliverables.map(
+    (deliverable) => deliverable.id,
+  );
+
+  const installmentIds = writeData.stages.map(
+    (stage) => stage.id,
+  );
+
+  const createdAt = new Date();
+
+  async function getCreatedRecords() {
+    const [deliverables, installments] = await Promise.all([
+      deliverableIds.length > 0
+        ? db
+            .select()
+            .from(commissionDeliverables)
+            .where(
+              and(
+                eq(
+                  commissionDeliverables.commissionId,
+                  input.commissionId,
+                ),
+                eq(commissionDeliverables.quoteId, input.quoteId),
+                inArray(commissionDeliverables.id, deliverableIds),
+              ),
+            )
+            .orderBy(asc(commissionDeliverables.sequence))
+        : Promise.resolve([] as CommissionDeliverable[]),
+
+      db
+        .select()
+        .from(commissionPaymentInstallments)
+        .where(
+          and(
+            eq(
+              commissionPaymentInstallments.commissionId,
+              input.commissionId,
+            ),
+            eq(
+              commissionPaymentInstallments.quoteId,
+              input.quoteId,
+            ),
+            inArray(commissionPaymentInstallments.id, installmentIds),
+          ),
+        )
+        .orderBy(asc(commissionPaymentInstallments.sequence)),
+    ]);
+
+    return {
+      deliverables,
+      installments,
+    };
+  }
+
+  try {
+    const writeResult =
+      await db.execute<CreateCommissionGroupedPaymentPlanWriteRow>(
+        sql`
+          WITH
+            locked_target AS MATERIALIZED (
+              SELECT
+                commission.id AS commission_id,
+                quote.id AS quote_id,
+                quote.currency
+              FROM commissions AS commission
+              INNER JOIN commission_quotes AS quote
+                ON quote.commission_id = commission.id
+              INNER JOIN commission_agreements AS agreement
+                ON agreement.commission_id = commission.id
+                AND agreement.quote_id = quote.id
+              WHERE
+                commission.id = ${input.commissionId}::uuid
+                AND commission.status = 'awaiting_agreement'
+                AND commission.is_on_hold = false
+                AND quote.id = ${input.quoteId}::uuid
+                AND quote.status = 'accepted'
+                AND quote.total_amount = ${plan.totalAmount}::numeric
+                AND quote.currency = ${currency}
+                AND agreement.id = ${input.agreementId}::uuid
+                AND agreement.status = 'draft'
+              FOR UPDATE OF commission, quote, agreement
+            ),
+
+            eligible_target AS MATERIALIZED (
+              SELECT locked_target.*
+              FROM locked_target
+              WHERE NOT EXISTS (
+                SELECT 1
+                FROM commission_payment_installments AS existing
+                WHERE
+                  existing.commission_id =
+                    locked_target.commission_id
+                  AND existing.quote_id = locked_target.quote_id
+              )
+              AND NOT EXISTS (
+                SELECT 1
+                FROM commission_deliverables AS existing
+                WHERE
+                  existing.commission_id =
+                    locked_target.commission_id
+                  AND existing.quote_id = locked_target.quote_id
+              )
+            ),
+
+            deliverable_input AS MATERIALIZED (
+              SELECT
+                deliverable.id::uuid AS id,
+                deliverable.sequence,
+                deliverable.title,
+                deliverable.description,
+                deliverable.quantity
+              FROM jsonb_to_recordset(
+                ${JSON.stringify(writeData.deliverables)}::jsonb
+              ) AS deliverable (
+                id text,
+                sequence integer,
+                title text,
+                description text,
+                quantity integer
+              )
+            ),
+
+            created_deliverables AS (
+              INSERT INTO commission_deliverables (
+                id,
+                commission_id,
+                quote_id,
+                sequence,
+                title,
+                description,
+                quantity,
+                created_at,
+                updated_at
+              )
+              SELECT
+                deliverable.id,
+                eligible_target.commission_id,
+                eligible_target.quote_id,
+                deliverable.sequence,
+                deliverable.title,
+                deliverable.description,
+                deliverable.quantity,
+                ${createdAt},
+                ${createdAt}
+              FROM eligible_target
+              CROSS JOIN deliverable_input AS deliverable
+              RETURNING id
+            ),
+
+            stage_input AS MATERIALIZED (
+              SELECT
+                stage.id::uuid AS id,
+                stage.sequence,
+                stage."deliverableId"::uuid AS deliverable_id,
+                stage.label,
+                stage.amount,
+                stage.trigger,
+                stage."customTriggerNote" AS custom_trigger_note
+              FROM jsonb_to_recordset(
+                ${JSON.stringify(writeData.stages)}::jsonb
+              ) AS stage (
+                id text,
+                sequence integer,
+                "deliverableId" text,
+                label text,
+                amount numeric,
+                trigger text,
+                "customTriggerNote" text
+              )
+            ),
+
+            created_installments AS (
+              INSERT INTO commission_payment_installments (
+                id,
+                commission_id,
+                quote_id,
+                deliverable_id,
+                sequence,
+                label,
+                amount,
+                currency,
+                trigger,
+                custom_trigger_note,
+                status,
+                created_at,
+                updated_at
+              )
+              SELECT
+                stage.id,
+                eligible_target.commission_id,
+                eligible_target.quote_id,
+                stage.deliverable_id,
+                stage.sequence,
+                stage.label,
+                stage.amount,
+                eligible_target.currency,
+                stage.trigger::installment_trigger,
+                stage.custom_trigger_note,
+                'pending'::installment_status,
+                ${createdAt},
+                ${createdAt}
+              FROM eligible_target
+              CROSS JOIN stage_input AS stage
+              WHERE
+                (
+                  SELECT COUNT(*)
+                  FROM created_deliverables
+                ) = ${writeData.deliverables.length}
+                AND (
+                  stage.deliverable_id IS NULL
+                  OR EXISTS (
+                    SELECT 1
+                    FROM created_deliverables AS deliverable
+                    WHERE deliverable.id = stage.deliverable_id
+                  )
+                )
+              RETURNING id
+            ),
+
+            updated_commission AS (
+              UPDATE commissions AS commission
+              SET updated_at = ${createdAt}
+              FROM eligible_target
+              WHERE
+                commission.id = eligible_target.commission_id
+                AND (
+                  SELECT COUNT(*)
+                  FROM created_deliverables
+                ) = ${writeData.deliverables.length}
+                AND (
+                  SELECT COUNT(*)
+                  FROM created_installments
+                ) = ${writeData.stages.length}
+              RETURNING commission.id
+            )
+
+          SELECT
+            CASE
+              WHEN (
+                SELECT COUNT(*)
+                FROM eligible_target
+              ) = 0
+                THEN 0
+              ELSE
+                /*
+                 * Raise a SQL error if only part of the plan
+                 * was written. PostgreSQL will roll back the
+                 * entire statement.
+                 */
+                1 / (
+                  CASE
+                    WHEN
+                      (
+                        SELECT COUNT(*)
+                        FROM created_deliverables
+                      ) = ${writeData.deliverables.length}
+                      AND (
+                        SELECT COUNT(*)
+                        FROM created_installments
+                      ) = ${writeData.stages.length}
+                      AND (
+                        SELECT COUNT(*)
+                        FROM updated_commission
+                      ) = 1
+                        THEN 1
+                      ELSE 0
+                  END
+                )
+            END::integer AS "writeComplete"
+        `,
+      );
+
+    if (writeResult.rows[0]?.writeComplete === 1) {
+      const createdRecords = await getCreatedRecords();
+
+      if (
+        createdRecords.deliverables.length !==
+          writeData.deliverables.length ||
+        createdRecords.installments.length !== writeData.stages.length
+      ) {
+        throw new Error(
+          "Grouped payment plan creation returned incomplete records.",
+        );
+      }
+
+      return {
+        outcome: "created",
+        deliverables: createdRecords.deliverables,
+        installments: createdRecords.installments,
+      };
+    }
+
+    const currentState =
+      await getCommissionPaymentPlanPreparationState(input);
+
+    if (!currentState.commission) {
+      return { outcome: "not_found" };
+    }
+
+    if (currentState.commission.status !== "awaiting_agreement") {
+      return {
+        outcome: "wrong_status",
+        currentStatus: currentState.commission.status,
+      };
+    }
+
+    if (currentState.commission.isOnHold) {
+      return { outcome: "on_hold" };
+    }
+
+    if (currentState.quote?.status !== "accepted") {
+      return { outcome: "quote_not_accepted" };
+    }
+
+    if (currentState.agreement?.status !== "draft") {
+      return { outcome: "agreement_not_draft" };
+    }
+
+    if (currentState.planAlreadyExists) {
+      return { outcome: "plan_already_exists" };
+    }
+
+    return { outcome: "conflict" };
+  } catch (error) {
+    /*
+     * Neon may commit the statement but lose its response.
+     * The pre-generated IDs identify records belonging to
+     * this specific creation attempt.
+     */
+    try {
+      const createdRecords = await getCreatedRecords();
+
+      if (
+        createdRecords.deliverables.length ===
+          writeData.deliverables.length &&
+        createdRecords.installments.length === writeData.stages.length
+      ) {
+        return {
+          outcome: "created",
+          deliverables: createdRecords.deliverables,
+          installments: createdRecords.installments,
+        };
+      }
+
+      const currentState =
+        await getCommissionPaymentPlanPreparationState(input);
+
+      if (currentState.planAlreadyExists) {
+        return { outcome: "plan_already_exists" };
+      }
+    } catch {
+      // Preserve the original error if reconciliation fails.
+    }
+
+    throw error;
+  }
 }

@@ -1079,6 +1079,105 @@ export const commissionQuoteItems = pgTable(
 
 /*
  * ============================================================
+ * COMMISSION DELIVERABLES
+ * ============================================================
+ *
+ * A deliverable is a piece of work included in a Commission.
+ *
+ * Examples:
+ * - Illustration 1 (quantity: 1)
+ * - Illustration 2 (quantity: 1)
+ * - Character designs (quantity: 10)
+ *
+ * Deliverables are associated with the accepted Quote.
+ * Their sequence is their display order, not an automatic
+ * workflow transition.
+ */
+export const commissionDeliverables = pgTable(
+  "commission_deliverables",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+
+    commissionId: uuid("commission_id")
+      .notNull()
+      .references(() => commissions.id, {
+        onDelete: "restrict",
+      }),
+
+    quoteId: uuid("quote_id")
+      .notNull()
+      .references(() => commissionQuotes.id, {
+        onDelete: "restrict",
+      }),
+
+    sequence: integer("sequence").notNull(),
+
+    title: varchar("title", { length: 150 }).notNull(),
+
+    description: text("description"),
+
+    quantity: integer("quantity").notNull().default(1),
+
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.commissionId, table.quoteId],
+      foreignColumns: [
+        commissionQuotes.commissionId,
+        commissionQuotes.id,
+      ],
+      name: "commission_deliverables_quote_commission_fk",
+    }).onDelete("restrict"),
+
+    uniqueIndex("commission_deliverables_id_commission_quote_unique").on(
+      table.id,
+      table.commissionId,
+      table.quoteId,
+    ),
+
+    uniqueIndex("commission_deliverables_quote_sequence_unique").on(
+      table.quoteId,
+      table.sequence,
+    ),
+
+    index("commission_deliverables_commission_id_idx").on(
+      table.commissionId,
+    ),
+
+    index("commission_deliverables_quote_id_idx").on(
+      table.quoteId,
+    ),
+
+    check(
+      "commission_deliverables_sequence_check",
+      sql`${table.sequence} >= 1`,
+    ),
+
+    check(
+      "commission_deliverables_quantity_check",
+      sql`${table.quantity} >= 1`,
+    ),
+
+    check(
+      "commission_deliverables_title_check",
+      sql`char_length(trim(${table.title})) > 0`,
+    ),
+  ],
+);
+
+/*
+ * ============================================================
  * COMMISSION PAYMENT INSTALLMENTS
  * ============================================================
  */
@@ -1099,6 +1198,19 @@ export const commissionPaymentInstallments = pgTable(
       .references(() => commissionQuotes.id, {
         onDelete: "restrict",
       }),
+
+    /*
+     * Optional deliverable association.
+     *
+     * null -> payment for the overall project
+     * UUID -> payment associated with a specific deliverable
+     */
+    deliverableId: uuid("deliverable_id").references(
+      () => commissionDeliverables.id,
+      {
+        onDelete: "restrict",
+      },
+    ),
 
     /*
      * Display/payment order:
@@ -1164,6 +1276,20 @@ export const commissionPaymentInstallments = pgTable(
       .defaultNow(),
   },
   (table) => [
+    foreignKey({
+      columns: [
+        table.deliverableId,
+        table.commissionId,
+        table.quoteId,
+      ],
+      foreignColumns: [
+        commissionDeliverables.id,
+        commissionDeliverables.commissionId,
+        commissionDeliverables.quoteId,
+      ],
+      name: "commission_installments_deliverable_scope_fk",
+    }).onDelete("restrict"),
+
     uniqueIndex("commission_installments_quote_sequence_unique").on(
       table.quoteId,
       table.sequence,
@@ -1172,6 +1298,10 @@ export const commissionPaymentInstallments = pgTable(
     index("commission_installments_commission_id_idx").on(table.commissionId),
 
     index("commission_installments_quote_id_idx").on(table.quoteId),
+
+    index("commission_installments_deliverable_id_idx").on(
+      table.deliverableId,
+    ),
 
     index("commission_installments_status_idx").on(table.status),
 

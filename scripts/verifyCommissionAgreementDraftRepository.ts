@@ -14,6 +14,7 @@ async function main(): Promise<void> {
 
   const {
     commissionAgreements,
+    commissionDeliverables,
     commissionEmailMessages,
     commissionEmailThreads,
     commissionEvents,
@@ -52,7 +53,18 @@ async function main(): Promise<void> {
     );
 
   const {
+    createEmptyCommissionAgreementDraftData,
+  } = await import("../lib/commissions/commissionAgreementData");
+
+  const {
+    saveCommissionAgreementDraftData,
+  } = await import(
+    "../lib/repositories/commissionAgreements/commissionAgreementDataRepository"
+  );
+
+  const {
     createCommissionPaymentPlan,
+    createCommissionGroupedPaymentPlan,
     updateCommissionPaymentPlan,
   } = await import(
     "../lib/repositories/commissionPayments/commissionPaymentPlanRepository"
@@ -417,6 +429,94 @@ async function main(): Promise<void> {
     }
 
     console.log("[OK] A second active Agreement draft was rejected");
+
+    /*
+    * Save an incomplete Agreement draft using the primary
+    * temporary Commission.
+    */
+    const emptyAgreementData =
+      createEmptyCommissionAgreementDraftData();
+
+    const saveAgreementDataInput = {
+      commissionId: primary.commissionId,
+      quoteId: primary.quoteId,
+      agreementId: agreement.id,
+      expectedAgreementUpdatedAt: agreement.updatedAt,
+      agreementData: {
+        ...emptyAgreementData,
+        project: {
+          ...emptyAgreementData.project,
+          name: "Temporary verification project",
+        },
+      },
+    };
+
+    const savedAgreementDataResult =
+      await saveCommissionAgreementDraftData(saveAgreementDataInput);
+
+    equal(savedAgreementDataResult.outcome, "saved");
+
+    if (savedAgreementDataResult.outcome !== "saved") {
+      throw new Error("Expected the Agreement draft data to be saved.");
+    }
+
+    equal(
+      (
+        savedAgreementDataResult.agreement
+          .agreementData as { project?: { name?: string } } | null
+      )?.project?.name,
+      "Temporary verification project",
+    );
+
+    equal(savedAgreementDataResult.agreement.status, "draft");
+
+    ok(
+      savedAgreementDataResult.agreement.updatedAt.getTime() >
+        agreement.updatedAt.getTime(),
+    );
+
+    console.log(
+      "[OK] Incomplete Agreement draft data was saved without presenting it",
+    );
+
+    /*
+    * Reusing the previous Agreement version must not
+    * overwrite the saved draft.
+    */
+    const staleAgreementDataResult =
+      await saveCommissionAgreementDraftData({
+        ...saveAgreementDataInput,
+        agreementData: emptyAgreementData,
+      });
+
+    equal(staleAgreementDataResult.outcome, "conflict");
+
+    const agreementAfterStaleSaveRows = await db
+      .select({
+        agreementData: commissionAgreements.agreementData,
+        status: commissionAgreements.status,
+      })
+      .from(commissionAgreements)
+      .where(eq(commissionAgreements.id, agreement.id))
+      .limit(1);
+
+    const agreementAfterStaleSave = agreementAfterStaleSaveRows[0];
+
+    ok(agreementAfterStaleSave);
+    equal(agreementAfterStaleSave.status, "draft");
+
+    equal(
+      (
+        agreementAfterStaleSave.agreementData as {
+          project?: { name?: string };
+        } | null
+      )?.project?.name,
+      "Temporary verification project",
+    );
+
+    console.log(
+      "[OK] Agreement draft data save rejected an outdated version",
+    );
 
     const paymentPlanResult = await createCommissionPaymentPlan({
       commissionId: primary.commissionId,
@@ -1076,6 +1176,131 @@ async function main(): Promise<void> {
       "[OK] Payment plan update rejected a plan with a non-pending installment",
     );
 
+    /*
+    * Verify grouped payment plan creation using a separate
+    * temporary Commission, accepted Quote and draft Agreement.
+    */
+    const grouped = await prepareAcceptedQuote("Grouped Payment Plan");
+
+    const groupedAgreementResult = await createCommissionAgreementDraft({
+      commissionId: grouped.commissionId,
+      quoteId: grouped.quoteId,
+      termsVersion: "2026.1",
+      agreementVersion: "verification-1",
+      createdByAdminUserId: adminUserId,
+    });
+
+    equal(groupedAgreementResult.outcome, "created");
+
+    if (groupedAgreementResult.outcome !== "created") {
+      throw new Error("Could not create the grouped verification Agreement.");
+    }
+
+    const groupedPlanInput = {
+      commissionId: grouped.commissionId,
+      quoteId: grouped.quoteId,
+      agreementId: groupedAgreementResult.agreement.id,
+      createdByAdminUserId: adminUserId,
+      plan: {
+        projectStages: [
+          {
+            label: "Project booking payment",
+            amount: "50.00",
+            trigger: "before_start",
+          },
+        ],
+        deliverables: [
+          {
+            title: "Illustration 1",
+            description: "First illustration",
+            quantity: 1,
+            stages: [
+              {
+                label: "Illustration 1 - Initial payment",
+                amount: "100.00",
+                trigger: "before_start",
+              },
+              {
+                label: "Illustration 1 - Final payment",
+                amount: "100.00",
+                trigger: "before_final_delivery",
+              },
+            ],
+          },
+          {
+            title: "Illustration 2",
+            description: "Second illustration",
+            quantity: 1,
+            stages: [
+              {
+                label: "Illustration 2 - Initial payment",
+                amount: "100.00",
+                trigger: "before_start",
+              },
+              {
+                label: "Illustration 2 - Final payment",
+                amount: "100.00",
+                trigger: "before_final_delivery",
+              },
+            ],
+          },
+        ],
+      },
+    };
+
+    const groupedPlanResult = await createCommissionGroupedPaymentPlan(
+      groupedPlanInput,
+    );
+
+    if (groupedPlanResult.outcome !== "created") {
+      throw new Error(
+        `Grouped payment plan was not created: ${groupedPlanResult.outcome}`,
+      );
+    }
+
+    const { deliverables, installments } = groupedPlanResult;
+
+    equal(deliverables.length, 2);
+    equal(installments.length, 5);
+
+    equal(deliverables[0]?.title, "Illustration 1");
+    equal(deliverables[0]?.sequence, 1);
+    equal(deliverables[1]?.title, "Illustration 2");
+    equal(deliverables[1]?.sequence, 2);
+
+    equal(installments[0]?.deliverableId, null);
+    equal(installments[0]?.amount, "50.00");
+
+    equal(installments[1]?.deliverableId, deliverables[0]?.id);
+    equal(installments[2]?.deliverableId, deliverables[0]?.id);
+
+    equal(installments[3]?.deliverableId, deliverables[1]?.id);
+    equal(installments[4]?.deliverableId, deliverables[1]?.id);
+
+    equal(
+      installments.every(
+        (installment) =>
+          installment.commissionId === grouped.commissionId &&
+          installment.quoteId === grouped.quoteId &&
+          installment.currency === "USD" &&
+          installment.status === "pending",
+      ),
+      true,
+    );
+
+    console.log(
+      "[OK] Grouped plan created two deliverables and five correctly linked payment stages",
+    );
+
+    const repeatedGroupedResult =
+      await createCommissionGroupedPaymentPlan(groupedPlanInput);
+
+    equal(repeatedGroupedResult.outcome, "plan_already_exists");
+
+    console.log(
+      "[OK] Repeated grouped plan creation was rejected",
+    );
+
     console.log(
       "[OK] Commission agreement draft repository verification passed",
     );
@@ -1108,6 +1333,15 @@ async function main(): Promise<void> {
         .where(
           inArray(
             commissionPaymentInstallments.commissionId,
+            createdCommissionIds,
+          ),
+        );
+
+      await db
+        .delete(commissionDeliverables)
+        .where(
+          inArray(
+            commissionDeliverables.commissionId,
             createdCommissionIds,
           ),
         );

@@ -16,6 +16,7 @@ import type {
   CommissionQuoteSelectedAdjustment,
 } from "@/lib/commissions/commissionQuotePricing";
 import { transitionCommissionStatus } from "@/lib/repositories/commissionWorkflowRepository";
+import { saveCommissionAgreementDraftData } from "@/lib/repositories/commissionAgreements/commissionAgreementDataRepository";
 
 import {
   isCommissionManualActor,
@@ -52,6 +53,24 @@ import {
 import {
   retryCommissionEmailMessage,
 } from "@/lib/email/commissionEmailRetryService";
+
+import { CURRENT_COMMISSION_TERMS_VERSION } from "@/lib/legal/commissionTerms";
+import { CURRENT_COMMISSION_AGREEMENT_VERSION } from "@/lib/legal/commissionAgreement";
+
+import { createCommissionAgreementDraft } from "@/lib/repositories/commissionAgreements/commissionAgreementDraftRepository";
+import { getCommissionQuotes } from "@/lib/repositories/commissionQuoteRepository";
+import {
+  createCommissionGroupedPaymentPlan,
+  createCommissionPaymentPlan,
+  updateCommissionPaymentPlan,
+  type UpdateCommissionPaymentStageInput,
+} from "@/lib/repositories/commissionPayments/commissionPaymentPlanRepository";
+
+import type { CommissionPaymentStageInput } from "@/lib/commissions/commissionPaymentPlan";
+import type {
+  CommissionGroupedPaymentPlanInput,
+} from "@/lib/commissions/commissionGroupedPaymentPlan";
+
 export interface CommissionStatusActionState {
   outcome: "idle" | "success" | "error" | "conflict";
   message: string | null;
@@ -95,6 +114,22 @@ export interface CommissionQuoteActionState {
 }
 
 export interface CommissionClassificationActionState {
+  outcome: "idle" | "success" | "error" | "conflict";
+  message: string | null;
+}
+
+export interface CommissionAgreementDraftActionState {
+  outcome: "idle" | "success" | "error" | "conflict";
+  message: string | null;
+  agreementUpdatedAt?: string;
+}
+
+export interface CommissionAgreementCreateActionState {
+  outcome: "idle" | "success" | "error" | "conflict";
+  message: string | null;
+}
+
+export interface CommissionPaymentPlanActionState {
   outcome: "idle" | "success" | "error" | "conflict";
   message: string | null;
 }
@@ -1954,5 +1989,890 @@ export async function supersedeCommissionQuoteAction(
     return quoteError(
       "The quote revision could not be created. Please try again.",
     );
+  }
+}
+
+export async function saveCommissionAgreementDraftDataAction(
+  _previousState: CommissionAgreementDraftActionState,
+  formData: FormData,
+): Promise<CommissionAgreementDraftActionState> {
+  await requireAdmin();
+
+  const commissionId = getFormValue(formData, "commissionId");
+  const quoteId = getFormValue(formData, "quoteId");
+  const agreementId = getFormValue(formData, "agreementId");
+
+  const expectedAgreementUpdatedAt = parseRequiredDate(
+    getFormValue(formData, "expectedAgreementUpdatedAt"),
+  );
+
+  if (
+    !UUID_PATTERN.test(commissionId) ||
+    !UUID_PATTERN.test(quoteId) ||
+    !UUID_PATTERN.test(agreementId)
+  ) {
+    return {
+      outcome: "error",
+      message: "The commission, quote, or Agreement identifier is invalid.",
+    };
+  }
+
+  if (!expectedAgreementUpdatedAt) {
+    return {
+      outcome: "error",
+      message: "The Agreement version timestamp is invalid.",
+    };
+  }
+
+  const rawAgreementData = getFormValue(formData, "agreementData");
+
+  if (!rawAgreementData || rawAgreementData.length > 100_000) {
+    return {
+      outcome: "error",
+      message: "The Agreement draft data is missing or too large.",
+    };
+  }
+
+  let agreementData: unknown;
+
+  try {
+    agreementData = JSON.parse(rawAgreementData);
+  } catch {
+    return {
+      outcome: "error",
+      message: "The Agreement draft data is not valid JSON.",
+    };
+  }
+
+  try {
+    const result = await saveCommissionAgreementDraftData({
+      commissionId,
+      quoteId,
+      agreementId,
+      expectedAgreementUpdatedAt,
+      agreementData,
+    });
+
+    switch (result.outcome) {
+      case "saved":
+        revalidateCommissionActivityPaths(commissionId);
+
+        return {
+          outcome: "success",
+          message: "Agreement draft saved successfully.",
+          agreementUpdatedAt: result.agreement.updatedAt.toISOString(),
+        };
+
+      case "invalid":
+        return {
+          outcome: "error",
+          message: `The Agreement field "${result.field}" is invalid.`,
+        };
+
+      case "not_found":
+        return {
+          outcome: "error",
+          message: "The Commission or Agreement could not be found.",
+        };
+
+      case "wrong_status":
+        return {
+          outcome: "conflict",
+          message: `The Agreement cannot be edited while the commission is ${result.currentStatus}.`,
+        };
+
+      case "on_hold":
+        return {
+          outcome: "conflict",
+          message: "The Agreement cannot be edited while the commission is on hold.",
+        };
+
+      case "quote_not_accepted":
+        return {
+          outcome: "conflict",
+          message: "The Agreement requires an accepted Quote.",
+        };
+
+      case "agreement_not_draft":
+        return {
+          outcome: "conflict",
+          message: "This Agreement is no longer a draft and cannot be edited.",
+        };
+
+      case "conflict":
+        return {
+          outcome: "conflict",
+          message:
+            "The Agreement has changed since you opened it. Refresh the page before saving again.",
+        };
+    }
+  } catch (error) {
+    console.error("Failed to save Commission Agreement draft:", error);
+
+    return {
+      outcome: "error",
+      message:
+        "The Agreement draft could not be saved. Please try again.",
+    };
+  }
+}
+
+export async function createCommissionAgreementDraftAction(
+  _previousState: CommissionAgreementCreateActionState,
+  formData: FormData,
+): Promise<CommissionAgreementCreateActionState> {
+  const session = await requireAdmin();
+  const commissionId = getFormValue(formData, "commissionId");
+
+  if (!UUID_PATTERN.test(commissionId)) {
+    return {
+      outcome: "error",
+      message: "The commission identifier is invalid.",
+    };
+  }
+
+  try {
+    const quotes = await getCommissionQuotes(commissionId);
+
+    const acceptedQuotes = quotes.filter(
+      ({ quote }) => quote.status === "accepted",
+    );
+
+    if (acceptedQuotes.length !== 1) {
+      return {
+        outcome: "conflict",
+        message:
+          acceptedQuotes.length === 0
+            ? "An accepted Quote is required before creating the Agreement."
+            : "More than one accepted Quote was found. Review the Quote history before creating the Agreement.",
+      };
+    }
+
+    const acceptedQuote = acceptedQuotes[0];
+
+    const result = await createCommissionAgreementDraft({
+      commissionId,
+      quoteId: acceptedQuote.quote.id,
+      termsVersion: CURRENT_COMMISSION_TERMS_VERSION,
+      agreementVersion: CURRENT_COMMISSION_AGREEMENT_VERSION,
+      createdByAdminUserId: session.user.id,
+    });
+
+    switch (result.outcome) {
+      case "created":
+        revalidateCommissionActivityPaths(commissionId);
+
+        return {
+          outcome: "success",
+          message: "Agreement draft created successfully.",
+        };
+
+      case "invalid":
+        return {
+          outcome: "error",
+          message: `The ${result.field} is invalid.`,
+        };
+
+      case "not_found":
+        return {
+          outcome: "error",
+          message: "The commission could not be found.",
+        };
+
+      case "wrong_status":
+        return {
+          outcome: "conflict",
+          message: `The Agreement cannot be created while the commission is ${result.currentStatus}.`,
+        };
+
+      case "on_hold":
+        return {
+          outcome: "conflict",
+          message:
+            "The Agreement cannot be created while the commission is on hold.",
+        };
+
+      case "quote_not_accepted":
+        return {
+          outcome: "conflict",
+          message:
+            "The selected Quote is no longer accepted. Refresh the page.",
+        };
+
+      case "active_agreement_exists":
+        revalidateCommissionActivityPaths(commissionId);
+
+        return {
+          outcome: "conflict",
+          message:
+            "An active Agreement already exists. Refresh the page to view it.",
+        };
+
+      case "conflict":
+        return {
+          outcome: "conflict",
+          message:
+            "The commission changed while creating the Agreement. Refresh the page and try again.",
+        };
+    }
+  } catch (error) {
+    console.error("Failed to create Commission Agreement draft:", error);
+
+    return {
+      outcome: "error",
+      message:
+        "The Agreement draft could not be created. Please try again.",
+    };
+  }
+}
+
+function parseCommissionPaymentStages(
+  value: string,
+): CommissionPaymentStageInput[] | null {
+  if (!value || value.length > 100_000) {
+    return null;
+  }
+
+  try {
+    const parsed: unknown = JSON.parse(value);
+
+    if (!Array.isArray(parsed) || parsed.length === 0 || parsed.length > 50) {
+      return null;
+    }
+
+    const stages: CommissionPaymentStageInput[] = [];
+
+    for (const stage of parsed) {
+      if (
+        !stage ||
+        typeof stage !== "object" ||
+        Array.isArray(stage)
+      ) {
+        return null;
+      }
+
+      const record = stage as Record<string, unknown>;
+
+      if (
+        typeof record.label !== "string" ||
+        typeof record.amount !== "string" ||
+        typeof record.trigger !== "string" ||
+        (
+          record.customTriggerNote !== undefined &&
+          record.customTriggerNote !== null &&
+          typeof record.customTriggerNote !== "string"
+        )
+      ) {
+        return null;
+      }
+
+      stages.push({
+        label: record.label,
+        amount: record.amount,
+        trigger: record.trigger,
+        customTriggerNote:
+          typeof record.customTriggerNote === "string"
+            ? record.customTriggerNote
+            : null,
+      });
+    }
+
+    return stages;
+  } catch {
+    return null;
+  }
+}
+
+function parseCommissionGroupedPaymentPlan(
+  value: string,
+): CommissionGroupedPaymentPlanInput | null {
+  if (!value || value.length > 100_000) {
+    return null;
+  }
+
+  try {
+    const parsed: unknown = JSON.parse(value);
+
+    if (
+      !parsed ||
+      typeof parsed !== "object" ||
+      Array.isArray(parsed)
+    ) {
+      return null;
+    }
+
+    const record = parsed as Record<string, unknown>;
+
+    if (
+      !Array.isArray(record.projectStages) ||
+      !Array.isArray(record.deliverables) ||
+      record.deliverables.length > 100
+    ) {
+      return null;
+    }
+
+    let totalStageCount = record.projectStages.length;
+
+    if (totalStageCount > 50) {
+      return null;
+    }
+
+    /*
+     * The existing parser requires at least one stage.
+     * An empty projectStages array is valid when payments
+     * belong exclusively to individual deliverables.
+     */
+    const projectStages =
+      record.projectStages.length === 0
+        ? []
+        : parseCommissionPaymentStages(
+            JSON.stringify(record.projectStages),
+          );
+
+    if (!projectStages) {
+      return null;
+    }
+
+    const deliverables: CommissionGroupedPaymentPlanInput["deliverables"][number][] =
+      [];
+
+    for (const item of record.deliverables) {
+      if (
+        !item ||
+        typeof item !== "object" ||
+        Array.isArray(item)
+      ) {
+        return null;
+      }
+
+      const deliverable = item as Record<string, unknown>;
+
+      if (
+        typeof deliverable.title !== "string" ||
+        (
+          deliverable.description !== undefined &&
+          deliverable.description !== null &&
+          typeof deliverable.description !== "string"
+        ) ||
+        typeof deliverable.quantity !== "number" ||
+        !Array.isArray(deliverable.stages)
+      ) {
+        return null;
+      }
+
+      totalStageCount += deliverable.stages.length;
+
+      if (totalStageCount > 50) {
+        return null;
+      }
+
+      /*
+       * A deliverable may have no individual payments when
+       * its cost is covered by project-wide payment stages.
+       */
+      const stages =
+        deliverable.stages.length === 0
+          ? []
+          : parseCommissionPaymentStages(
+              JSON.stringify(deliverable.stages),
+            );
+
+      if (!stages) {
+        return null;
+      }
+
+      deliverables.push({
+        title: deliverable.title,
+        description:
+          typeof deliverable.description === "string"
+            ? deliverable.description
+            : null,
+        quantity: deliverable.quantity,
+        stages,
+      });
+    }
+
+    if (totalStageCount === 0) {
+      return null;
+    }
+
+    return {
+      projectStages,
+      deliverables,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function createCommissionGroupedPaymentPlanAction(
+  _previousState: CommissionPaymentPlanActionState,
+  formData: FormData,
+): Promise<CommissionPaymentPlanActionState> {
+  const session = await requireAdmin();
+
+  const commissionId = getFormValue(formData, "commissionId");
+  const agreementId = getFormValue(formData, "agreementId");
+
+  if (
+    !UUID_PATTERN.test(commissionId) ||
+    !UUID_PATTERN.test(agreementId)
+  ) {
+    return {
+      outcome: "error",
+      message: "The commission or Agreement identifier is invalid.",
+    };
+  }
+
+  const plan = parseCommissionGroupedPaymentPlan(
+    getFormValue(formData, "plan"),
+  );
+
+  if (!plan) {
+    return {
+      outcome: "error",
+      message: "The grouped payment plan has an invalid structure.",
+    };
+  }
+
+  try {
+    /*
+     * Resolve the accepted Quote on the server.
+     * Never trust a quoteId supplied by the browser.
+     */
+    const quotes = await getCommissionQuotes(commissionId);
+
+    const acceptedQuotes = quotes.filter(
+      ({ quote }) => quote.status === "accepted",
+    );
+
+    if (acceptedQuotes.length !== 1) {
+      return {
+        outcome: "conflict",
+        message:
+          acceptedQuotes.length === 0
+            ? "An accepted Quote is required before creating a payment plan."
+            : "More than one accepted Quote was found. Review the Quote history.",
+      };
+    }
+
+    const result = await createCommissionGroupedPaymentPlan({
+      commissionId,
+      quoteId: acceptedQuotes[0].quote.id,
+      agreementId,
+      plan,
+      createdByAdminUserId: session.user.id,
+    });
+
+    switch (result.outcome) {
+      case "created":
+        revalidateCommissionActivityPaths(commissionId);
+
+        return {
+          outcome: "success",
+          message: "Grouped payment plan created successfully.",
+        };
+
+      case "invalid":
+        return {
+          outcome: "error",
+          message: result.validation.message,
+        };
+
+      case "not_found":
+        return {
+          outcome: "error",
+          message: "The commission could not be found.",
+        };
+
+      case "wrong_status":
+        return {
+          outcome: "conflict",
+          message: `The payment plan cannot be created while the commission is ${result.currentStatus}.`,
+        };
+
+      case "on_hold":
+        return {
+          outcome: "conflict",
+          message:
+            "The payment plan cannot be created while the commission is on hold.",
+        };
+
+      case "quote_not_accepted":
+        return {
+          outcome: "conflict",
+          message:
+            "The selected Quote is no longer accepted. Refresh the page.",
+        };
+
+      case "agreement_not_draft":
+        return {
+          outcome: "conflict",
+          message: "The Agreement is no longer a draft.",
+        };
+
+      case "plan_already_exists":
+        revalidateCommissionActivityPaths(commissionId);
+
+        return {
+          outcome: "conflict",
+          message:
+            "A payment plan already exists. Refresh the page to view it.",
+        };
+
+      case "conflict":
+        return {
+          outcome: "conflict",
+          message:
+            "The commission changed while creating the payment plan. Refresh the page and try again.",
+        };
+    }
+  } catch (error) {
+    console.error(
+      "Failed to create grouped Commission payment plan:",
+      error,
+    );
+
+    return {
+      outcome: "error",
+      message:
+        "The grouped payment plan could not be created. Please try again.",
+    };
+  }
+}
+
+export async function createCommissionPaymentPlanAction(
+  _previousState: CommissionPaymentPlanActionState,
+  formData: FormData,
+): Promise<CommissionPaymentPlanActionState> {
+  const session = await requireAdmin();
+
+  const commissionId = getFormValue(formData, "commissionId");
+  const agreementId = getFormValue(formData, "agreementId");
+
+  if (
+    !UUID_PATTERN.test(commissionId) ||
+    !UUID_PATTERN.test(agreementId)
+  ) {
+    return {
+      outcome: "error",
+      message: "The commission or Agreement identifier is invalid.",
+    };
+  }
+
+  const stages = parseCommissionPaymentStages(
+    getFormValue(formData, "stages"),
+  );
+
+  if (!stages) {
+    return {
+      outcome: "error",
+      message: "The payment stages have an invalid structure.",
+    };
+  }
+
+  try {
+    /*
+     * Resolve the accepted Quote on the server instead
+     * of trusting a quoteId supplied by the browser.
+     */
+    const quotes = await getCommissionQuotes(commissionId);
+
+    const acceptedQuotes = quotes.filter(
+      ({ quote }) => quote.status === "accepted",
+    );
+
+    if (acceptedQuotes.length !== 1) {
+      return {
+        outcome: "conflict",
+        message:
+          acceptedQuotes.length === 0
+            ? "An accepted Quote is required before creating a payment plan."
+            : "More than one accepted Quote was found. Review the Quote history.",
+      };
+    }
+
+    const result = await createCommissionPaymentPlan({
+      commissionId,
+      quoteId: acceptedQuotes[0].quote.id,
+      agreementId,
+      stages,
+      createdByAdminUserId: session.user.id,
+    });
+
+    switch (result.outcome) {
+      case "created":
+        revalidateCommissionActivityPaths(commissionId);
+
+        return {
+          outcome: "success",
+          message: "Payment plan created successfully.",
+        };
+
+      case "invalid":
+        return {
+          outcome: "error",
+          message: result.validation.message,
+        };
+
+      case "not_found":
+        return {
+          outcome: "error",
+          message: "The commission could not be found.",
+        };
+
+      case "wrong_status":
+        return {
+          outcome: "conflict",
+          message: `The payment plan cannot be created while the commission is ${result.currentStatus}.`,
+        };
+
+      case "on_hold":
+        return {
+          outcome: "conflict",
+          message: "The payment plan cannot be created while the commission is on hold.",
+        };
+
+      case "quote_not_accepted":
+        return {
+          outcome: "conflict",
+          message: "The selected Quote is no longer accepted. Refresh the page.",
+        };
+
+      case "agreement_not_draft":
+        return {
+          outcome: "conflict",
+          message: "The Agreement is no longer a draft.",
+        };
+
+      case "plan_already_exists":
+        revalidateCommissionActivityPaths(commissionId);
+
+        return {
+          outcome: "conflict",
+          message: "A payment plan already exists. Refresh the page to view it.",
+        };
+
+      case "conflict":
+        return {
+          outcome: "conflict",
+          message: "The commission changed while creating the payment plan. Refresh the page and try again.",
+        };
+    }
+  } catch (error) {
+    console.error("Failed to create Commission payment plan:", error);
+
+    return {
+      outcome: "error",
+      message: "The payment plan could not be created. Please try again.",
+    };
+  }
+}
+
+function parseCommissionPaymentStagesForUpdate(
+  value: string,
+): UpdateCommissionPaymentStageInput[] | null {
+  if (!value || value.length > 100_000) {
+    return null;
+  }
+
+  try {
+    const parsed: unknown = JSON.parse(value);
+
+    if (!Array.isArray(parsed) || parsed.length === 0 || parsed.length > 50) {
+      return null;
+    }
+
+    const stages: UpdateCommissionPaymentStageInput[] = [];
+
+    for (const stage of parsed) {
+      if (
+        !stage ||
+        typeof stage !== "object" ||
+        Array.isArray(stage)
+      ) {
+        return null;
+      }
+
+      const record = stage as Record<string, unknown>;
+
+      if (
+        typeof record.label !== "string" ||
+        typeof record.amount !== "string" ||
+        typeof record.trigger !== "string" ||
+        (record.id !== undefined &&
+          (typeof record.id !== "string" ||
+            !UUID_PATTERN.test(record.id))) ||
+        (record.customTriggerNote !== undefined &&
+          record.customTriggerNote !== null &&
+          typeof record.customTriggerNote !== "string")
+      ) {
+        return null;
+      }
+
+      stages.push({
+        id: typeof record.id === "string" ? record.id : undefined,
+        label: record.label,
+        amount: record.amount,
+        trigger: record.trigger,
+        customTriggerNote:
+          typeof record.customTriggerNote === "string"
+            ? record.customTriggerNote
+            : null,
+      });
+    }
+
+    return stages;
+  } catch {
+    return null;
+  }
+}
+
+export async function updateCommissionPaymentPlanAction(
+  _previousState: CommissionPaymentPlanActionState,
+  formData: FormData,
+): Promise<CommissionPaymentPlanActionState> {
+  const session = await requireAdmin();
+
+  const commissionId = getFormValue(formData, "commissionId");
+  const agreementId = getFormValue(formData, "agreementId");
+
+  const expectedAgreementUpdatedAt = parseRequiredDate(
+    getFormValue(formData, "expectedAgreementUpdatedAt"),
+  );
+
+  if (
+    !UUID_PATTERN.test(commissionId) ||
+    !UUID_PATTERN.test(agreementId)
+  ) {
+    return {
+      outcome: "error",
+      message: "The commission or Agreement identifier is invalid.",
+    };
+  }
+
+  if (!expectedAgreementUpdatedAt) {
+    return {
+      outcome: "error",
+      message: "The Agreement version timestamp is invalid.",
+    };
+  }
+
+  const stages = parseCommissionPaymentStagesForUpdate(
+    getFormValue(formData, "stages"),
+  );
+
+  if (!stages) {
+    return {
+      outcome: "error",
+      message: "The payment stages have an invalid structure.",
+    };
+  }
+
+  try {
+    /*
+     * Resolve the accepted Quote on the server.
+     * The repository will also verify that every existing
+     * stage ID belongs to this Commission and Quote.
+     */
+    const quotes = await getCommissionQuotes(commissionId);
+
+    const acceptedQuotes = quotes.filter(
+      ({ quote }) => quote.status === "accepted",
+    );
+
+    if (acceptedQuotes.length !== 1) {
+      return {
+        outcome: "conflict",
+        message:
+          acceptedQuotes.length === 0
+            ? "An accepted Quote is required before editing the payment plan."
+            : "More than one accepted Quote was found. Review the Quote history.",
+      };
+    }
+
+    const result = await updateCommissionPaymentPlan({
+      commissionId,
+      quoteId: acceptedQuotes[0].quote.id,
+      agreementId,
+      expectedAgreementUpdatedAt,
+      stages,
+      updatedByAdminUserId: session.user.id,
+    });
+
+    switch (result.outcome) {
+      case "updated":
+        revalidateCommissionActivityPaths(commissionId);
+
+        return {
+          outcome: "success",
+          message: "Payment plan updated successfully.",
+        };
+
+      case "invalid":
+        return {
+          outcome: "error",
+          message: result.validation.message,
+        };
+
+      case "not_found":
+        return {
+          outcome: "error",
+          message: "The Commission or payment plan could not be found.",
+        };
+
+      case "wrong_status":
+        return {
+          outcome: "conflict",
+          message: `The payment plan cannot be edited while the commission is ${result.currentStatus}.`,
+        };
+
+      case "on_hold":
+        return {
+          outcome: "conflict",
+          message:
+            "The payment plan cannot be edited while the commission is on hold.",
+        };
+
+      case "quote_not_accepted":
+        return {
+          outcome: "conflict",
+          message: "The Quote is no longer accepted. Refresh the page.",
+        };
+
+      case "agreement_not_draft":
+        return {
+          outcome: "conflict",
+          message: "The Agreement is no longer a draft.",
+        };
+
+      case "plan_not_found":
+        return {
+          outcome: "conflict",
+          message: "No payment plan exists. Refresh the page.",
+        };
+
+      case "plan_locked":
+        return {
+          outcome: "conflict",
+          message:
+            "This payment plan can no longer be edited because a payment is linked to it or one of its stages is no longer pending.",
+        };
+
+      case "conflict":
+        return {
+          outcome: "conflict",
+          message:
+            "The Agreement or payment plan has changed. Refresh the page before saving again.",
+        };
+    }
+  } catch (error) {
+    console.error("Failed to update Commission payment plan:", error);
+
+    return {
+      outcome: "error",
+      message:
+        "The payment plan could not be updated. Please try again.",
+    };
   }
 }
