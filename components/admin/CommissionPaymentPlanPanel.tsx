@@ -20,6 +20,7 @@ interface CommissionPaymentPlanPanelProps {
   deliverables: Deliverable[];
   stages: PaymentStage[];
   currency: string;
+  agreementStatus: string;
 }
 
 function humanize(value: string): string {
@@ -156,7 +157,20 @@ export default function CommissionPaymentPlanPanel({
   deliverables,
   stages,
   currency,
+  agreementStatus,
 }: CommissionPaymentPlanPanelProps) {
+  // Total amount of the payment plan.
+  const totalAmount = formatStageTotal(stages);
+
+  // Amount represented by stages recorded as paid.
+  const paidStages = stages.filter(
+    (stage) => stage.status === "paid",
+  );
+
+  const paidAmount = formatStageTotal(paidStages);
+
+  // Display the current Agreement lifecycle status.
+  const statusLabel = humanize(agreementStatus);
   const projectStages = stages.filter(
     (stage) => stage.deliverableId === null,
   );
@@ -173,21 +187,61 @@ export default function CommissionPaymentPlanPanel({
 
   return (
     <section className="glass-card p-6">
-      <h2 className="text-xl font-light">Payment plan</h2>
+      {/* Payment plan header */}
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <h2 className="text-xl font-light text-white">
+            Payment plan
+          </h2>
 
-      <p className="mt-2 text-sm text-white/60">
-        {deliverables.length}{" "}
-        {deliverables.length === 1
-          ? "deliverable"
-          : "deliverables"}
-        {" · "}
-        {stages.length} payment{" "}
-        {stages.length === 1 ? "stage" : "stages"}
-      </p>
+          <p className="mt-1 text-sm text-white/60">
+            {deliverables.length}{" "}
+            {deliverables.length === 1
+              ? "deliverable"
+              : "deliverables"}
+            {" · "}
+            {stages.length} payment{" "}
+            {stages.length === 1 ? "stage" : "stages"}
+          </p>
+        </div>
 
-      <p className="mt-2 text-sm text-white/75">
-        Plan total: {formatStageTotal(stages)} {currency}
-      </p>
+        {/* Current Agreement status */}
+        <span
+          className={
+            agreementStatus === "draft"
+              ? "inline-flex shrink-0 items-center rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-xs font-medium text-emerald-200"
+              : "inline-flex shrink-0 items-center rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-medium text-white/80"
+          }
+          title="Agreement status"
+        >
+          {statusLabel}
+        </span>
+      </div>
+
+      {/* Payment plan summary */}
+      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {/* Total amount */}
+        <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-4">
+          <p className="text-xs font-medium text-white/60">
+            Total
+          </p>
+
+          <p className="mt-2 break-words text-xl font-semibold text-white">
+            {totalAmount} {currency}
+          </p>
+        </div>
+
+        {/* Paid amount */}
+        <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-4">
+          <p className="text-xs font-medium text-white/60">
+            Paid
+          </p>
+
+          <p className="mt-2 break-words text-xl font-semibold text-white">
+            {paidAmount} {currency}
+          </p>
+        </div>
+      </div>
 
       <div className="mt-5 space-y-3">
         {projectStages.length > 0 && (

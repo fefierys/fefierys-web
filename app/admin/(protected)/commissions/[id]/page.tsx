@@ -11,6 +11,7 @@ import CommissionAgreementPanel from "@/components/admin/CommissionAgreementPane
 import CommissionAgreementCreatePanel from "@/components/admin/CommissionAgreementCreatePanel";
 import CommissionPaymentPlanCreatePanel from "@/components/admin/CommissionPaymentPlanCreatePanel";
 import CommissionPaymentPlanPanel from "@/components/admin/CommissionPaymentPlanPanel";
+import CommissionPaymentPlanEditPanel from "@/components/admin/CommissionPaymentPlanEditPanel";
 import { requireAdmin } from "@/lib/auth/admin";
 import { formatCommissionDate } from "@/lib/commissions/commissionDate";
 import { COMMISSION_STATUS_LABELS } from "@/lib/commissions/commissionStatus";
@@ -29,6 +30,7 @@ import { getActiveCommissionAgreement } from "@/lib/repositories/commissionAgree
 import {
   getCommissionDeliverables,
   getCommissionPaymentPlan,
+  hasCommissionPaymentPlanLinkedPayments,
 } from "@/lib/repositories/commissionPayments/commissionPaymentPlanRepository";
 
 export const dynamic = "force-dynamic";
@@ -155,6 +157,25 @@ export default async function CommissionDetailPage({
     events,
     statusHistory,
   } = detail;
+
+  const meetsPaymentPlanEditConditions =
+    commission.status === "awaiting_agreement" &&
+    !commission.isOnHold &&
+    activeAgreement?.status === "draft" &&
+    agreementQuote !== null &&
+    agreementPaymentPlan.length > 0 &&
+    agreementPaymentPlan.every((stage) => stage.status === "pending");
+
+  const hasLinkedPayment = meetsPaymentPlanEditConditions
+    ? await hasCommissionPaymentPlanLinkedPayments(
+        commission.id,
+        agreementPaymentPlan.map((stage) => stage.id),
+      )
+    : false;
+
+  const canEditPaymentPlan =
+    meetsPaymentPlanEditConditions && !hasLinkedPayment;
+
   const editableDraft =
     quotes.find(({ quote }) => quote.status === "draft") ?? null;
   let quotePricingCatalog = pricingCatalog;
@@ -525,14 +546,33 @@ export default async function CommissionDetailPage({
 
             {/* Payment plan: existing stages */}
             {activeAgreement && agreementPaymentPlan.length > 0 && (
-              <CommissionPaymentPlanPanel
-                currency={
-                  agreementQuote?.currency ??
-                  agreementPaymentPlan[0].currency
-                }
-                deliverables={agreementDeliverables}
-                stages={agreementPaymentPlan}
-              />
+              <div className="space-y-3">
+                {canEditPaymentPlan && agreementQuote && (
+                  <div className="flex justify-end">
+                    <CommissionPaymentPlanEditPanel
+                      commissionId={commission.id}
+                      agreementId={activeAgreement.id}
+                      expectedAgreementUpdatedAt={
+                        activeAgreement.updatedAt.toISOString()
+                      }
+                      quoteTotalAmount={agreementQuote.totalAmount}
+                      currency={agreementQuote.currency}
+                      initialDeliverables={agreementDeliverables}
+                      initialStages={agreementPaymentPlan}
+                    />
+                  </div>
+                )}
+
+                <CommissionPaymentPlanPanel
+                  agreementStatus={activeAgreement.status}
+                  currency={
+                    agreementQuote?.currency ??
+                    agreementPaymentPlan[0].currency
+                  }
+                  deliverables={agreementDeliverables}
+                  stages={agreementPaymentPlan}
+                />
+              </div>
             )}
           </div>
         )}

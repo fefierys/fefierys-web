@@ -1021,13 +1021,6 @@ export function validateCommissionGroupedPaymentPlanEditIds(
     }
   }
 
-  if (receivedStageIds.size !== existingStagesById.size) {
-    return {
-      valid: false,
-      message: "All existing payment stages must be included in the update.",
-    };
-  }
-
   return { valid: true };
 }
 
@@ -1078,10 +1071,24 @@ function validateCommissionGroupedPaymentPlanEditOrder(
       (id): id is string => id !== undefined,
     );
 
-    const existingOrderChanged = existingStageIds.some(
-      (id, index) => id !== submittedExistingIds[index],
+    // Existing stages may be removed, but the remaining
+    // stages must preserve their original relative order.
+    const submittedExistingIdSet = new Set(
+      submittedExistingIds,
     );
 
+    const expectedRemainingIds = existingStageIds.filter(
+      (id) => submittedExistingIdSet.has(id),
+    );
+
+    const existingOrderChanged =
+      expectedRemainingIds.length !== submittedExistingIds.length ||
+      expectedRemainingIds.some(
+        (id, index) => id !== submittedExistingIds[index],
+      );
+
+    // New stages must still be appended after the
+    // existing stages within their respective group.
     const firstNewStageIndex = submittedStageIds.findIndex(
       (id) => id === undefined,
     );
@@ -1092,11 +1099,14 @@ function validateCommissionGroupedPaymentPlanEditOrder(
         .slice(firstNewStageIndex)
         .some((id) => id !== undefined);
 
-    if (existingOrderChanged || newStageInsertedBeforeExisting) {
+    if (
+      existingOrderChanged ||
+      newStageInsertedBeforeExisting
+    ) {
       return {
         valid: false,
         message:
-          "Existing payment stages must keep their order within each group. New stages must be added at the end of their group.",
+          "Remaining payment stages must keep their relative order within each group. New stages must be added at the end of their group.",
       };
     }
 
@@ -2242,6 +2252,17 @@ export async function updateCommissionGroupedPaymentPlan(
   const existingStagesToWrite = writeData.stages.filter((row) => !row.isNew);
   const newStagesToWrite = writeData.stages.filter((row) => row.isNew);
 
+  // Identify existing stages omitted from the submitted plan.
+  // These stages must be deleted while preserving the IDs
+  // of all remaining installments.
+  const retainedStageIds = new Set(
+    existingStagesToWrite.map((stage) => stage.id),
+  );
+
+  const deletedStageIds = existingInstallments
+    .filter((stage) => !retainedStageIds.has(stage.id))
+    .map((stage) => stage.id);
+
   // Locks are acquired before the database-side checks. Comparing complete
   // ID/order/association snapshots catches stale plans, even if a different
   // code path forgot to advance Agreement.updatedAt.
@@ -2377,6 +2398,33 @@ export async function updateCommissionGroupedPaymentPlan(
           SELECT 1 / CASE WHEN
             (SELECT COUNT(*) FROM moved) = ${existingInstallments.length}
           THEN 1 ELSE 0 END AS "stagesReserved"
+        `,
+
+        // Delete existing stages omitted from the submitted plan.
+        // The preceding transaction guards have already verified
+        // that the plan is editable and no payments are linked.
+        //
+        // The deletion is restricted to this commission and quote.
+        // Every expected deletion must succeed, otherwise the
+        // entire transaction is rolled back.
+        httpSql`
+          WITH deleted AS (
+            DELETE FROM commission_payment_installments AS i
+            WHERE i.commission_id = ${input.commissionId}::uuid
+              AND i.quote_id = ${input.quoteId}::uuid
+              AND i.id IN (
+                SELECT value::uuid
+                FROM jsonb_array_elements_text(
+                  ${JSON.stringify(deletedStageIds)}::jsonb
+                ) AS ids(value)
+              )
+              AND i.status = 'pending'::installment_status
+              AND i.sequence >= 1001
+            RETURNING i.id
+          )
+          SELECT 1 / CASE WHEN
+            (SELECT COUNT(*) FROM deleted) = ${deletedStageIds.length}
+          THEN 1 ELSE 0 END AS "stagesDeleted"
         `,
 
         // 4. Update existing deliverable metadata. Existing deliverable
@@ -2607,4 +2655,28 @@ export async function updateCommissionGroupedPaymentPlan(
   }
 
   return { outcome: "updated", deliverables, installments };
+}
+
+export async function hasCommissionPaymentPlanLinkedPayments(
+  commissionId: string,
+  installmentIds: readonly string[],
+): Promise<boolean> {
+  if (installmentIds.length === 0) {
+    return false;
+  }
+
+  const linkedPayments = await db
+    .select({
+      id: commissionPayments.id,
+    })
+    .from(commissionPayments)
+    .where(
+      and(
+        eq(commissionPayments.commissionId, commissionId),
+        inArray(commissionPayments.installmentId, [...installmentIds]),
+      ),
+    )
+    .limit(1);
+
+  return linkedPayments.length > 0;
 }

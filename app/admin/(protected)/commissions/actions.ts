@@ -62,12 +62,14 @@ import { getCommissionQuotes } from "@/lib/repositories/commissionQuoteRepositor
 import {
   createCommissionGroupedPaymentPlan,
   createCommissionPaymentPlan,
+  updateCommissionGroupedPaymentPlan,
   updateCommissionPaymentPlan,
   type UpdateCommissionPaymentStageInput,
 } from "@/lib/repositories/commissionPayments/commissionPaymentPlanRepository";
 
 import type { CommissionPaymentStageInput } from "@/lib/commissions/commissionPaymentPlan";
 import type {
+  CommissionGroupedPaymentPlanEditInput,
   CommissionGroupedPaymentPlanInput,
 } from "@/lib/commissions/commissionGroupedPaymentPlan";
 
@@ -2873,6 +2875,202 @@ export async function updateCommissionPaymentPlanAction(
       outcome: "error",
       message:
         "The payment plan could not be updated. Please try again.",
+    };
+  }
+}
+
+/**
+ * Reuse the creation parser for common structural limits and field types,
+ * while retaining optional database IDs on existing deliverables and stages.
+ * Ownership, order and lock checks remain authoritative in the repository.
+ */
+function parseCommissionGroupedPaymentPlanForUpdate(
+  value: string,
+): CommissionGroupedPaymentPlanEditInput | null {
+  const validatedPlan = parseCommissionGroupedPaymentPlan(value);
+
+  if (!validatedPlan) {
+    return null;
+  }
+
+  try {
+    const submittedPlan = JSON.parse(value) as {
+      projectStages: Array<{ id?: unknown }>;
+      deliverables: Array<{
+        id?: unknown;
+        stages: Array<{ id?: unknown }>;
+      }>;
+    };
+
+    const isValidOptionalId = (id: unknown): boolean =>
+      id === undefined ||
+      (typeof id === "string" && UUID_PATTERN.test(id));
+
+    if (
+      submittedPlan.projectStages.some((stage) => !isValidOptionalId(stage.id)) ||
+      submittedPlan.deliverables.some(
+        (deliverable) =>
+          !isValidOptionalId(deliverable.id) ||
+          deliverable.stages.some((stage) => !isValidOptionalId(stage.id)),
+      )
+    ) {
+      return null;
+    }
+
+    return {
+      projectStages: validatedPlan.projectStages.map((stage, index) => ({
+        ...stage,
+        id: submittedPlan.projectStages[index].id as string | undefined,
+      })),
+      deliverables: validatedPlan.deliverables.map((deliverable, index) => ({
+        ...deliverable,
+        id: submittedPlan.deliverables[index].id as string | undefined,
+        stages: deliverable.stages.map((stage, stageIndex) => ({
+          ...stage,
+          id: submittedPlan.deliverables[index].stages[stageIndex].id as
+            | string
+            | undefined,
+        })),
+      })),
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function updateCommissionGroupedPaymentPlanAction(
+  _previousState: CommissionPaymentPlanActionState,
+  formData: FormData,
+): Promise<CommissionPaymentPlanActionState> {
+  const session = await requireAdmin();
+
+  const commissionId = getFormValue(formData, "commissionId");
+  const agreementId = getFormValue(formData, "agreementId");
+  const expectedAgreementUpdatedAt = parseRequiredDate(
+    getFormValue(formData, "expectedAgreementUpdatedAt"),
+  );
+
+  if (
+    !UUID_PATTERN.test(commissionId) ||
+    !UUID_PATTERN.test(agreementId)
+  ) {
+    return {
+      outcome: "error",
+      message: "The commission or Agreement identifier is invalid.",
+    };
+  }
+
+  if (!expectedAgreementUpdatedAt) {
+    return {
+      outcome: "error",
+      message: "The Agreement version timestamp is invalid.",
+    };
+  }
+
+  const plan = parseCommissionGroupedPaymentPlanForUpdate(
+    getFormValue(formData, "plan"),
+  );
+
+  if (!plan) {
+    return {
+      outcome: "error",
+      message: "The grouped payment plan has an invalid structure or identifier.",
+    };
+  }
+
+  try {
+    // Resolve the accepted Quote on the server, not from browser input.
+    const quotes = await getCommissionQuotes(commissionId);
+    const acceptedQuotes = quotes.filter(
+      ({ quote }) => quote.status === "accepted",
+    );
+
+    if (acceptedQuotes.length !== 1) {
+      return {
+        outcome: "conflict",
+        message:
+          acceptedQuotes.length === 0
+            ? "An accepted Quote is required before editing the payment plan."
+            : "More than one accepted Quote was found. Review the Quote history.",
+      };
+    }
+
+    const result = await updateCommissionGroupedPaymentPlan({
+      commissionId,
+      quoteId: acceptedQuotes[0].quote.id,
+      agreementId,
+      expectedAgreementUpdatedAt,
+      plan,
+      updatedByAdminUserId: session.user.id,
+    });
+
+    switch (result.outcome) {
+      case "updated":
+        revalidateCommissionActivityPaths(commissionId);
+        return {
+          outcome: "success",
+          message: "Grouped payment plan updated successfully.",
+        };
+
+      case "invalid":
+        return { outcome: "error", message: result.validation.message };
+
+      case "not_found":
+        return {
+          outcome: "error",
+          message: "The Commission or payment plan could not be found.",
+        };
+
+      case "wrong_status":
+        return {
+          outcome: "conflict",
+          message: `The payment plan cannot be edited while the commission is ${result.currentStatus}.`,
+        };
+
+      case "on_hold":
+        return {
+          outcome: "conflict",
+          message: "The payment plan cannot be edited while the commission is on hold.",
+        };
+
+      case "quote_not_accepted":
+        return {
+          outcome: "conflict",
+          message: "The Quote is no longer accepted. Refresh the page.",
+        };
+
+      case "agreement_not_draft":
+        return {
+          outcome: "conflict",
+          message: "The Agreement is no longer a draft.",
+        };
+
+      case "plan_not_found":
+        return {
+          outcome: "conflict",
+          message: "No payment plan exists. Refresh the page.",
+        };
+
+      case "plan_locked":
+        return {
+          outcome: "conflict",
+          message:
+            "This payment plan can no longer be edited because a payment is linked to it or one of its stages is no longer pending.",
+        };
+
+      case "conflict":
+        revalidateCommissionActivityPaths(commissionId);
+        return {
+          outcome: "conflict",
+          message:
+            "The Agreement or payment plan has changed. Refresh the page before saving again.",
+        };
+    }
+  } catch (error) {
+    console.error("Failed to update grouped Commission payment plan:", error);
+    return {
+      outcome: "error",
+      message: "The grouped payment plan could not be updated. Please try again.",
     };
   }
 }
