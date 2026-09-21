@@ -65,6 +65,7 @@ async function main(): Promise<void> {
   const {
     createCommissionPaymentPlan,
     createCommissionGroupedPaymentPlan,
+    updateCommissionGroupedPaymentPlan,
     updateCommissionPaymentPlan,
   } = await import(
     "../lib/repositories/commissionPayments/commissionPaymentPlanRepository"
@@ -1300,6 +1301,268 @@ async function main(): Promise<void> {
     console.log(
       "[OK] Repeated grouped plan creation was rejected",
     );
+
+    /*
+     * Edit the existing grouped plan on this temporary Commission.
+     * Add a stage to Illustration 1; Illustration 2 must keep its IDs
+     * even though its global stage sequences move from 4-5 to 5-6.
+     */
+    const groupedAgreementBeforeUpdateRows = await db
+      .select({ updatedAt: commissionAgreements.updatedAt })
+      .from(commissionAgreements)
+      .where(eq(commissionAgreements.id, groupedAgreementResult.agreement.id))
+      .limit(1);
+
+    const groupedAgreementBeforeUpdate = groupedAgreementBeforeUpdateRows[0];
+    ok(groupedAgreementBeforeUpdate);
+
+    const groupedUpdateInput = {
+      commissionId: grouped.commissionId,
+      quoteId: grouped.quoteId,
+      agreementId: groupedAgreementResult.agreement.id,
+      expectedAgreementUpdatedAt: groupedAgreementBeforeUpdate.updatedAt,
+      updatedByAdminUserId: adminUserId,
+      plan: {
+        projectStages: [
+          {
+            id: installments[0]!.id,
+            label: "Project booking payment",
+            amount: "50.00",
+            trigger: "before_start",
+          },
+        ],
+        deliverables: [
+          {
+            id: deliverables[0]!.id,
+            title: "Illustration 1 - revised",
+            description: "Updated first illustration",
+            quantity: 2,
+            stages: [
+              {
+                id: installments[1]!.id,
+                label: "Illustration 1 - Initial payment",
+                amount: "90.00",
+                trigger: "before_start",
+              },
+              {
+                id: installments[2]!.id,
+                label: "Illustration 1 - Second payment",
+                amount: "60.00",
+                trigger: "after_sketch_approval",
+              },
+              {
+                label: "Illustration 1 - New final payment",
+                amount: "50.00",
+                trigger: "before_final_delivery",
+              },
+            ],
+          },
+          {
+            id: deliverables[1]!.id,
+            title: "Illustration 2",
+            description: "Second illustration",
+            quantity: 1,
+            stages: [
+              {
+                id: installments[3]!.id,
+                label: "Illustration 2 - Initial payment",
+                amount: "110.00",
+                trigger: "before_start",
+              },
+              {
+                id: installments[4]!.id,
+                label: "Illustration 2 - Final payment",
+                amount: "90.00",
+                trigger: "before_final_delivery",
+              },
+            ],
+          },
+          {
+            title: "Illustration 3 - new",
+            description: "Covered by project-wide payments",
+            quantity: 1,
+            stages: [],
+          },
+        ],
+      },
+    } satisfies import("../lib/repositories/commissionPayments/commissionPaymentPlanRepository")
+      .UpdateCommissionGroupedPaymentPlanInput;
+
+    const groupedUpdateResult = await updateCommissionGroupedPaymentPlan(
+      groupedUpdateInput,
+    );
+
+    equal(groupedUpdateResult.outcome, "updated");
+    if (groupedUpdateResult.outcome !== "updated") {
+      throw new Error("Expected grouped payment plan update to succeed.");
+    }
+
+    equal(groupedUpdateResult.deliverables.length, 3);
+    equal(groupedUpdateResult.installments.length, 6);
+    equal(groupedUpdateResult.deliverables[0]?.id, deliverables[0]?.id);
+    equal(groupedUpdateResult.deliverables[1]?.id, deliverables[1]?.id);
+    equal(groupedUpdateResult.deliverables[0]?.title, "Illustration 1 - revised");
+    equal(groupedUpdateResult.deliverables[0]?.quantity, 2);
+    equal(groupedUpdateResult.deliverables[2]?.sequence, 3);
+    ok(!deliverables.some((row) => row.id === groupedUpdateResult.deliverables[2]?.id));
+
+    const expectedStageIds = [
+      installments[0]!.id,
+      installments[1]!.id,
+      installments[2]!.id,
+      null,
+      installments[3]!.id,
+      installments[4]!.id,
+    ];
+
+    groupedUpdateResult.installments.forEach((stage, index) => {
+      equal(stage.sequence, index + 1);
+      if (expectedStageIds[index] !== null) {
+        equal(stage.id, expectedStageIds[index]);
+      } else {
+        ok(!installments.some((oldStage) => oldStage.id === stage.id));
+        equal(stage.label, "Illustration 1 - New final payment");
+      }
+      equal(stage.status, "pending");
+      equal(stage.currency, "USD");
+    });
+
+    equal(groupedUpdateResult.installments[3]?.deliverableId, deliverables[0]?.id);
+    equal(groupedUpdateResult.installments[4]?.deliverableId, deliverables[1]?.id);
+    equal(groupedUpdateResult.installments[5]?.deliverableId, deliverables[1]?.id);
+    equal(groupedUpdateResult.installments[4]?.amount, "110.00");
+    equal(groupedUpdateResult.installments[5]?.amount, "90.00");
+
+    const groupedAgreementAfterUpdateRows = await db
+      .select({ updatedAt: commissionAgreements.updatedAt })
+      .from(commissionAgreements)
+      .where(eq(commissionAgreements.id, groupedAgreementResult.agreement.id))
+      .limit(1);
+
+    const groupedAgreementAfterUpdate = groupedAgreementAfterUpdateRows[0];
+    ok(groupedAgreementAfterUpdate);
+    ok(
+      groupedAgreementAfterUpdate.updatedAt.getTime() >
+        groupedAgreementBeforeUpdate.updatedAt.getTime(),
+    );
+
+    console.log(
+      "[OK] Grouped update preserved IDs and associations, added a stage and deliverable, and renumbered later stages",
+    );
+
+    // A rejected edit must leave both the Agreement and the entire plan intact.
+    async function getGroupedSnapshot(): Promise<string> {
+      const [savedDeliverables, savedStages, savedAgreement] = await Promise.all([
+        db.select().from(commissionDeliverables)
+          .where(eq(commissionDeliverables.commissionId, grouped.commissionId))
+          .orderBy(commissionDeliverables.sequence),
+        db.select().from(commissionPaymentInstallments)
+          .where(eq(commissionPaymentInstallments.commissionId, grouped.commissionId))
+          .orderBy(commissionPaymentInstallments.sequence),
+        db.select({ updatedAt: commissionAgreements.updatedAt })
+          .from(commissionAgreements)
+          .where(eq(commissionAgreements.id, groupedPlanInput.agreementId)),
+      ]);
+      return JSON.stringify({ savedDeliverables, savedStages, savedAgreement });
+    }
+
+    const savedSnapshot = await getGroupedSnapshot();
+    const staleGroupedResult = await updateCommissionGroupedPaymentPlan(
+      groupedUpdateInput,
+    );
+    equal(staleGroupedResult.outcome, "conflict");
+    equal(await getGroupedSnapshot(), savedSnapshot);
+    console.log("[OK] Stale Agreement version rejected without modifying the grouped plan");
+
+    // A valid structure with an incorrect monetary total must be rejected.
+    const invalidAmountPlan = {
+      projectStages: [
+        {
+          id: groupedUpdateResult.installments[0]!.id,
+          label: "Project booking payment",
+          amount: "51.00",
+          trigger: "before_start" as const,
+        },
+      ],
+      deliverables: groupedUpdateResult.deliverables.map((deliverable) => ({
+        id: deliverable.id,
+        title: deliverable.title,
+        description: deliverable.description,
+        quantity: deliverable.quantity,
+        stages: groupedUpdateResult.installments
+          .filter((stage) => stage.deliverableId === deliverable.id)
+          .map((stage) => ({
+            id: stage.id,
+            label: stage.label,
+            amount: stage.amount,
+            trigger: stage.trigger,
+            customTriggerNote: stage.customTriggerNote,
+          })),
+      })),
+    };
+
+    const invalidAmountResult = await updateCommissionGroupedPaymentPlan({
+      ...groupedUpdateInput,
+      expectedAgreementUpdatedAt: groupedAgreementAfterUpdate.updatedAt,
+      plan: invalidAmountPlan,
+    });
+    equal(invalidAmountResult.outcome, "invalid");
+    equal(await getGroupedSnapshot(), savedSnapshot);
+    console.log("[OK] Invalid grouped monetary total rejected without writes");
+
+    // Force a late SQL failure after a real UPDATE, then verify full rollback.
+    // This uses ONLY the temporary Commission created by this test script.
+    const { neon } = await import("@neondatabase/serverless");
+    const testDatabaseUrl = process.env.DATABASE_URL;
+    ok(testDatabaseUrl);
+    const httpSql = neon(testDatabaseUrl);
+    let rollbackErrorCode: string | undefined;
+
+    try {
+      await httpSql.transaction([
+        httpSql`
+          UPDATE commission_deliverables
+          SET title = 'SHOULD ROLL BACK'
+          WHERE id = ${deliverables[0]!.id}::uuid
+            AND commission_id = ${grouped.commissionId}::uuid
+        `,
+        httpSql`
+          INSERT INTO commission_payment_installments
+            (commission_id, quote_id, sequence, label, amount, currency, trigger)
+          VALUES (
+            ${grouped.commissionId}::uuid,
+            ${grouped.quoteId}::uuid,
+            1, 'Deliberate duplicate sequence', 1.00, 'USD', 'before_start'
+          )
+        `,
+      ]);
+    } catch (error) {
+      if (typeof error === "object" && error !== null && "code" in error) {
+        rollbackErrorCode = String(error.code);
+      }
+    }
+
+    equal(rollbackErrorCode, "23505");
+    equal(await getGroupedSnapshot(), savedSnapshot);
+    console.log("[OK] Late SQL error rolled back an earlier change on the temporary plan");
+
+    // A linked payment locks the entire plan, even when its status is pending.
+    await db.insert(commissionPayments).values({
+      commissionId: grouped.commissionId,
+      installmentId: groupedUpdateResult.installments[0]!.id,
+      type: "installment",
+      status: "pending",
+      amount: "1.00",
+      currency: "USD",
+    });
+    const lockedSnapshot = await getGroupedSnapshot();
+    const lockedGroupedResult = await updateCommissionGroupedPaymentPlan({
+      ...groupedUpdateInput,
+      expectedAgreementUpdatedAt: groupedAgreementAfterUpdate.updatedAt,
+    });
+    equal(lockedGroupedResult.outcome, "plan_locked");
+    equal(await getGroupedSnapshot(), lockedSnapshot);
+    console.log("[OK] Linked payment locked the grouped plan without modifying it");
 
     console.log(
       "[OK] Commission agreement draft repository verification passed",

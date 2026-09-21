@@ -28,6 +28,30 @@ export interface CommissionGroupedPaymentPlanInput {
   deliverables: readonly CommissionPaymentDeliverableInput[];
 }
 
+export interface CommissionPaymentStageEditInput
+  extends CommissionPaymentStageInput {
+  /**
+   * Existing stage ID.
+   * Omit only when adding a new stage.
+   */
+  id?: string;
+}
+
+export interface CommissionPaymentDeliverableEditInput
+  extends Omit<CommissionPaymentDeliverableInput, "stages"> {
+  /**
+   * Existing deliverable ID.
+   * Omit only when adding a new deliverable.
+   */
+  id?: string;
+  stages: readonly CommissionPaymentStageEditInput[];
+}
+
+export interface CommissionGroupedPaymentPlanEditInput {
+  projectStages: readonly CommissionPaymentStageEditInput[];
+  deliverables: readonly CommissionPaymentDeliverableEditInput[];
+}
+
 export interface NormalizedCommissionPaymentDeliverable {
   sequence: number;
   title: string;
