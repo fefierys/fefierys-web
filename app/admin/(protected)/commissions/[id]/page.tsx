@@ -517,9 +517,23 @@ export default async function CommissionDetailPage({
                   termsVersion={activeAgreement.termsVersion}
                   preview={
                     agreementPreviewData ? (
-                      <CommissionAgreementDocumentPreview
-                        document={agreementPreviewData}
-                      />
+                      <div className="space-y-3">
+                        <CommissionAgreementDocumentPreview
+                          document={agreementPreviewData}
+                        />
+
+                        <a
+                          className="block w-full rounded-xl border border-white/15 bg-white/10 px-4 py-3 text-center text-sm transition hover:bg-white/15"
+                          href={`/api/admin/commissions/${commission.id}/agreement/draft-pdf`}
+                        >
+                          Download draft PDF
+                        </a>
+
+                        <p className="text-xs leading-relaxed text-white/50">
+                          For internal review only. Downloading does not issue,
+                          sign or send the Agreement.
+                        </p>
+                      </div>
                     ) : (
                       <p className="text-sm leading-relaxed text-white/60">
                         {agreementPreviewError ??
