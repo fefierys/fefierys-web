@@ -8,6 +8,7 @@ import CommissionStatusBadge from "@/components/admin/CommissionStatusBadge";
 import CommissionWorkflowActions from "@/components/admin/CommissionWorkflowActions";
 import CommissionConversationPanel from "@/components/admin/CommissionConversationPanel";
 import CommissionAgreementPanel from "@/components/admin/CommissionAgreementPanel";
+import CommissionAgreementDocumentPreview from "@/components/admin/CommissionAgreementDocumentPreview";
 import CommissionAgreementCreatePanel from "@/components/admin/CommissionAgreementCreatePanel";
 import CommissionPaymentPlanCreatePanel from "@/components/admin/CommissionPaymentPlanCreatePanel";
 import CommissionPaymentPlanPanel from "@/components/admin/CommissionPaymentPlanPanel";
@@ -19,7 +20,13 @@ import type { CommissionQuotePricingEditorConfig } from "@/lib/commissions/commi
 import {
   createEmptyCommissionAgreementDraftData,
   validateCommissionAgreementDraftData,
+  validateCommissionAgreementReadyToPresent,
 } from "@/lib/commissions/commissionAgreementData";
+
+import {
+  buildCommissionAgreementDocumentData,
+  type CommissionAgreementDocumentData,
+} from "@/lib/commissions/commissionAgreementDocumentData";
 import { getAdminCommissionDetail } from "@/lib/repositories/commissionAdminRepository";
 import {
   getActiveCommissionPricingCatalog,
@@ -114,13 +121,15 @@ export default async function CommissionDetailPage({
     notFound();
   }
 
-  const agreementQuote = activeAgreement
+  const agreementQuoteWithItems = activeAgreement
     ? quotes.find(
         ({ quote }) =>
           quote.id === activeAgreement.quoteId &&
           quote.status === "accepted",
-      )?.quote ?? null
+      ) ?? null
     : null;
+
+  const agreementQuote = agreementQuoteWithItems?.quote ?? null;
 
   const agreementPaymentPlan = activeAgreement
     ? await getCommissionPaymentPlan(
@@ -157,6 +166,50 @@ export default async function CommissionDetailPage({
     events,
     statusHistory,
   } = detail;
+
+  let agreementPreviewData:
+    CommissionAgreementDocumentData | null = null;
+
+  let agreementPreviewError: string | null = null;
+
+  if (
+    activeAgreement?.status === "draft" &&
+    agreementQuoteWithItems !== null &&
+    agreementPaymentPlan.length > 0 &&
+    commission.status === "awaiting_agreement" &&
+    !commission.isOnHold
+  ) {
+    const readyValidation =
+      validateCommissionAgreementReadyToPresent(
+        activeAgreement.agreementData,
+      );
+
+    if (!readyValidation.valid) {
+      agreementPreviewError =
+        `Complete the Agreement field: ${readyValidation.field}.`;
+    } else {
+      try {
+        agreementPreviewData =
+          buildCommissionAgreementDocumentData({
+            commission,
+            agreement: activeAgreement,
+            quote: agreementQuoteWithItems.quote,
+            quoteItems: agreementQuoteWithItems.items,
+            deliverables: agreementDeliverables,
+            paymentStages: agreementPaymentPlan,
+          });
+      } catch (error) {
+        console.error(
+          "Unable to prepare Commission Agreement preview:",
+          error,
+        );
+
+        agreementPreviewError =
+          "The Agreement preview could not be prepared. " +
+          "Review the Quote and payment plan data.";
+      }
+    }
+  }
 
   const meetsPaymentPlanEditConditions =
     commission.status === "awaiting_agreement" &&
@@ -444,7 +497,7 @@ export default async function CommissionDetailPage({
         {activeTab === "documents" && (
           <div className="mt-6 grid items-start gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(20rem,0.9fr)]">
             <div className="min-w-0 space-y-6">
-                          <CommissionQuotePanel
+              <CommissionQuotePanel
                 commissionId={commission.id}
                 commissionStatus={commission.status}
                 pricingConfig={pricingConfig}
@@ -462,6 +515,20 @@ export default async function CommissionDetailPage({
                   initialUpdatedAt={activeAgreement.updatedAt.toISOString()}
                   quoteId={activeAgreement.quoteId}
                   termsVersion={activeAgreement.termsVersion}
+                  preview={
+                    agreementPreviewData ? (
+                      <CommissionAgreementDocumentPreview
+                        document={agreementPreviewData}
+                      />
+                    ) : (
+                      <p className="text-sm leading-relaxed text-white/60">
+                        {agreementPreviewError ??
+                          (agreementPaymentPlan.length === 0
+                            ? "Create the payment plan in the Payments tab before previewing the Agreement."
+                            : "The Agreement preview is not available in the current commission state.")}
+                      </p>
+                    )
+                  }
                 />
               ) : !activeAgreement &&
                 commission.status === "awaiting_agreement" ? (
@@ -526,6 +593,7 @@ export default async function CommissionDetailPage({
                   </section>
                 )
               )}
+
             </div>
           </div>
         )}

@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  type ReactNode,
   useActionState,
   useCallback,
   useState,
@@ -27,6 +28,7 @@ interface CommissionAgreementPanelProps {
   termsVersion: string;
   initialUpdatedAt: string;
   initialData: CommissionAgreementDraftData;
+  preview?: ReactNode;
 }
 
 const INITIAL_ACTION_STATE: CommissionAgreementDraftActionState = {
@@ -47,6 +49,7 @@ export default function CommissionAgreementPanel({
   termsVersion,
   initialUpdatedAt,
   initialData,
+  preview,
 }: CommissionAgreementPanelProps) {
   const [open, setOpen] = useState(false);
   const closeModal = useCallback(() => {
@@ -170,6 +173,8 @@ export default function CommissionAgreementPanel({
         >
           Edit Agreement draft
         </button>
+
+        {preview && <div className="mt-3">{preview}</div>}
       </section>
 
       <CommissionAdminModal
