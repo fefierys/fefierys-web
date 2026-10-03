@@ -89,7 +89,7 @@ async function main() {
     const latestCreatedAt =
       result.rows.length > 0
         ? BigInt(result.rows[result.rows.length - 1].created_at)
-        : 0n;
+        : BigInt(0);
 
     const pending = journal.entries.filter(
       (entry) => BigInt(entry.when) > latestCreatedAt,
