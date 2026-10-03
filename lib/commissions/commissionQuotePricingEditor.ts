@@ -21,18 +21,29 @@ export interface CommissionQuotePricingEditorAdjustment {
   stackable: boolean;
 }
 
+export interface CommissionQuotePricingEditorOption {
+  adjustments: CommissionQuotePricingEditorAdjustment[];
+  option: {
+    baseAmount: string;
+    description: string | null;
+    id: string;
+    quoteLabel: string;
+  };
+  service: {
+    id: string;
+    title: string;
+  };
+}
+
 export type CommissionQuotePricingEditorConfig =
   | {
       mode: "custom";
     }
   | {
       adjustments: CommissionQuotePricingEditorAdjustment[];
+      catalogMode: "single" | "bulk";
       mode: "catalog";
-      option: {
-        baseAmount: string;
-        description: string | null;
-        id: string;
-        quoteLabel: string;
-      };
+      option: CommissionQuotePricingEditorOption["option"];
+      options: CommissionQuotePricingEditorOption[];
       pricingVersionId: string;
     };

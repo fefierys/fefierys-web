@@ -1,10 +1,6 @@
 "use client";
 
-import {
-  useActionState,
-  useEffect,
-  useState,
-} from "react";
+import { useActionState, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
 import {
@@ -12,6 +8,10 @@ import {
   type CommissionQuoteActionState,
 } from "@/app/admin/(protected)/commissions/actions";
 import { formatCommissionDate } from "@/lib/commissions/commissionDate";
+import {
+  formatCommissionQuoteAmount,
+  parseCommissionQuoteAmount,
+} from "@/lib/commissions/commissionQuote";
 import type { CommissionQuoteWithItems } from "@/lib/repositories/commissionQuoteRepository";
 
 interface CommissionQuoteSendConfirmProps {
@@ -21,11 +21,20 @@ interface CommissionQuoteSendConfirmProps {
   quote: CommissionQuoteWithItems;
 }
 
-const initialActionState:
-  CommissionQuoteActionState = {
-    message: null,
-    outcome: "idle",
-  };
+const initialActionState: CommissionQuoteActionState = {
+  message: null,
+  outcome: "idle",
+};
+
+function formatLineAmount(quantity: number, unitAmount: string): string {
+  const minorUnits = parseCommissionQuoteAmount(unitAmount);
+
+  if (minorUnits === null) {
+    return "—";
+  }
+
+  return formatCommissionQuoteAmount(minorUnits * BigInt(quantity));
+}
 
 export default function CommissionQuoteSendConfirm({
   commissionId,
@@ -33,82 +42,45 @@ export default function CommissionQuoteSendConfirm({
   onSuccess,
   quote,
 }: CommissionQuoteSendConfirmProps) {
-  const [
-    footerRoot,
-    setFooterRoot,
-  ] = useState<HTMLElement | null>(
-    null,
-  );
+  const [footerRoot, setFooterRoot] = useState<HTMLElement | null>(null);
 
-  const [
-    state,
-    formAction,
-    pending,
-  ] = useActionState(
+  const [state, formAction, pending] = useActionState(
     sendCommissionQuoteAction,
     initialActionState,
   );
 
-  const formId =
-    `commission-quote-send-form-${quote.quote.id}`;
+  const formId = `commission-quote-send-form-${quote.quote.id}`;
 
-  const success =
-    state.outcome === "success";
+  const success = state.outcome === "success";
 
   useEffect(() => {
-    const frame =
-      window.requestAnimationFrame(
-        () => {
-          setFooterRoot(
-            document.getElementById(
-              "commission-admin-modal-footer-root",
-            ),
-          );
-        },
+    const frame = window.requestAnimationFrame(() => {
+      setFooterRoot(
+        document.getElementById("commission-admin-modal-footer-root"),
       );
+    });
 
     return () => {
-      window.cancelAnimationFrame(
-        frame,
-      );
+      window.cancelAnimationFrame(frame);
     };
   }, []);
 
-  const error =
-    success
-      ? null
-      : state.message;
+  const error = success ? null : state.message;
 
   function handleCloseSuccess() {
-    onSuccess(
-      `Quote v${quote.quote.version} sent and emailed successfully.`,
-    );
+    onSuccess(`Quote v${quote.quote.version} sent and emailed successfully.`);
   }
 
   return (
-    <form
-      action={formAction}
-      className="min-w-0"
-      id={formId}
-    >
-      <input
-        name="commissionId"
-        type="hidden"
-        value={commissionId}
-      />
+    <form action={formAction} className="min-w-0" id={formId}>
+      <input name="commissionId" type="hidden" value={commissionId} />
 
-      <input
-        name="quoteId"
-        type="hidden"
-        value={quote.quote.id}
-      />
+      <input name="quoteId" type="hidden" value={quote.quote.id} />
 
       <input
         name="expectedUpdatedAt"
         type="hidden"
-        value={
-          quote.quote.updatedAt.toISOString()
-        }
+        value={quote.quote.updatedAt.toISOString()}
       />
 
       {success ? (
@@ -124,11 +96,8 @@ export default function CommissionQuoteSendConfirm({
               </h3>
 
               <p className="mt-2 text-sm leading-relaxed text-white/65">
-                Quote v
-                {quote.quote.version} was
-                emailed to the client with a
-                secure link to review and
-                respond.
+                Quote v{quote.quote.version} was emailed to the client with a
+                secure link to review and respond.
               </p>
             </div>
           </div>
@@ -139,9 +108,7 @@ export default function CommissionQuoteSendConfirm({
                 Client notified
               </dt>
 
-              <dd className="mt-1.5 font-medium text-white/80">
-                Yes
-              </dd>
+              <dd className="mt-1.5 font-medium text-white/80">Yes</dd>
             </div>
 
             <div>
@@ -181,21 +148,16 @@ export default function CommissionQuoteSendConfirm({
                 </p>
 
                 <h3 className="mt-1 text-lg font-medium text-white">
-                  Quote v
-                  {quote.quote.version}
+                  Quote v{quote.quote.version}
                 </h3>
 
                 <p className="mt-1 text-sm text-white/55">
-                  Valid until{" "}
-                  {formatCommissionDate(
-                    quote.quote.validUntil,
-                  )}
+                  Valid until {formatCommissionDate(quote.quote.validUntil)}
                 </p>
               </div>
 
               <p className="text-2xl font-medium text-white">
-                {quote.quote.totalAmount}{" "}
-                {quote.quote.currency}
+                {quote.quote.totalAmount} {quote.quote.currency}
               </p>
             </div>
 
@@ -204,9 +166,114 @@ export default function CommissionQuoteSendConfirm({
                 Included items
               </p>
 
-              <div className="mt-3 space-y-2">
-                {quote.items.map(
-                  (item) => (
+              <div className="mt-3 space-y-3">
+                {quote.illustrations.length > 0 ? (
+                  <>
+                    {quote.illustrations.map((illustration) => {
+                      const illustrationItems = quote.items.filter(
+                        (item) => item.illustrationId === illustration.id,
+                      );
+
+                      const baseItem = illustrationItems.find(
+                        (item) => item.kind === "base",
+                      );
+
+                      return (
+                        <div
+                          className="rounded-xl border border-white/10 bg-white/[0.03] p-3"
+                          key={illustration.id}
+                        >
+                          <div>
+                            <p className="text-sm font-medium text-white/90">
+                              {baseItem?.label ??
+                                `Illustration ${illustration.sequence}`}
+                            </p>
+
+                            {baseItem?.description && (
+                              <p className="mt-1 text-xs leading-relaxed text-white/50">
+                                {baseItem.description}
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="mt-3 space-y-2 border-t border-white/10 pt-3">
+                            {illustrationItems.map((item) => (
+                              <div
+                                className="flex min-w-0 items-start justify-between gap-4"
+                                key={item.id}
+                              >
+                                <div className="min-w-0">
+                                  <p className="text-sm text-white/80">
+                                    {item.kind === "base"
+                                      ? "Base illustration"
+                                      : item.label}
+                                  </p>
+
+                                  <p className="mt-0.5 text-xs text-white/40">
+                                    {item.quantity} × {item.unitAmount}{" "}
+                                    {quote.quote.currency}
+                                  </p>
+                                </div>
+
+                                <p className="shrink-0 text-sm tabular-nums text-white/85">
+                                  {formatLineAmount(
+                                    item.quantity,
+                                    item.unitAmount,
+                                  )}{" "}
+                                  {quote.quote.currency}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {quote.items.some(
+                      (item) => item.illustrationId === null,
+                    ) && (
+                      <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                        <p className="text-sm font-medium text-white/90">
+                          Additional charges and global discount
+                        </p>
+
+                        <div className="mt-3 space-y-2 border-t border-white/10 pt-3">
+                          {quote.items
+                            .filter((item) => item.illustrationId === null)
+                            .map((item) => (
+                              <div
+                                className="flex min-w-0 items-start justify-between gap-4"
+                                key={item.id}
+                              >
+                                <div className="min-w-0">
+                                  <p className="text-sm text-white/80">
+                                    {item.label}
+                                  </p>
+
+                                  <p className="mt-0.5 text-xs text-white/40">
+                                    {item.kind === "discount" &&
+                                    item.calculationType === "percentage" &&
+                                    item.percentageRate
+                                      ? `${Number(item.percentageRate)}% of pre-discount subtotal`
+                                      : `${item.quantity} × ${item.unitAmount} ${quote.quote.currency}`}
+                                  </p>
+                                </div>
+
+                                <p className="shrink-0 text-sm tabular-nums text-white/85">
+                                  {formatLineAmount(
+                                    item.quantity,
+                                    item.unitAmount,
+                                  )}{" "}
+                                  {quote.quote.currency}
+                                </p>
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  quote.items.map((item) => (
                     <div
                       className="flex min-w-0 items-start justify-between gap-4 text-sm"
                       key={item.id}
@@ -217,36 +284,29 @@ export default function CommissionQuoteSendConfirm({
                         </p>
 
                         <p className="mt-0.5 text-xs text-white/40">
-                          {item.quantity} ×{" "}
-                          {item.unitAmount}{" "}
-                          {
-                            quote.quote
-                              .currency
-                          }
+                          {item.quantity} × {item.unitAmount}{" "}
+                          {quote.quote.currency}
                         </p>
                       </div>
+
+                      <p className="shrink-0 tabular-nums text-white/85">
+                        {formatLineAmount(item.quantity, item.unitAmount)}{" "}
+                        {quote.quote.currency}
+                      </p>
                     </div>
-                  ),
+                  ))
                 )}
               </div>
             </div>
           </section>
 
           <div className="mt-5 rounded-2xl border border-sky-200/15 bg-sky-200/[0.07] p-4 text-sm leading-relaxed text-sky-50/85">
-            <p className="font-medium text-sky-50">
-              What happens next?
-            </p>
+            <p className="font-medium text-sky-50">What happens next?</p>
 
             <p className="mt-1.5">
-              The client will receive an
-              email with a secure link to
-              review and respond to this
-              quote. Once sent, the
-              commission will move to{" "}
-              <strong className="font-medium">
-                Awaiting quote response
-              </strong>
-              .
+              The client will receive an email with a secure link to review and
+              respond to this quote. Once sent, the commission will move to{" "}
+              <strong className="font-medium">Awaiting quote response</strong>.
             </p>
           </div>
         </>
@@ -258,9 +318,7 @@ export default function CommissionQuoteSendConfirm({
               <div className="flex justify-end border-t border-white/10 bg-[#7880b2] px-5 py-4 sm:px-7 sm:py-5">
                 <button
                   className="rounded-xl border border-white/15 bg-white/10 px-5 py-3 text-sm text-white transition hover:bg-white/15"
-                  onClick={
-                    handleCloseSuccess
-                  }
+                  onClick={handleCloseSuccess}
                   type="button"
                 >
                   Close
@@ -283,9 +341,7 @@ export default function CommissionQuoteSendConfirm({
                   form={formId}
                   type="submit"
                 >
-                  {pending
-                    ? "Sending..."
-                    : "Send quote"}
+                  {pending ? "Sending..." : "Send quote"}
                 </button>
               </div>
             ),

@@ -17,6 +17,7 @@ export const COMMISSION_REQUEST_SOURCES = [
 export const COMMISSION_SERVICE_CLASSIFICATIONS = [
   "unclassified",
   "catalog",
+  "bulk",
   "custom",
 ] as const satisfies readonly CommissionServiceClassification[];
 

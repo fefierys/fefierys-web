@@ -323,6 +323,9 @@ function parseQuoteSelectedAdjustments(
       typeof record.adjustmentId !== "string" ||
       !UUID_PATTERN.test(record.adjustmentId) ||
       typeof record.quantity !== "number" ||
+      (record.fixedAmount !== undefined &&
+        record.fixedAmount !== null &&
+        typeof record.fixedAmount !== "string") ||
       (record.internalNote !== undefined &&
         record.internalNote !== null &&
         typeof record.internalNote !== "string") ||
@@ -335,6 +338,8 @@ function parseQuoteSelectedAdjustments(
 
     adjustments.push({
       adjustmentId: record.adjustmentId,
+      fixedAmount:
+        typeof record.fixedAmount === "string" ? record.fixedAmount : null,
       internalNote:
         typeof record.internalNote === "string" ? record.internalNote : null,
       percentageRate:
@@ -376,7 +381,10 @@ function parseQuoteIllustrations(
     if (
       typeof record.id !== "string" ||
       !UUID_PATTERN.test(record.id) ||
-      illustrationIds.has(record.id)
+      illustrationIds.has(record.id) ||
+      (record.pricingOptionId !== undefined &&
+        (typeof record.pricingOptionId !== "string" ||
+          !UUID_PATTERN.test(record.pricingOptionId)))
     ) {
       return null;
     }
@@ -393,6 +401,10 @@ function parseQuoteIllustrations(
 
     illustrations.push({
       id: record.id,
+      pricingOptionId:
+        typeof record.pricingOptionId === "string"
+          ? record.pricingOptionId
+          : undefined,
       selectedAdjustments,
     });
   }
@@ -1025,13 +1037,21 @@ export async function classifyCommissionAction(
             pricingServiceId,
             updatedByAdminUserId: session.user.id,
           }
-        : {
-            classification,
-            commissionId,
-            expectedUpdatedAt,
-            note,
-            updatedByAdminUserId: session.user.id,
-          },
+        : classification === "bulk"
+          ? {
+              classification,
+              commissionId,
+              expectedUpdatedAt,
+              note: note || null,
+              updatedByAdminUserId: session.user.id,
+            }
+          : {
+              classification,
+              commissionId,
+              expectedUpdatedAt,
+              note,
+              updatedByAdminUserId: session.user.id,
+            },
     );
 
     switch (result.outcome) {
@@ -1042,7 +1062,9 @@ export async function classifyCommissionAction(
           message:
             classification === "catalog"
               ? "Commission classified from the pricing catalog."
-              : "Commission classified as custom.",
+              : classification === "bulk"
+                ? "Commission classified as bulk."
+                : "Commission classified as custom.",
         };
       case "invalid":
         return { outcome: "error", message: result.validation.message };

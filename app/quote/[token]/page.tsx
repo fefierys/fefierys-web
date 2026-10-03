@@ -10,10 +10,7 @@ import { getPublicCommissionQuoteByToken } from "@/lib/repositories/commissionQu
 
 import PublicQuoteResponseActions from "@/components/quote/PublicQuoteResponseActions";
 
-import {
-  acceptPublicQuoteAction,
-  declinePublicQuoteAction,
-} from "./actions";
+import { acceptPublicQuoteAction, declinePublicQuoteAction } from "./actions";
 
 import {
   formatCommissionQuoteAmount,
@@ -47,61 +44,50 @@ interface QuoteStatusContent {
   badgeClassName: string;
 }
 
-const STATUS_CONTENT: Record<
-  PublicCommissionQuoteStatus,
-  QuoteStatusContent
-> = {
-  sent: {
-    eyebrow: "Awaiting your response",
-    title: "Your quote is ready",
-    description:
+const STATUS_CONTENT: Record<PublicCommissionQuoteStatus, QuoteStatusContent> =
+  {
+    sent: {
+      eyebrow: "Awaiting your response",
+      title: "Your quote is ready",
+      description:
         "Please review the details below. You can accept or decline this quote securely from this page.",
-    badgeClassName:
-      "border-amber-200/25 bg-amber-200/10 text-amber-50",
-  },
+      badgeClassName: "border-amber-200/25 bg-amber-200/10 text-amber-50",
+    },
 
-  accepted: {
-    eyebrow: "Accepted",
-    title: "Quote accepted",
-    description:
-      "This quote has been accepted and is now preserved here for your records.",
-    badgeClassName:
-      "border-emerald-200/25 bg-emerald-200/10 text-emerald-50",
-  },
+    accepted: {
+      eyebrow: "Accepted",
+      title: "Quote accepted",
+      description:
+        "This quote has been accepted and is now preserved here for your records.",
+      badgeClassName: "border-emerald-200/25 bg-emerald-200/10 text-emerald-50",
+    },
 
-  declined: {
-    eyebrow: "Declined",
-    title: "Quote declined",
-    description:
-      "This quote was declined and can no longer be accepted or changed from this page.",
-    badgeClassName:
-      "border-red-200/25 bg-red-200/10 text-red-50",
-  },
+    declined: {
+      eyebrow: "Declined",
+      title: "Quote declined",
+      description:
+        "This quote was declined and can no longer be accepted or changed from this page.",
+      badgeClassName: "border-red-200/25 bg-red-200/10 text-red-50",
+    },
 
-  expired: {
-    eyebrow: "Expired",
-    title: "This quote has expired",
-    description:
-      "The validity period for this quote has ended. It remains available here for reference.",
-    badgeClassName:
-      "border-white/15 bg-white/[0.06] text-white/70",
-  },
+    expired: {
+      eyebrow: "Expired",
+      title: "This quote has expired",
+      description:
+        "The validity period for this quote has ended. It remains available here for reference.",
+      badgeClassName: "border-white/15 bg-white/[0.06] text-white/70",
+    },
 
-  superseded: {
-    eyebrow: "Replaced",
-    title: "This quote has been replaced",
-    description:
-      "A newer version of this quote has been created. This version remains available for reference but can no longer be accepted or declined.",
-    badgeClassName:
-      "border-violet-200/25 bg-violet-200/10 text-violet-50",
-  },
-};
+    superseded: {
+      eyebrow: "Replaced",
+      title: "This quote has been replaced",
+      description:
+        "A newer version of this quote has been created. This version remains available for reference but can no longer be accepted or declined.",
+      badgeClassName: "border-violet-200/25 bg-violet-200/10 text-violet-50",
+    },
+  };
 
-function QuoteStatus({
-  status,
-}: {
-  status: PublicCommissionQuoteStatus;
-}) {
+function QuoteStatus({ status }: { status: PublicCommissionQuoteStatus }) {
   const content = STATUS_CONTENT[status];
 
   return (
@@ -113,71 +99,169 @@ function QuoteStatus({
   );
 }
 
-function formatLineAmount(
-  quantity: number,
-  unitAmount: string,
-): string {
-  const minorUnits =
-    parseCommissionQuoteAmount(unitAmount);
+function formatLineAmount(quantity: number, unitAmount: string): string {
+  const minorUnits = parseCommissionQuoteAmount(unitAmount);
 
   if (minorUnits === null) {
     return unitAmount;
   }
 
-  return formatCommissionQuoteAmount(
-    minorUnits * BigInt(quantity),
-  );
+  return formatCommissionQuoteAmount(minorUnits * BigInt(quantity));
 }
 
-function QuoteItems({
-  quote,
-}: {
-  quote: PublicCommissionQuote;
-}) {
+function QuoteItems({ quote }: { quote: PublicCommissionQuote }) {
+  const hasIllustrations = quote.illustrations.length > 0;
+
+  const globalItems = hasIllustrations
+    ? quote.items.filter((item) => item.illustrationSequence === null)
+    : [];
+
   return (
     <section className="glass-card overflow-hidden">
       <div className="border-b border-white/10 px-5 py-5 sm:px-7">
-        <h2 className="text-lg font-medium text-white">
-          Quote details
-        </h2>
+        <h2 className="text-lg font-medium text-white">Quote details</h2>
 
-        <p className="mt-1 text-sm text-white/50">
-          Quote v{quote.version}
-        </p>
+        <p className="mt-1 text-sm text-white/50">Quote v{quote.version}</p>
       </div>
 
-      <div className="divide-y divide-white/10">
-        {quote.items.map((item) => (
-          <div
-            className="flex flex-col gap-3 px-5 py-5 sm:flex-row sm:items-start sm:justify-between sm:px-7"
-            key={`${item.sequence}-${item.label}`}
-          >
-            <div className="min-w-0">
-              <p className="font-medium text-white/90">
-                {item.label}
-              </p>
+      {hasIllustrations ? (
+        <div className="space-y-4 px-5 py-5 sm:px-7 sm:py-6">
+          {quote.illustrations.map((illustration) => {
+            const illustrationItems = quote.items.filter(
+              (item) => item.illustrationSequence === illustration.sequence,
+            );
 
-              {item.description && (
-                <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-white/50">
-                  {item.description}
+            const baseItem = illustrationItems.find(
+              (item) => item.kind === "base",
+            );
+
+            return (
+              <article
+                className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.025]"
+                key={illustration.sequence}
+              >
+                <div className="border-b border-white/10 px-4 py-4 sm:px-5">
+                  <p className="font-medium text-white/90">
+                    {baseItem?.label ?? `Illustration ${illustration.sequence}`}
+                  </p>
+
+                  {baseItem?.description && (
+                    <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-white/50">
+                      {baseItem.description}
+                    </p>
+                  )}
+                </div>
+
+                <div className="divide-y divide-white/10">
+                  {illustrationItems.map((item) => (
+                    <div
+                      className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-5"
+                      key={`${item.sequence}-${item.label}`}
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-white/85">
+                          {item.kind === "base"
+                            ? "Base illustration"
+                            : item.label}
+                        </p>
+
+                        {item.kind !== "base" && item.description && (
+                          <p className="mt-1 max-w-2xl text-sm leading-relaxed text-white/50">
+                            {item.description}
+                          </p>
+                        )}
+
+                        <p className="mt-1.5 text-xs text-white/40">
+                          {item.quantity} × {item.unitAmount} {quote.currency}
+                        </p>
+                      </div>
+
+                      <p className="shrink-0 text-sm font-medium tabular-nums text-white/80">
+                        {formatLineAmount(item.quantity, item.unitAmount)}{" "}
+                        {quote.currency}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </article>
+            );
+          })}
+
+          {globalItems.length > 0 && (
+            <article className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.025]">
+              <div className="border-b border-white/10 px-4 py-4 sm:px-5">
+                <p className="font-medium text-white/90">
+                  Additional charges and global discount
                 </p>
-              )}
+              </div>
 
-              <p className="mt-2 text-xs text-white/40">
-                {item.quantity} × {item.unitAmount} {quote.currency}
+              <div className="divide-y divide-white/10">
+                {globalItems.map((item) => (
+                  <div
+                    className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-5"
+                    key={`${item.sequence}-${item.label}`}
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-white/85">
+                        {item.label}
+                      </p>
+
+                      {item.description && (
+                        <p className="mt-1 max-w-2xl text-sm leading-relaxed text-white/50">
+                          {item.description}
+                        </p>
+                      )}
+
+                      <p className="mt-1.5 text-xs text-white/40">
+                        {item.kind === "discount" &&
+                        item.calculationType === "percentage" &&
+                        item.percentageRate
+                          ? `${Number(
+                              item.percentageRate,
+                            )}% of pre-discount subtotal`
+                          : `${item.quantity} × ${item.unitAmount} ${quote.currency}`}
+                      </p>
+                    </div>
+
+                    <p className="shrink-0 text-sm font-medium tabular-nums text-white/80">
+                      {formatLineAmount(item.quantity, item.unitAmount)}{" "}
+                      {quote.currency}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </article>
+          )}
+        </div>
+      ) : (
+        <div className="divide-y divide-white/10">
+          {quote.items.map((item) => (
+            <div
+              className="flex flex-col gap-3 px-5 py-5 sm:flex-row sm:items-start sm:justify-between sm:px-7"
+              key={`${item.sequence}-${item.label}`}
+            >
+              <div className="min-w-0">
+                <p className="font-medium text-white/90">{item.label}</p>
+
+                {item.description && (
+                  <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-white/50">
+                    {item.description}
+                  </p>
+                )}
+
+                <p className="mt-2 text-xs text-white/40">
+                  {item.quantity} × {item.unitAmount} {quote.currency}
+                </p>
+              </div>
+
+              <p className="shrink-0 text-sm font-medium tabular-nums text-white/80">
+                {formatLineAmount(item.quantity, item.unitAmount)}{" "}
+                {quote.currency}
               </p>
             </div>
-
-            <p className="shrink-0 text-sm font-medium text-white/80">
-                {formatLineAmount(
-                    item.quantity,
-                    item.unitAmount,
-                )}{" "}
-                {quote.currency}
-            </p>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       <div className="flex items-end justify-between gap-5 border-t border-white/10 bg-white/[0.035] px-5 py-5 sm:px-7 sm:py-6">
         <div>
@@ -185,9 +269,7 @@ function QuoteItems({
             Total
           </p>
 
-          <p className="mt-1 text-sm text-white/50">
-            {quote.currency}
-          </p>
+          <p className="mt-1 text-sm text-white/50">{quote.currency}</p>
         </div>
 
         <p className="text-2xl font-medium text-white sm:text-3xl">
@@ -198,9 +280,7 @@ function QuoteItems({
   );
 }
 
-export default async function QuotePage({
-  params,
-}: QuotePageProps) {
+export default async function QuotePage({ params }: QuotePageProps) {
   const { token } = await params;
 
   const quote = await getPublicCommissionQuoteByToken(token);
@@ -209,11 +289,9 @@ export default async function QuotePage({
     notFound();
   }
 
-  const acceptAction =
-    acceptPublicQuoteAction.bind(null, token);
+  const acceptAction = acceptPublicQuoteAction.bind(null, token);
 
-  const declineAction =
-    declinePublicQuoteAction.bind(null, token);
+  const declineAction = declinePublicQuoteAction.bind(null, token);
 
   const statusContent = STATUS_CONTENT[quote.status];
 
@@ -303,17 +381,17 @@ export default async function QuotePage({
 
           {quote.status === "sent" && (
             <PublicQuoteResponseActions
-                acceptAction={acceptAction}
-                currency={quote.currency}
-                declineAction={declineAction}
-                totalAmount={quote.totalAmount}
-                version={quote.version}
+              acceptAction={acceptAction}
+              currency={quote.currency}
+              declineAction={declineAction}
+              totalAmount={quote.totalAmount}
+              version={quote.version}
             />
-            )}
+          )}
 
           <p className="px-3 pt-3 text-center text-xs leading-relaxed text-white/35">
-            This secure link is intended for the recipient of this quote.
-            Please avoid sharing it with others.
+            This secure link is intended for the recipient of this quote. Please
+            avoid sharing it with others.
           </p>
         </div>
       </div>

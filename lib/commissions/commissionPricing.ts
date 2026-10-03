@@ -493,7 +493,7 @@ export function calculateCommissionPricing(input: {
       return {
         valid: false,
         code: "internal_note_required",
-        message: `Adjustment ${key} requires an internal note.`,
+        message: `Please add a reason for ${label} before saving the quote.`,
       };
     }
 

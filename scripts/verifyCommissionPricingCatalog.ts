@@ -3,6 +3,7 @@ import { deepEqual, equal, ok } from "node:assert/strict";
 import {
   INITIAL_COMMISSION_PRICING_SERVICES,
   INITIAL_COMMISSION_PRICING_VERSION_NAME,
+  INITIAL_CUSTOM_DISCOUNT,
   INITIAL_INDIE_AUTHOR_DISCOUNT,
 } from "../data/commissionPricingCatalog";
 import {
@@ -41,7 +42,7 @@ function adjustmentDefinition(adjustment: {
 }
 
 function main(): void {
-  equal(INITIAL_COMMISSION_PRICING_VERSION_NAME, "Fefierys catalog 2026.1");
+  equal(INITIAL_COMMISSION_PRICING_VERSION_NAME, "Fefierys catalog 2026.2");
   equal(INITIAL_COMMISSION_PRICING_SERVICES.length, 16);
   equal(
     INITIAL_COMMISSION_PRICING_SERVICES.reduce(
@@ -166,6 +167,23 @@ function main(): void {
   equal(INITIAL_INDIE_AUTHOR_DISCOUNT.requiresInternalNote, true);
   equal(INITIAL_INDIE_AUTHOR_DISCOUNT.stackable, false);
   console.log("[OK] Indie Author Discount is editable from 0% to 100%");
+  equal(
+    validateCommissionPricingAdjustmentDefinition(
+      adjustmentDefinition(INITIAL_CUSTOM_DISCOUNT),
+    ).valid,
+    true,
+  );
+  equal(INITIAL_CUSTOM_DISCOUNT.calculationType, "fixed");
+  equal(INITIAL_CUSTOM_DISCOUNT.calculationBasis, "none");
+  equal(INITIAL_CUSTOM_DISCOUNT.fixedAmount, "0");
+  equal(INITIAL_CUSTOM_DISCOUNT.percentageRate, null);
+  equal(INITIAL_CUSTOM_DISCOUNT.isValueEditable, true);
+  equal(INITIAL_CUSTOM_DISCOUNT.minimumPercentageRate, null);
+  equal(INITIAL_CUSTOM_DISCOUNT.maximumPercentageRate, null);
+  equal(INITIAL_CUSTOM_DISCOUNT.maxQuantity, 1);
+  equal(INITIAL_CUSTOM_DISCOUNT.requiresInternalNote, true);
+  equal(INITIAL_CUSTOM_DISCOUNT.stackable, false);
+  console.log("[OK] Custom Discount is an editable fixed USD discount");
   console.log("[OK] Initial commission pricing catalog verification passed");
 }
 

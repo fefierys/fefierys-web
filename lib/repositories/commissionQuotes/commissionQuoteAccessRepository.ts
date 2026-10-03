@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull, ne } from "drizzle-orm";
+import { and, asc, eq, isNull, ne, sql } from "drizzle-orm";
 
 import {
   hashPublicQuoteToken,
@@ -21,6 +21,11 @@ interface PublicQuoteAccessTarget {
   status: PublicCommissionQuoteStatus;
   updatedAt: Date;
   validUntil: Date;
+}
+
+interface PublicQuoteIllustrationRow extends Record<string, unknown> {
+  id: string;
+  sequence: number;
 }
 
 /*
@@ -76,6 +81,9 @@ export async function resolveCommissionQuotePublicToken(
  *
  * No internal database identifiers, token hashes, pricing identifiers,
  * internal notes, events, or administrative metadata are returned.
+ *
+ * Illustration UUIDs are used only inside this repository to resolve
+ * grouping. The public projection exposes illustrationSequence instead.
  */
 export async function getPublicCommissionQuoteByToken(
   token: string,
@@ -108,10 +116,7 @@ export async function getPublicCommissionQuoteByToken(
       expiredAt: commissionQuotes.expiredAt,
     })
     .from(commissionQuotes)
-    .innerJoin(
-      commissions,
-      eq(commissions.id, commissionQuotes.commissionId),
-    )
+    .innerJoin(commissions, eq(commissions.id, commissionQuotes.commissionId))
     .where(
       and(
         eq(commissionQuotes.publicTokenHash, tokenHash),
@@ -127,30 +132,94 @@ export async function getPublicCommissionQuoteByToken(
     return null;
   }
 
-  const itemRows = await db
-    .select({
-      sequence: commissionQuoteItems.sequence,
-      label: commissionQuoteItems.label,
-      description: commissionQuoteItems.description,
-      quantity: commissionQuoteItems.quantity,
-      unitAmount: commissionQuoteItems.unitAmount,
-    })
-    .from(commissionQuoteItems)
-    .innerJoin(
-      commissionQuotes,
-      eq(commissionQuotes.id, commissionQuoteItems.quoteId),
-    )
-    .where(
-      and(
-        eq(commissionQuotes.publicTokenHash, tokenHash),
-        isNull(commissionQuotes.publicTokenRevokedAt),
-        ne(commissionQuotes.status, "draft"),
+  const [illustrationResult, itemRows] = await Promise.all([
+    db.execute<PublicQuoteIllustrationRow>(
+      sql`
+          SELECT
+            illustration.id::text AS id,
+            illustration.sequence
+          FROM commission_quote_illustrations
+            AS illustration
+          INNER JOIN commission_quotes
+            AS quote
+            ON quote.id =
+              illustration.quote_id
+          WHERE
+            quote.public_token_hash =
+              ${tokenHash}
+            AND quote.public_token_revoked_at
+              IS NULL
+            AND quote.status <> 'draft'
+          ORDER BY
+            illustration.sequence,
+            illustration.id
+        `,
+    ),
+
+    db
+      .select({
+        sequence: commissionQuoteItems.sequence,
+
+        illustrationId: commissionQuoteItems.illustrationId,
+
+        kind: commissionQuoteItems.kind,
+
+        calculationType: commissionQuoteItems.calculationType,
+
+        percentageRate: commissionQuoteItems.percentageRate,
+
+        label: commissionQuoteItems.label,
+
+        description: commissionQuoteItems.description,
+
+        quantity: commissionQuoteItems.quantity,
+
+        unitAmount: commissionQuoteItems.unitAmount,
+      })
+      .from(commissionQuoteItems)
+      .innerJoin(
+        commissionQuotes,
+        eq(commissionQuotes.id, commissionQuoteItems.quoteId),
+      )
+      .where(
+        and(
+          eq(commissionQuotes.publicTokenHash, tokenHash),
+          isNull(commissionQuotes.publicTokenRevokedAt),
+          ne(commissionQuotes.status, "draft"),
+        ),
+      )
+      .orderBy(
+        asc(commissionQuoteItems.sequence),
+        asc(commissionQuoteItems.id),
       ),
-    )
-    .orderBy(
-      asc(commissionQuoteItems.sequence),
-      asc(commissionQuoteItems.id),
-    );
+  ]);
+
+  const illustrationSequenceById = new Map(
+    illustrationResult.rows.map((illustration) => [
+      illustration.id,
+      illustration.sequence,
+    ]),
+  );
+
+  const items = itemRows.map((item) => ({
+    sequence: item.sequence,
+
+    illustrationSequence:
+      item.illustrationId === null
+        ? null
+        : (illustrationSequenceById.get(item.illustrationId) ?? null),
+
+    kind: item.kind,
+
+    calculationType: item.calculationType,
+
+    percentageRate: item.percentageRate,
+
+    label: item.label,
+    description: item.description,
+    quantity: item.quantity,
+    unitAmount: item.unitAmount,
+  }));
 
   /*
    * A quote whose stored status is still "sent" but whose validity
@@ -181,6 +250,10 @@ export async function getPublicCommissionQuoteByToken(
     declinedAt: quote.declinedAt,
     expiredAt: quote.expiredAt,
 
-    items: itemRows,
+    illustrations: illustrationResult.rows.map((illustration) => ({
+      sequence: illustration.sequence,
+    })),
+
+    items,
   };
 }

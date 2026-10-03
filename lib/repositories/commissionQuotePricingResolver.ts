@@ -12,6 +12,7 @@ import { db } from "@/lib/db";
 import { commissions } from "@/lib/db/schema/commissions";
 
 import {
+  getActiveCommissionPricingCatalog,
   getActiveCommissionPricingOptionWithAdjustments,
   getCommissionPricingCatalogByVersion,
 } from "./commissionPricingRepository";
@@ -64,6 +65,7 @@ export async function resolveCommissionQuotePricingForCreate(input: {
     .from(commissions)
     .where(eq(commissions.id, input.commissionId))
     .limit(1);
+
   const commission = commissionRows[0];
 
   if (!commission) {
@@ -73,7 +75,17 @@ export async function resolveCommissionQuotePricingForCreate(input: {
     };
   }
 
-  if (input.selection.mode !== commission.serviceClassification) {
+  if (commission.serviceClassification === "unclassified") {
+    return {
+      outcome: "classification_required",
+      message: "Classify the commission before preparing its quote.",
+    };
+  }
+
+  const expectedPricingMode =
+    commission.serviceClassification === "custom" ? "custom" : "catalog";
+
+  if (input.selection.mode !== expectedPricingMode) {
     return {
       outcome: "pricing_mode_mismatch",
       message:
@@ -86,6 +98,56 @@ export async function resolveCommissionQuotePricingForCreate(input: {
       buildCommissionQuotePricingSnapshot({
         customItems: input.selection.customItems,
         mode: "custom",
+      }),
+    );
+  }
+
+  if (commission.serviceClassification === "bulk") {
+    const illustrationValidation = validateBulkIllustrations(
+      input.selection.illustrations,
+    );
+
+    if (illustrationValidation) {
+      return illustrationValidation;
+    }
+
+    const catalog = await getActiveCommissionPricingCatalog({
+      audience: "admin",
+    });
+
+    if (!catalog) {
+      return {
+        outcome: "catalog_unavailable",
+        message:
+          "The active pricing catalog is not available. Review the pricing catalog before creating this quote.",
+      };
+    }
+
+    const catalogOptions = catalog.services.flatMap((service) =>
+      service.options.map(({ adjustments, option }) => ({
+        adjustments,
+        option,
+      })),
+    );
+
+    if (catalogOptions.length === 0) {
+      return {
+        outcome: "catalog_unavailable",
+        message:
+          "The active pricing catalog does not contain any available options.",
+      };
+    }
+
+    return toResolutionResult(
+      buildCommissionQuotePricingSnapshot({
+        baseQuantity: input.selection.baseQuantity ?? 1,
+        catalogOptions,
+        customItems: input.selection.customItems,
+        globalAdjustments: input.selection.globalAdjustments,
+        illustrations: input.selection.illustrations,
+        mode: "catalog",
+        pricingVersionId: catalog.version.id,
+        selectedAdjustments: input.selection.selectedAdjustments,
       }),
     );
   }
@@ -137,7 +199,37 @@ export async function resolveCommissionQuotePricingForUpdate(input: {
     };
   }
 
-  if (storedQuote.quote.pricingMode !== input.selection.mode) {
+  const commissionRows = await db
+    .select({
+      serviceClassification: commissions.serviceClassification,
+    })
+    .from(commissions)
+    .where(eq(commissions.id, storedQuote.quote.commissionId))
+    .limit(1);
+
+  const commission = commissionRows[0];
+
+  if (!commission) {
+    return {
+      outcome: "not_found",
+      message: "The commission no longer exists.",
+    };
+  }
+
+  if (commission.serviceClassification === "unclassified") {
+    return {
+      outcome: "classification_required",
+      message: "Classify the commission before editing its quote.",
+    };
+  }
+
+  const expectedPricingMode =
+    commission.serviceClassification === "custom" ? "custom" : "catalog";
+
+  if (
+    storedQuote.quote.pricingMode !== input.selection.mode ||
+    storedQuote.quote.pricingMode !== expectedPricingMode
+  ) {
     return {
       outcome: "pricing_mode_mismatch",
       message: "A quote draft cannot be converted to a different pricing type.",
@@ -154,11 +246,8 @@ export async function resolveCommissionQuotePricingForUpdate(input: {
   }
 
   const pricingVersionId = storedQuote.quote.pricingVersionId;
-  const pricingOptionId = storedQuote.items.find(
-    (item) => item.kind === "base",
-  )?.pricingOptionId;
 
-  if (!pricingVersionId || !pricingOptionId) {
+  if (!pricingVersionId) {
     return {
       outcome: "catalog_unavailable",
       message: "The quote catalog snapshot is incomplete and cannot be edited.",
@@ -170,14 +259,75 @@ export async function resolveCommissionQuotePricingForUpdate(input: {
     audience: "admin",
     versionId: pricingVersionId,
   });
-  const catalogOption = catalog?.services
-    .flatMap((service) => service.options)
-    .find((candidate) => candidate.option.id === pricingOptionId);
 
-  if (!catalog || !catalogOption) {
+  if (!catalog) {
     return {
       outcome: "catalog_unavailable",
       message: "The pricing catalog used by this quote is no longer available.",
+    };
+  }
+
+  const catalogOptions = catalog.services.flatMap((service) =>
+    service.options.map(({ adjustments, option }) => ({
+      adjustments,
+      option,
+    })),
+  );
+
+  if (commission.serviceClassification === "bulk") {
+    const illustrationValidation = validateBulkIllustrations(
+      input.selection.illustrations,
+    );
+
+    if (illustrationValidation) {
+      return illustrationValidation;
+    }
+
+    if (catalogOptions.length === 0) {
+      return {
+        outcome: "catalog_unavailable",
+        message:
+          "The pricing catalog used by this quote does not contain any available options.",
+      };
+    }
+
+    return toResolutionResult(
+      buildCommissionQuotePricingSnapshot({
+        baseQuantity: input.selection.baseQuantity ?? 1,
+        catalogOptions,
+        customItems: input.selection.customItems,
+        globalAdjustments: input.selection.globalAdjustments,
+        illustrations: input.selection.illustrations,
+        mode: "catalog",
+        pricingVersionId: catalog.version.id,
+        selectedAdjustments: input.selection.selectedAdjustments,
+      }),
+    );
+  }
+
+  const storedPricingOptionIds = new Set(
+    storedQuote.items
+      .filter((item) => item.kind === "base" && item.pricingOptionId)
+      .map((item) => item.pricingOptionId as string),
+  );
+
+  if (storedPricingOptionIds.size !== 1) {
+    return {
+      outcome: "catalog_unavailable",
+      message: "The quote catalog snapshot is incomplete and cannot be edited.",
+    };
+  }
+
+  const pricingOptionId = [...storedPricingOptionIds][0];
+
+  const catalogOption = catalogOptions.find(
+    (candidate) => candidate.option.id === pricingOptionId,
+  );
+
+  if (!catalogOption) {
+    return {
+      outcome: "catalog_unavailable",
+      message: "The pricing option used by this quote is no longer available.",
     };
   }
 
@@ -196,10 +346,55 @@ export async function resolveCommissionQuotePricingForUpdate(input: {
   );
 }
 
+function validateBulkIllustrations(
+  illustrations: CommissionQuoteIllustrationSelection[] | undefined,
+): ResolveCommissionQuotePricingResult | null {
+  if (!illustrations || illustrations.length === 0) {
+    return {
+      outcome: "invalid",
+      validation: {
+        valid: false,
+        code: "illustration_invalid",
+        message: "Add at least one illustration to the Bulk quote.",
+      },
+    };
+  }
+
+  if (
+    illustrations.some((illustration) => !illustration.pricingOptionId?.trim())
+  ) {
+    return {
+      outcome: "invalid",
+      validation: {
+        valid: false,
+        code: "catalog_option_required",
+        message: "Select a catalog option for every Bulk illustration.",
+      },
+    };
+  }
+
+  const distinctPricingOptionIds = new Set(
+    illustrations.map((illustration) => illustration.pricingOptionId!.trim()),
+  );
+
+  if (distinctPricingOptionIds.size < 2) {
+    return {
+      outcome: "invalid",
+      validation: {
+        valid: false,
+        code: "catalog_option_required",
+        message:
+          "A Bulk quote must include at least two different catalog options.",
+      },
+    };
+  }
+
+  return null;
+}
+
 function toResolutionResult(
   result: BuildCommissionQuotePricingSnapshotResult,
 ): ResolveCommissionQuotePricingResult {
-  
   return result.valid
     ? {
         outcome: "resolved",

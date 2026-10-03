@@ -34,6 +34,15 @@ export type ClassifyCommissionInput =
       updatedByAdminUserId: string;
     }
   | {
+      classification: "bulk";
+      commissionId: string;
+      expectedUpdatedAt: Date;
+      note?: string | null;
+      pricingOptionId?: null;
+      pricingServiceId?: null;
+      updatedByAdminUserId: string;
+    }
+  | {
       classification: "custom";
       commissionId: string;
       expectedUpdatedAt: Date;
@@ -92,7 +101,10 @@ export async function classifyCommission(
 
   let pricingServiceId: string | null = null;
   let pricingOptionId: string | null = null;
-  let classificationTitle = "Custom commission classified";
+  let classificationTitle =
+    input.classification === "bulk"
+      ? "Bulk commission classified"
+      : "Custom commission classified";
 
   if (input.classification === "catalog") {
     const selection = await getActiveCommissionPricingOptionWithAdjustments({

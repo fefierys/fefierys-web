@@ -5,6 +5,7 @@ import { config } from "dotenv";
 import {
   INITIAL_COMMISSION_PRICING_SERVICES,
   INITIAL_COMMISSION_PRICING_VERSION_NAME,
+  INITIAL_CUSTOM_DISCOUNT,
   INITIAL_INDIE_AUTHOR_DISCOUNT,
 } from "../data/commissionPricingCatalog";
 import {
@@ -151,6 +152,7 @@ async function main(): Promise<void> {
             (adjustment) => `${expectedService.code}:${adjustment.code}`,
           ),
           INITIAL_INDIE_AUTHOR_DISCOUNT.code,
+          INITIAL_CUSTOM_DISCOUNT.code,
         ],
       );
     }
@@ -163,7 +165,7 @@ async function main(): Promise<void> {
     .select()
     .from(commissionPricingAdjustments)
     .where(eq(commissionPricingAdjustments.pricingVersionId, version.id));
-  equal(adjustmentRows.length, 48);
+  equal(adjustmentRows.length, 49);
 
   const indieDiscount = adjustmentRows.find(
     (adjustment) => adjustment.code === INITIAL_INDIE_AUTHOR_DISCOUNT.code,
@@ -183,6 +185,26 @@ async function main(): Promise<void> {
   console.log("[OK] All 48 adjustments were stored correctly");
   console.log("[OK] Indie Author Discount rules were stored correctly");
 
+  const customDiscount = adjustmentRows.find(
+    (adjustment) => adjustment.code === INITIAL_CUSTOM_DISCOUNT.code,
+  );
+
+  ok(customDiscount);
+  equal(customDiscount.kind, "discount");
+  equal(customDiscount.calculationType, "fixed");
+  equal(customDiscount.calculationBasis, "none");
+  equal(customDiscount.fixedAmount, "0.00");
+  equal(customDiscount.percentageRate, null);
+  equal(customDiscount.isValueEditable, true);
+  equal(customDiscount.minimumPercentageRate, null);
+  equal(customDiscount.maximumPercentageRate, null);
+  equal(customDiscount.maxQuantity, 1);
+  equal(customDiscount.requiresInternalNote, true);
+  equal(customDiscount.stackable, false);
+  equal(customDiscount.visibility, "admin_only");
+
+  console.log("[OK] Custom Discount rules were stored correctly");
+
   const optionRows = await db
     .select({ id: commissionPricingOptions.id })
     .from(commissionPricingOptions)
@@ -198,8 +220,8 @@ async function main(): Promise<void> {
     .where(
       inArray(commissionPricingOptionAdjustments.pricingOptionId, optionIds),
     );
-  equal(applicabilityRows.length, 168);
-  console.log("[OK] All 168 option-adjustment links were stored correctly");
+  equal(applicabilityRows.length, 211);
+  console.log("[OK] All 211 option-adjustment links were stored correctly");
   console.log("[OK] Seeded commission pricing catalog verification passed");
 }
 

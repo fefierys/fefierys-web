@@ -26,7 +26,7 @@ interface PricingServiceSummary {
 }
 
 interface CommissionClassificationPanelProps {
-  classification: "unclassified" | "catalog" | "custom";
+  classification: "unclassified" | "catalog" | "bulk" | "custom";
   classificationNote: string | null;
   commissionId: string;
   expectedUpdatedAt: string;
@@ -100,8 +100,12 @@ export default function CommissionClassificationPanel({
     "";
 
   const [open, setOpen] = useState(false);
-  const [mode, setMode] = useState<"catalog" | "custom">(
-    classification === "custom" ? "custom" : "catalog",
+  const [mode, setMode] = useState<"catalog" | "bulk" | "custom">(
+    classification === "bulk"
+      ? "bulk"
+      : classification === "custom"
+        ? "custom"
+        : "catalog",
   );
   const [serviceId, setServiceId] = useState(initialServiceId);
   const [optionId, setOptionId] = useState(initialOptionId);
@@ -162,7 +166,8 @@ export default function CommissionClassificationPanel({
     (option) => option.id === pricingOptionId,
   );
   const classificationLocked = hasQuotes && classification !== "unclassified";
-  const canClassify = !classificationLocked && services.length > 0;
+  const canClassify =
+    !classificationLocked && (mode === "custom" || services.length > 0);
 
   return (
     <>
@@ -192,6 +197,20 @@ export default function CommissionClassificationPanel({
               <p className="mt-1 text-sm text-white/60">
                 {currentService?.title} · {currentOption.baseAmount} USD
               </p>
+            </>
+          ) : classification === "bulk" ? (
+            <>
+              <p className="font-medium">Bulk commission</p>
+              <p className="mt-1 text-sm text-white/60">
+                Multiple catalog options can be combined in this
+                commission&apos;s quote.
+              </p>
+
+              {classificationNote && (
+                <p className="mt-2 whitespace-pre-wrap text-sm text-white/50">
+                  {classificationNote}
+                </p>
+              )}
             </>
           ) : classification === "custom" ? (
             <>
@@ -250,7 +269,7 @@ export default function CommissionClassificationPanel({
 
           <div>
             <p className="mb-2 text-sm text-white/75">Classification</p>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <button
                 className={`rounded-xl border px-4 py-3 text-sm transition ${
                   mode === "catalog"
@@ -261,6 +280,17 @@ export default function CommissionClassificationPanel({
                 type="button"
               >
                 Catalog
+              </button>
+              <button
+                className={`rounded-xl border px-4 py-3 text-sm transition ${
+                  mode === "bulk"
+                    ? "border-white/25 bg-white/15 text-white"
+                    : "border-white/10 bg-white/5 text-white/65 hover:bg-white/10"
+                }`}
+                onClick={() => setMode("bulk")}
+                type="button"
+              >
+                Bulk
               </button>
               <button
                 className={`rounded-xl border px-4 py-3 text-sm transition ${
@@ -318,11 +348,20 @@ export default function CommissionClassificationPanel({
               )}
             </>
           ) : (
-            <input name="pricingServiceId" type="hidden" value="" />
-          )}
+            <>
+              <input name="pricingServiceId" type="hidden" value="" />
+              <input name="pricingOptionId" type="hidden" value="" />
 
-          {mode === "custom" && (
-            <input name="pricingOptionId" type="hidden" value="" />
+              {mode === "bulk" && (
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <p className="font-medium">Multiple catalog options</p>
+                  <p className="mt-1 text-sm leading-relaxed text-white/60">
+                    The catalog services and options will be selected
+                    individually when preparing the quote.
+                  </p>
+                </div>
+              )}
+            </>
           )}
 
           <div>
@@ -343,7 +382,9 @@ export default function CommissionClassificationPanel({
               placeholder={
                 mode === "custom"
                   ? "Describe the custom service requested by the client."
-                  : "Why this catalog option was selected."
+                  : mode === "bulk"
+                    ? "Add any internal notes about this bulk classification."
+                    : "Why this catalog option was selected."
               }
             />
           </div>
@@ -364,7 +405,11 @@ export default function CommissionClassificationPanel({
             </button>
             <button
               className="rounded-xl border border-white/20 bg-white/15 px-5 py-3 text-sm transition hover:bg-white/20 disabled:cursor-wait disabled:opacity-60"
-              disabled={pending || (mode === "catalog" && !selectedOption)}
+              disabled={
+                pending ||
+                !canClassify ||
+                (mode === "catalog" && !selectedOption)
+              }
               type="submit"
             >
               {pending ? "Saving…" : "Save classification"}

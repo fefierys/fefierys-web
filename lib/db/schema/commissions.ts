@@ -64,7 +64,7 @@ export const commissionRequestSourceEnum = pgEnum("commission_request_source", [
 
 export const commissionServiceClassificationEnum = pgEnum(
   "commission_service_classification",
-  ["unclassified", "catalog", "custom"],
+  ["unclassified", "catalog", "bulk", "custom"],
 );
 
 export const commissionCloseReasonEnum = pgEnum("commission_close_reason", [
@@ -499,6 +499,14 @@ export const commissions = pgTable(
           ${table.serviceClassification} = 'catalog'
           AND ${table.pricingServiceId} IS NOT NULL
           AND ${table.pricingOptionId} IS NOT NULL
+          AND ${table.classifiedAt} IS NOT NULL
+          AND ${table.classifiedBy} IS NOT NULL
+        )
+        OR
+        (
+          ${table.serviceClassification} = 'bulk'
+          AND ${table.pricingServiceId} IS NULL
+          AND ${table.pricingOptionId} IS NULL
           AND ${table.classifiedAt} IS NOT NULL
           AND ${table.classifiedBy} IS NOT NULL
         )
@@ -1100,8 +1108,31 @@ export const commissionQuoteItems = pgTable(
         )
         OR
         (
-          ${table.kind} IN ('extra', 'license', 'discount')
+          ${table.kind} IN ('extra', 'license')
           AND ${table.pricingOptionId} IS NOT NULL
+          AND ${table.pricingAdjustmentId} IS NOT NULL
+          AND ${table.calculationType} IS NOT NULL
+          AND ${table.calculationBasis} IS NOT NULL
+          AND (
+            (
+              ${table.calculationType} = 'fixed'
+              AND ${table.calculationBasis} = 'none'
+              AND ${table.percentageRate} IS NULL
+            )
+            OR
+            (
+              ${table.calculationType} = 'percentage'
+              AND ${table.calculationBasis} != 'none'
+              AND ${table.percentageRate} IS NOT NULL
+              AND ${table.percentageRate} >= 0
+              AND ${table.percentageRate} <= 100
+            )
+          )
+        )
+        OR
+        (
+          ${table.kind} = 'discount'
+          AND ${table.pricingOptionId} IS NULL
           AND ${table.pricingAdjustmentId} IS NOT NULL
           AND ${table.calculationType} IS NOT NULL
           AND ${table.calculationBasis} IS NOT NULL

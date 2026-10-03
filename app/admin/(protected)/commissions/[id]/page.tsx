@@ -80,12 +80,7 @@ export default async function CommissionDetailPage({
     notFound();
   }
 
-  const {
-    commission,
-    conversation,
-    events,
-    statusHistory,
-  } = detail;
+  const { commission, conversation, events, statusHistory } = detail;
   const editableDraft =
     quotes.find(({ quote }) => quote.status === "draft") ?? null;
   let quotePricingCatalog = pricingCatalog;
@@ -104,48 +99,91 @@ export default async function CommissionDetailPage({
 
   const editorPricingMode = editableDraft
     ? editableDraft.quote.pricingMode
-    : commission.serviceClassification;
+    : commission.serviceClassification === "bulk"
+      ? "catalog"
+      : commission.serviceClassification;
+
+  const editorCatalogMode =
+    commission.serviceClassification === "bulk" ? "bulk" : "single";
+
+  const editorCatalogOptions =
+    quotePricingCatalog?.services.flatMap((serviceEntry) =>
+      serviceEntry.options.map(({ adjustments, option }) => ({
+        adjustments: adjustments.map((adjustment) => ({
+          calculationBasis: adjustment.calculationBasis,
+          calculationType: adjustment.calculationType,
+          description: adjustment.description,
+          fixedAmount: adjustment.fixedAmount,
+          id: adjustment.id,
+          isValueEditable: adjustment.isValueEditable,
+          kind: adjustment.kind,
+          maximumPercentageRate: adjustment.maximumPercentageRate,
+          maxQuantity: adjustment.maxQuantity,
+          minimumPercentageRate: adjustment.minimumPercentageRate,
+          name: adjustment.name,
+          percentageRate: adjustment.percentageRate,
+          requiresInternalNote: adjustment.requiresInternalNote,
+          stackable: adjustment.stackable,
+        })),
+        option: {
+          baseAmount: option.baseAmount,
+          description: option.description,
+          id: option.id,
+          quoteLabel: option.quoteLabel,
+        },
+        service: {
+          id: serviceEntry.service.id,
+          title: serviceEntry.service.title,
+        },
+      })),
+    ) ?? [];
+
   const editorPricingOptionId =
-    editableDraft?.quote.pricingMode === "catalog"
-      ? (editableDraft.items.find((item) => item.kind === "base")
-          ?.pricingOptionId ?? null)
-      : commission.pricingOptionId;
-  const editorPricingOption = quotePricingCatalog?.services
-    .flatMap((service) => service.options)
-    .find(({ option }) => option.id === editorPricingOptionId);
+    editorCatalogMode === "single"
+      ? editableDraft?.quote.pricingMode === "catalog"
+        ? (editableDraft.items.find((item) => item.kind === "base")
+            ?.pricingOptionId ?? null)
+        : commission.pricingOptionId
+      : null;
+
+  const editorPricingOption =
+    editorCatalogMode === "single"
+      ? (editorCatalogOptions.find(
+          ({ option }) => option.id === editorPricingOptionId,
+        ) ?? null)
+      : null;
+
+  const bulkFallbackOption =
+    editorCatalogMode === "bulk" ? (editorCatalogOptions[0] ?? null) : null;
+
   const pricingConfig: CommissionQuotePricingEditorConfig | null =
     editorPricingMode === "custom"
       ? { mode: "custom" }
       : editorPricingMode === "catalog" &&
           quotePricingCatalog &&
+          editorCatalogMode === "single" &&
           editorPricingOption
         ? {
-            adjustments: editorPricingOption.adjustments.map((adjustment) => ({
-              calculationBasis: adjustment.calculationBasis,
-              calculationType: adjustment.calculationType,
-              description: adjustment.description,
-              fixedAmount: adjustment.fixedAmount,
-              id: adjustment.id,
-              isValueEditable: adjustment.isValueEditable,
-              kind: adjustment.kind,
-              maximumPercentageRate: adjustment.maximumPercentageRate,
-              maxQuantity: adjustment.maxQuantity,
-              minimumPercentageRate: adjustment.minimumPercentageRate,
-              name: adjustment.name,
-              percentageRate: adjustment.percentageRate,
-              requiresInternalNote: adjustment.requiresInternalNote,
-              stackable: adjustment.stackable,
-            })),
+            adjustments: editorPricingOption.adjustments,
+            catalogMode: "single",
             mode: "catalog",
-            option: {
-              baseAmount: editorPricingOption.option.baseAmount,
-              description: editorPricingOption.option.description,
-              id: editorPricingOption.option.id,
-              quoteLabel: editorPricingOption.option.quoteLabel,
-            },
+            option: editorPricingOption.option,
+            options: [editorPricingOption],
             pricingVersionId: quotePricingCatalog.version.id,
           }
-        : null;
+        : editorPricingMode === "catalog" &&
+            quotePricingCatalog &&
+            editorCatalogMode === "bulk" &&
+            bulkFallbackOption
+          ? {
+              adjustments: bulkFallbackOption.adjustments,
+              catalogMode: "bulk",
+              mode: "catalog",
+              option: bulkFallbackOption.option,
+              options: editorCatalogOptions,
+              pricingVersionId: quotePricingCatalog.version.id,
+            }
+          : null;
 
   return (
     <main className="min-h-screen px-6 pb-28 pt-36 md:py-28">
@@ -250,9 +288,7 @@ export default async function CommissionDetailPage({
               }))}
               subject={conversation.thread?.subject ?? null}
               threadExists={conversation.thread !== null}
-              threadReady={Boolean(
-                conversation.thread?.rootMessageId,
-              )}
+              threadReady={Boolean(conversation.thread?.rootMessageId)}
             />
           </div>
 
