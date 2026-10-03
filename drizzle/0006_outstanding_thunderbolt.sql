@@ -1,4 +1,4 @@
-﻿CREATE UNIQUE INDEX "commission_quotes_commission_active_unique" ON "commission_quotes" USING btree ("commission_id") WHERE
+CREATE UNIQUE INDEX "commission_quotes_commission_active_unique" ON "commission_quotes" USING btree ("commission_id") WHERE
             "commission_quotes"."status"
             IN ('draft', 'sent')
           ;--> statement-breakpoint
