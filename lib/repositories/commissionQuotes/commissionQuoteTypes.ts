@@ -1,0 +1,344 @@
+import type {
+  CommissionQuoteDraftInput,
+  CommissionQuoteDraftValidation,
+  CommissionQuoteTransitionValidation,
+} from "../../commissions/commissionQuote";
+import type { CommissionQuotePricingSnapshot } from "../../commissions/commissionQuotePricing";
+import type { CommissionManualActor } from "../../commissions/commissionActivity";
+import type { CommissionTransitionValidation } from "../../commissions/commissionWorkflow";
+import type {
+  commissionEvents,
+  commissionQuoteIllustrations,
+  commissionQuoteItems,
+  commissionQuotes,
+  commissionStatusHistory,
+} from "../../db/schema/commissions";
+import type { CommissionStatus } from "../commissionAdminRepository";
+
+export type CommissionQuote = typeof commissionQuotes.$inferSelect;
+
+export type CommissionQuoteItem = typeof commissionQuoteItems.$inferSelect;
+
+export type CommissionQuoteIllustration =
+  typeof commissionQuoteIllustrations.$inferSelect;
+
+export type CommissionQuoteEvent = typeof commissionEvents.$inferSelect;
+
+export interface CommissionQuoteWithItems {
+  quote: CommissionQuote;
+  items: CommissionQuoteItem[];
+  illustrations: CommissionQuoteIllustration[];
+}
+
+type InvalidQuoteDraftValidation = Extract<
+  CommissionQuoteDraftValidation,
+  { valid: false }
+>;
+
+type InvalidQuoteTransitionValidation = Extract<
+  CommissionQuoteTransitionValidation,
+  { valid: false }
+>;
+
+type InvalidCommissionTransitionValidation = Extract<
+  CommissionTransitionValidation,
+  { valid: false }
+>;
+
+export type CommissionStatusHistoryEntry =
+  typeof commissionStatusHistory.$inferSelect;
+
+interface CommissionQuoteDraftMetadataInput {
+  description?: string | null;
+  notes?: string | null;
+  validUntil?: Date | null;
+}
+
+export type CommissionQuoteDraftWriteInput =
+  | (CommissionQuoteDraftInput & {
+      pricingSnapshot?: undefined;
+    })
+  | (CommissionQuoteDraftMetadataInput & {
+      pricingSnapshot: CommissionQuotePricingSnapshot;
+    });
+
+export type CreateCommissionQuoteDraftInput = CommissionQuoteDraftWriteInput & {
+  commissionId: string;
+  createdByAdminUserId: string;
+};
+
+export type CreateCommissionQuoteDraftResult =
+  | {
+      outcome: "created";
+      quote: CommissionQuote;
+      items: CommissionQuoteItem[];
+      event: CommissionQuoteEvent;
+    }
+  | {
+      outcome: "invalid";
+      validation: InvalidQuoteDraftValidation;
+    }
+  | {
+      outcome: "not_found";
+    }
+  | {
+      outcome: "wrong_status";
+      currentStatus: CommissionStatus;
+    }
+  | {
+      outcome: "active_quote_exists";
+      activeQuote: Pick<CommissionQuote, "id" | "version" | "status">;
+    }
+  | {
+      outcome: "conflict";
+    };
+
+export type UpdateCommissionQuoteDraftInput = CommissionQuoteDraftWriteInput & {
+  quoteId: string;
+  expectedUpdatedAt: Date;
+  updatedByAdminUserId: string;
+};
+
+export type UpdateCommissionQuoteDraftResult =
+  | {
+      outcome: "updated";
+      quote: CommissionQuote;
+      items: CommissionQuoteItem[];
+      event: CommissionQuoteEvent;
+    }
+  | {
+      outcome: "invalid";
+      validation: InvalidQuoteDraftValidation;
+    }
+  | {
+      outcome: "not_found";
+    }
+  | {
+      outcome: "not_draft";
+      currentStatus: CommissionQuote["status"];
+    }
+  | {
+      outcome: "wrong_commission_status";
+      currentStatus: CommissionStatus;
+    }
+  | {
+      outcome: "conflict";
+      currentUpdatedAt: Date;
+    };
+
+export interface SendCommissionQuoteInput {
+  quoteId: string;
+  expectedUpdatedAt: Date;
+  sentByAdminUserId: string;
+  senderEmail: string;
+  replyToEmail: string;
+}
+
+export type SendCommissionQuoteResult =
+  | {
+      outcome: "sent";
+      quote: CommissionQuote;
+      items: CommissionQuoteItem[];
+      transition: CommissionStatusHistoryEntry;
+      event: CommissionQuoteEvent;
+
+      /*
+       * Logical client-thread email created atomically with
+       * the quote send operation.
+       */
+      messageId: string;
+
+      /*
+       * Safe data required to build the client email body.
+       *
+       * The public quote bearer token is intentionally not
+       * returned here because it can now be reproduced
+       * server-side from quote.id when delivery is attempted.
+       */
+      clientName: string;
+      reference: string;
+    }
+  | {
+      outcome: "invalid";
+      validation: InvalidQuoteTransitionValidation;
+    }
+  | {
+      outcome: "not_found";
+    }
+  | {
+      outcome: "not_draft";
+      currentStatus: CommissionQuote["status"];
+    }
+  | {
+      outcome: "wrong_commission_status";
+      currentStatus: CommissionStatus;
+    }
+  | {
+      outcome: "on_hold";
+    }
+  | {
+      outcome: "thread_not_found";
+    }
+  | {
+      outcome: "thread_not_ready";
+    }
+  | {
+      outcome: "thread_blocked";
+    }
+  | {
+      outcome: "conflict";
+      currentUpdatedAt: Date;
+    };
+
+export interface AcceptCommissionQuoteInput {
+  quoteId: string;
+  expectedUpdatedAt: Date;
+  acceptedByAdminUserId: string;
+}
+
+export type AcceptCommissionQuoteResult =
+  | {
+      outcome: "accepted";
+      quote: CommissionQuote;
+      items: CommissionQuoteItem[];
+      transition: CommissionStatusHistoryEntry;
+      event: CommissionQuoteEvent;
+    }
+  | {
+      outcome: "invalid";
+      validation: InvalidQuoteTransitionValidation;
+    }
+  | {
+      outcome: "not_found";
+    }
+  | {
+      outcome: "not_sent";
+      currentStatus: CommissionQuote["status"];
+    }
+  | {
+      outcome: "wrong_commission_status";
+      currentStatus: CommissionStatus;
+    }
+  | {
+      outcome: "on_hold";
+    }
+  | {
+      outcome: "conflict";
+      currentUpdatedAt: Date;
+    };
+
+export interface DeclineCommissionQuoteInput {
+  quoteId: string;
+  expectedUpdatedAt: Date;
+  declinedByAdminUserId: string;
+  closeReasonNote?: string | null;
+}
+
+export type DeclineCommissionQuoteResult =
+  | {
+      outcome: "declined";
+      quote: CommissionQuote;
+      items: CommissionQuoteItem[];
+      transition: CommissionStatusHistoryEntry;
+      event: CommissionQuoteEvent;
+    }
+  | {
+      outcome: "invalid";
+      validation:
+        | InvalidQuoteTransitionValidation
+        | InvalidCommissionTransitionValidation;
+    }
+  | {
+      outcome: "not_found";
+    }
+  | {
+      outcome: "not_sent";
+      currentStatus: CommissionQuote["status"];
+    }
+  | {
+      outcome: "wrong_commission_status";
+      currentStatus: CommissionStatus;
+    }
+  | {
+      outcome: "conflict";
+      currentUpdatedAt: Date;
+    };
+
+export interface ExpireCommissionQuoteInput {
+  quoteId: string;
+  expectedUpdatedAt: Date;
+  recordedByAdminUserId?: string | null;
+  note?: string | null;
+}
+
+export type ExpireCommissionQuoteResult =
+  | {
+      outcome: "expired";
+      quote: CommissionQuote;
+      items: CommissionQuoteItem[];
+      transition: CommissionStatusHistoryEntry;
+      event: CommissionQuoteEvent;
+    }
+  | {
+      outcome: "invalid";
+      validation:
+        | InvalidQuoteTransitionValidation
+        | InvalidCommissionTransitionValidation;
+    }
+  | {
+      outcome: "not_found";
+    }
+  | {
+      outcome: "not_sent";
+      currentStatus: CommissionQuote["status"];
+    }
+  | {
+      outcome: "wrong_commission_status";
+      currentStatus: CommissionStatus;
+    }
+  | {
+      outcome: "conflict";
+      currentUpdatedAt: Date;
+    };
+
+export interface SupersedeCommissionQuoteInput {
+  quoteId: string;
+  expectedUpdatedAt: Date;
+  initiatedBy: CommissionManualActor;
+  supersededByAdminUserId: string;
+  note?: string | null;
+}
+
+export type SupersedeCommissionQuoteResult =
+  | {
+      outcome: "superseded";
+      supersededQuote: CommissionQuote;
+      draft: CommissionQuoteWithItems;
+      transition: CommissionStatusHistoryEntry;
+      supersededEvent: CommissionQuoteEvent;
+      createdEvent: CommissionQuoteEvent;
+    }
+  | {
+      outcome: "invalid";
+      validation:
+        | InvalidQuoteTransitionValidation
+        | InvalidCommissionTransitionValidation;
+    }
+  | {
+      outcome: "not_found";
+    }
+  | {
+      outcome: "not_sent";
+      currentStatus: CommissionQuote["status"];
+    }
+  | {
+      outcome: "wrong_commission_status";
+      currentStatus: CommissionStatus;
+    }
+  | {
+      outcome: "on_hold";
+    }
+  | {
+      outcome: "conflict";
+      currentUpdatedAt: Date;
+    };

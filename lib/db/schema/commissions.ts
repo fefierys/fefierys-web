@@ -1,0 +1,2708 @@
+import { sql } from "drizzle-orm";
+import {
+  boolean,
+  check,
+  foreignKey,
+  index,
+  integer,
+  jsonb,
+  numeric,
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+  varchar,
+} from "drizzle-orm/pg-core";
+
+import {
+  commissionPricingAdjustments,
+  commissionPricingCalculationBasisEnum,
+  commissionPricingCalculationTypeEnum,
+  commissionPricingOptions,
+  commissionPricingServices,
+  commissionPricingVersions,
+} from "./commissionPricing";
+
+/*
+ * ============================================================
+ * ENUMS
+ * ============================================================
+ */
+
+export const commissionStatusEnum = pgEnum("commission_status", [
+  "received",
+  "under_review",
+  "awaiting_client_details",
+  "quoting",
+  "awaiting_quote_response",
+  "awaiting_agreement",
+  "awaiting_payment",
+  "in_progress",
+  "sketch_review",
+  "sketch_revision",
+  "final_preview",
+  "final_review",
+  "final_revision",
+  "completed",
+  "cancelled",
+  "declined",
+  "expired",
+]);
+
+export const commissionActorEnum = pgEnum("commission_actor", [
+  "client",
+  "artist",
+  "system",
+]);
+
+export const commissionRequestSourceEnum = pgEnum("commission_request_source", [
+  "contact",
+  "commissions",
+  "admin",
+]);
+
+export const commissionServiceClassificationEnum = pgEnum(
+  "commission_service_classification",
+  ["unclassified", "catalog", "bulk", "custom"],
+);
+
+export const commissionCloseReasonEnum = pgEnum("commission_close_reason", [
+  "client_cancelled",
+  "artist_cancelled",
+  "mutual_cancellation",
+  "artist_declined_request",
+  "client_declined_quote",
+  "quote_expired",
+  "client_details_timeout",
+  "payment_timeout",
+  "other",
+]);
+
+export const quoteStatusEnum = pgEnum("quote_status", [
+  "draft",
+  "sent",
+  "accepted",
+  "declined",
+  "expired",
+  "superseded",
+]);
+
+export const quotePricingModeEnum = pgEnum("quote_pricing_mode", [
+  "legacy",
+  "catalog",
+  "custom",
+]);
+
+export const quoteItemKindEnum = pgEnum("quote_item_kind", [
+  "legacy",
+  "base",
+  "extra",
+  "license",
+  "discount",
+  "custom",
+]);
+
+export const installmentTriggerEnum = pgEnum("installment_trigger", [
+  "before_start",
+  "after_sketch_approval",
+  "before_final_delivery",
+  "custom",
+]);
+
+export const installmentStatusEnum = pgEnum("installment_status", [
+  "pending",
+  "due",
+  "paid",
+  "overdue",
+  "waived",
+  "cancelled",
+]);
+
+export const paymentTypeEnum = pgEnum("payment_type", [
+  "installment",
+  "additional",
+  "refund",
+  "adjustment",
+]);
+
+export const paymentStatusEnum = pgEnum("payment_status", [
+  "pending",
+  "confirmed",
+  "failed",
+  "partially_refunded",
+  "refunded",
+  "voided",
+]);
+
+export const paymentMethodEnum = pgEnum("payment_method", [
+  "paypal",
+  "bank_transfer",
+  "wise",
+  "stripe",
+  "other",
+]);
+
+export const agreementStatusEnum = pgEnum("agreement_status", [
+  "draft",
+  "sent",
+  "accepted",
+  "superseded",
+  "voided",
+]);
+
+export const acceptanceMethodEnum = pgEnum("acceptance_method", [
+  "electronic",
+  "manual",
+  "external_signature",
+]);
+
+export const approvalTypeEnum = pgEnum("approval_type", [
+  "sketch",
+  "final",
+  "amendment",
+]);
+
+export const approvalStatusEnum = pgEnum("approval_status", [
+  "pending",
+  "approved",
+  "changes_requested",
+  "superseded",
+]);
+
+export const commissionEventTypeEnum = pgEnum("commission_event_type", [
+  "commission_received",
+
+  "client_contacted",
+  "client_details_requested",
+  "client_details_received",
+
+  "quote_created",
+  "quote_updated",
+  "quote_sent",
+  "quote_accepted",
+  "quote_declined",
+  "quote_expired",
+  "quote_superseded",
+
+  "agreement_created",
+  "agreement_sent",
+  "agreement_accepted",
+  "terms_accepted",
+
+  "payment_due",
+  "payment_received",
+  "payment_overdue",
+  "payment_refunded",
+
+  "work_started",
+
+  "sketch_submitted",
+  "sketch_revision_requested",
+  "sketch_approved",
+
+  "final_preview_sent",
+  "final_delivered",
+  "final_revision_requested",
+  "final_approved",
+
+  "commission_paused",
+  "commission_resumed",
+
+  "document_generated",
+  "document_sent",
+
+  "commission_completed",
+  "commission_cancelled",
+  "commission_declined",
+  "commission_expired",
+
+  "commission_service_classified",
+
+  "note_added",
+]);
+
+export const documentTypeEnum = pgEnum("document_type", [
+  "quote",
+  "commission_agreement",
+  "commission_agreement_executed",
+  "commission_confirmation",
+  "payment_acknowledgement",
+  "commission_amendment",
+  "completion_summary",
+  "cancellation_summary",
+  "refund_acknowledgement",
+  "other",
+]);
+
+export const documentStatusEnum = pgEnum("document_status", [
+  "draft",
+  "generated",
+  "sent",
+  "send_failed",
+  "voided",
+]);
+
+export const commissionEmailScopeEnum = pgEnum("commission_email_scope", [
+  "client_thread",
+  "internal_notification",
+]);
+
+export const commissionEmailDirectionEnum = pgEnum(
+  "commission_email_direction",
+  ["outbound", "inbound"],
+);
+
+export const commissionEmailDeliveryStatusEnum = pgEnum(
+  "commission_email_delivery_status",
+  ["queued", "sending", "sent", "failed", "received"],
+);
+
+export const commissionEmailKindEnum = pgEnum("commission_email_kind", [
+  "inquiry_confirmation",
+  "internal_inquiry_notification",
+
+  "client_details_request",
+  "general_message",
+
+  "quote_ready",
+
+  "agreement_ready",
+
+  "payment_request",
+  "payment_confirmation",
+
+  "sketch_review",
+  "final_review",
+  "final_delivery",
+
+  "commission_completed",
+]);
+
+/*
+ * ============================================================
+ * COMMISSIONS
+ * ============================================================
+ */
+
+export const commissions = pgTable(
+  "commissions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+
+    /*
+     * Client-generated idempotency key.
+     *
+     * The same submission ID must be reused when the browser
+     * retries an inquiry after an uncertain network result.
+     *
+     * The database default keeps manually-created and migrated
+     * commissions valid when no external key is supplied.
+     */
+    submissionId: uuid("submission_id").defaultRandom().notNull(),
+
+    /*
+     * Human-readable reference.
+     *
+     * Example:
+     * COM-20260831-A1B2C3
+     *
+     * The UUID remains the real technical identity.
+     */
+    reference: varchar("reference", { length: 32 }).notNull(),
+
+    /*
+     * ========================================================
+     * CLIENT SNAPSHOT
+     * ========================================================
+     *
+     * These values belong to this specific commission.
+     * A future CRM/client entity must not silently alter
+     * historical commission data.
+     */
+
+    clientName: varchar("client_name", { length: 200 }).notNull(),
+
+    clientEmail: varchar("client_email", { length: 320 }).notNull(),
+
+    clientCompanyName: varchar("client_company_name", { length: 250 }),
+
+    clientCountry: varchar("client_country", { length: 100 }),
+
+    /*
+     * ========================================================
+     * REQUEST / SERVICE SNAPSHOT
+     * ========================================================
+     *
+     * These values intentionally do not reference the
+     * portfolio tables. Historical commissions must preserve
+     * what the client originally requested even if the
+     * portfolio changes later.
+     */
+
+    styleSnapshot: varchar("style_snapshot", { length: 200 }),
+
+    collectionSnapshot: varchar("collection_snapshot", { length: 200 }),
+
+    categorySnapshot: varchar("category_snapshot", { length: 200 }),
+
+    optionSnapshot: varchar("option_snapshot", { length: 200 }),
+
+    requestSource: commissionRequestSourceEnum("request_source")
+      .notNull()
+      .default("contact"),
+
+    serviceClassification: commissionServiceClassificationEnum(
+      "service_classification",
+    )
+      .notNull()
+      .default("unclassified"),
+
+    pricingServiceId: uuid("pricing_service_id").references(
+      () => commissionPricingServices.id,
+      {
+        onDelete: "restrict",
+      },
+    ),
+
+    pricingOptionId: uuid("pricing_option_id").references(
+      () => commissionPricingOptions.id,
+      {
+        onDelete: "restrict",
+      },
+    ),
+
+    classifiedAt: timestamp("classified_at", {
+      withTimezone: true,
+    }),
+
+    classifiedBy: commissionActorEnum("classified_by"),
+
+    classifiedByAdminUserId: varchar("classified_by_admin_user_id", {
+      length: 255,
+    }),
+
+    classificationNote: text("classification_note"),
+
+    initialMessage: text("initial_message").notNull(),
+
+    /*
+     * ========================================================
+     * WORKFLOW
+     * ========================================================
+     */
+
+    status: commissionStatusEnum("status").notNull().default("received"),
+
+    closeReason: commissionCloseReasonEnum("close_reason"),
+
+    closeReasonNote: text("close_reason_note"),
+
+    closedBy: commissionActorEnum("closed_by"),
+
+    /*
+     * Pause is intentionally independent from status.
+     *
+     * Example:
+     * status = sketch_review
+     * isOnHold = true
+     */
+    isOnHold: boolean("is_on_hold").notNull().default(false),
+
+    holdReason: text("hold_reason"),
+
+    holdStartedAt: timestamp("hold_started_at", {
+      withTimezone: true,
+    }),
+
+    /*
+     * Terms/agreement information is nullable here because
+     * a newly received inquiry has not accepted them yet.
+     *
+     * The complete acceptance record will later live in
+     * commission_agreements.
+     */
+    termsVersion: varchar("terms_version", { length: 50 }),
+
+    agreementVersion: varchar("agreement_version", { length: 50 }),
+
+    /*
+     * ========================================================
+     * BUSINESS DATES
+     * ========================================================
+     */
+
+    submittedAt: timestamp("submitted_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+
+    startedAt: timestamp("started_at", {
+      withTimezone: true,
+    }),
+
+    finalDeliveredAt: timestamp("final_delivered_at", {
+      withTimezone: true,
+    }),
+
+    completedAt: timestamp("completed_at", {
+      withTimezone: true,
+    }),
+
+    closedAt: timestamp("closed_at", {
+      withTimezone: true,
+    }),
+
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("commissions_reference_unique").on(table.reference),
+
+    uniqueIndex("commissions_submission_id_unique").on(table.submissionId),
+
+    index("commissions_status_idx").on(table.status),
+
+    index("commissions_client_email_idx").on(table.clientEmail),
+
+    index("commissions_created_at_idx").on(table.createdAt),
+
+    index("commissions_service_classification_idx").on(
+      table.serviceClassification,
+    ),
+
+    index("commissions_pricing_option_idx").on(table.pricingOptionId),
+
+    check(
+      "commissions_service_classification_check",
+      sql`
+        (
+          ${table.serviceClassification} = 'unclassified'
+          AND ${table.pricingServiceId} IS NULL
+          AND ${table.pricingOptionId} IS NULL
+          AND ${table.classifiedAt} IS NULL
+          AND ${table.classifiedBy} IS NULL
+          AND ${table.classifiedByAdminUserId} IS NULL
+          AND ${table.classificationNote} IS NULL
+        )
+        OR
+        (
+          ${table.serviceClassification} = 'catalog'
+          AND ${table.pricingServiceId} IS NOT NULL
+          AND ${table.pricingOptionId} IS NOT NULL
+          AND ${table.classifiedAt} IS NOT NULL
+          AND ${table.classifiedBy} IS NOT NULL
+        )
+        OR
+        (
+          ${table.serviceClassification} = 'bulk'
+          AND ${table.pricingServiceId} IS NULL
+          AND ${table.pricingOptionId} IS NULL
+          AND ${table.classifiedAt} IS NOT NULL
+          AND ${table.classifiedBy} IS NOT NULL
+        )
+        OR
+        (
+          ${table.serviceClassification} = 'custom'
+          AND ${table.pricingServiceId} IS NULL
+          AND ${table.pricingOptionId} IS NULL
+          AND ${table.classifiedAt} IS NOT NULL
+          AND ${table.classifiedBy} IS NOT NULL
+        )
+      `,
+    ),
+
+    check(
+      "commissions_classification_admin_actor_check",
+      sql`
+        (
+          ${table.classifiedBy} = 'artist'
+          AND ${table.classifiedByAdminUserId} IS NOT NULL
+        )
+        OR
+        (
+          ${table.classifiedBy} IS DISTINCT FROM 'artist'
+          AND ${table.classifiedByAdminUserId} IS NULL
+        )
+      `,
+    ),
+
+    /*
+     * Prevent partially-populated hold information.
+     *
+     * If a commission is on hold, holdStartedAt must exist.
+     * When it is not on hold, holdStartedAt must be null.
+     *
+     * holdReason remains optional because a note may not
+     * always be required technically.
+     */
+    check(
+      "commissions_hold_state_check",
+      sql`
+        (
+          ${table.isOnHold} = true
+          AND ${table.holdStartedAt} IS NOT NULL
+        )
+        OR
+        (
+          ${table.isOnHold} = false
+          AND ${table.holdStartedAt} IS NULL
+        )
+      `,
+    ),
+
+    /*
+     * completedAt should only exist for completed
+     * commissions.
+     *
+     * We intentionally do not require completedAt merely
+     * because status = completed here. The service layer
+     * will perform the atomic status transition and date
+     * assignment.
+     */
+    check(
+      "commissions_completed_at_check",
+      sql`
+        ${table.completedAt} IS NULL
+        OR ${table.status} = 'completed'
+      `,
+    ),
+
+    /*
+     * closedAt is only valid for terminal states.
+     */
+    check(
+      "commissions_closed_at_check",
+      sql`
+        ${table.closedAt} IS NULL
+        OR ${table.status} IN (
+          'completed',
+          'cancelled',
+          'declined',
+          'expired'
+        )
+      `,
+    ),
+  ],
+);
+
+/*
+ * ============================================================
+ * COMMISSION QUOTES
+ * ============================================================
+ */
+
+export const commissionQuotes = pgTable(
+  "commission_quotes",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+
+    commissionId: uuid("commission_id")
+      .notNull()
+      .references(() => commissions.id, {
+        onDelete: "restrict",
+      }),
+
+    /*
+     * A commission may have several historical quote
+     * versions:
+     *
+     * v1 -> superseded
+     * v2 -> accepted
+     */
+    version: integer("version").notNull(),
+
+    status: quoteStatusEnum("status").notNull().default("draft"),
+
+    /*
+     * Public quote access uses an opaque bearer token.
+     *
+     * Only the SHA-256 hash is persisted. The plaintext token is
+     * generated server-side and must never be stored in the database.
+     *
+     * One token belongs to one specific quote version.
+     */
+    publicTokenHash: varchar("public_token_hash", { length: 64 }),
+
+    publicTokenCreatedAt: timestamp("public_token_created_at", {
+      withTimezone: true,
+    }),
+
+    publicTokenRevokedAt: timestamp("public_token_revoked_at", {
+      withTimezone: true,
+    }),
+
+    /*
+     * Legacy quotes predate the versioned pricing catalog. Catalog and
+     * custom quotes store immutable totals calculated when the draft is
+     * created or updated.
+     */
+    pricingMode: quotePricingModeEnum("pricing_mode")
+      .notNull()
+      .default("legacy"),
+
+    pricingVersionId: uuid("pricing_version_id").references(
+      () => commissionPricingVersions.id,
+      {
+        onDelete: "restrict",
+      },
+    ),
+
+    baseSubtotal: numeric("base_subtotal", {
+      precision: 12,
+      scale: 2,
+    }),
+
+    preDiscountSubtotal: numeric("pre_discount_subtotal", {
+      precision: 12,
+      scale: 2,
+    }),
+
+    discountTotal: numeric("discount_total", {
+      precision: 12,
+      scale: 2,
+    }),
+
+    /*
+     * ISO 4217-style currency code:
+     * USD, CLP, EUR, etc.
+     */
+    currency: varchar("currency", { length: 3 }).notNull(),
+
+    /*
+     * PostgreSQL numeric is intentionally used instead
+     * of float/real for money.
+     */
+    totalAmount: numeric("total_amount", {
+      precision: 12,
+      scale: 2,
+    }).notNull(),
+
+    description: text("description"),
+
+    notes: text("notes"),
+
+    validUntil: timestamp("valid_until", {
+      withTimezone: true,
+    }),
+
+    sentAt: timestamp("sent_at", {
+      withTimezone: true,
+    }),
+
+    acceptedAt: timestamp("accepted_at", {
+      withTimezone: true,
+    }),
+
+    declinedAt: timestamp("declined_at", {
+      withTimezone: true,
+    }),
+
+    expiredAt: timestamp("expired_at", {
+      withTimezone: true,
+    }),
+
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("commission_quotes_commission_version_unique").on(
+      table.commissionId,
+      table.version,
+    ),
+
+    uniqueIndex("commission_quotes_commission_id_id_unique").on(
+      table.commissionId,
+      table.id,
+    ),
+
+    uniqueIndex("commission_quotes_public_token_hash_unique").on(
+      table.publicTokenHash,
+    ),
+
+    uniqueIndex("commission_quotes_commission_active_unique")
+      .on(table.commissionId)
+      .where(
+        sql`
+            ${table.status}
+            IN ('draft', 'sent')
+          `,
+      ),
+
+    index("commission_quotes_commission_id_idx").on(table.commissionId),
+
+    index("commission_quotes_status_idx").on(table.status),
+
+    index("commission_quotes_pricing_version_idx").on(table.pricingVersionId),
+
+    check(
+      "commission_quotes_version_check",
+      sql`
+          ${table.version} >= 1
+        `,
+    ),
+
+    check(
+      "commission_quotes_total_amount_check",
+      sql`
+          ${table.totalAmount} >= 0
+        `,
+    ),
+
+    check(
+      "commission_quotes_currency_check",
+      sql`
+          ${table.currency}
+          =
+          upper(${table.currency})
+        `,
+    ),
+
+    check(
+      "commission_quotes_pricing_snapshot_check",
+      sql`
+        (
+          ${table.pricingMode} = 'legacy'
+          AND ${table.pricingVersionId} IS NULL
+          AND ${table.baseSubtotal} IS NULL
+          AND ${table.preDiscountSubtotal} IS NULL
+          AND ${table.discountTotal} IS NULL
+        )
+        OR
+        (
+          ${table.pricingMode} = 'catalog'
+          AND ${table.pricingVersionId} IS NOT NULL
+          AND ${table.baseSubtotal} IS NOT NULL
+          AND ${table.preDiscountSubtotal} IS NOT NULL
+          AND ${table.discountTotal} IS NOT NULL
+        )
+        OR
+        (
+          ${table.pricingMode} = 'custom'
+          AND ${table.pricingVersionId} IS NULL
+          AND ${table.baseSubtotal} IS NOT NULL
+          AND ${table.preDiscountSubtotal} IS NOT NULL
+          AND ${table.discountTotal} IS NOT NULL
+        )
+      `,
+    ),
+
+    check(
+      "commission_quotes_pricing_totals_check",
+      sql`
+        ${table.pricingMode} = 'legacy'
+        OR
+        (
+          ${table.baseSubtotal} >= 0
+          AND ${table.preDiscountSubtotal} >= ${table.baseSubtotal}
+          AND ${table.discountTotal} >= 0
+          AND ${table.totalAmount}
+            = ${table.preDiscountSubtotal} - ${table.discountTotal}
+        )
+      `,
+    ),
+
+    check(
+      "commission_quotes_public_token_state_check",
+      sql`
+        (
+          ${table.publicTokenHash} IS NULL
+          AND ${table.publicTokenCreatedAt} IS NULL
+          AND ${table.publicTokenRevokedAt} IS NULL
+        )
+        OR
+        (
+          ${table.publicTokenHash} IS NOT NULL
+          AND ${table.publicTokenCreatedAt} IS NOT NULL
+          AND char_length(${table.publicTokenHash}) = 64
+        )
+      `,
+    ),
+
+    check(
+      "commission_quotes_status_dates_check",
+      sql`
+          (
+            ${table.status} = 'draft'
+            AND ${table.sentAt} IS NULL
+            AND ${table.acceptedAt} IS NULL
+            AND ${table.declinedAt} IS NULL
+            AND ${table.expiredAt} IS NULL
+          )
+          OR
+          (
+            ${table.status} = 'sent'
+            AND ${table.validUntil} IS NOT NULL
+            AND ${table.sentAt} IS NOT NULL
+            AND ${table.acceptedAt} IS NULL
+            AND ${table.declinedAt} IS NULL
+            AND ${table.expiredAt} IS NULL
+          )
+          OR
+          (
+            ${table.status} = 'accepted'
+            AND ${table.validUntil} IS NOT NULL
+            AND ${table.sentAt} IS NOT NULL
+            AND ${table.acceptedAt} IS NOT NULL
+            AND ${table.declinedAt} IS NULL
+            AND ${table.expiredAt} IS NULL
+          )
+          OR
+          (
+            ${table.status} = 'declined'
+            AND ${table.validUntil} IS NOT NULL
+            AND ${table.sentAt} IS NOT NULL
+            AND ${table.acceptedAt} IS NULL
+            AND ${table.declinedAt} IS NOT NULL
+            AND ${table.expiredAt} IS NULL
+          )
+          OR
+          (
+            ${table.status} = 'expired'
+            AND ${table.validUntil} IS NOT NULL
+            AND ${table.sentAt} IS NOT NULL
+            AND ${table.acceptedAt} IS NULL
+            AND ${table.declinedAt} IS NULL
+            AND ${table.expiredAt} IS NOT NULL
+          )
+          OR
+          (
+            ${table.status} = 'superseded'
+            AND ${table.validUntil} IS NOT NULL
+            AND ${table.sentAt} IS NOT NULL
+            AND ${table.acceptedAt} IS NULL
+            AND ${table.declinedAt} IS NULL
+            AND ${table.expiredAt} IS NULL
+          )
+        `,
+    ),
+  ],
+);
+
+/*
+ * ============================================================
+ * COMMISSION QUOTE ILLUSTRATIONS
+ * ============================================================
+ *
+ * Each row represents one illustration within a quote.
+ *
+ * A quote may contain several illustrations of the same
+ * catalog option. Extras and licenses will later reference
+ * the specific illustration to which they apply.
+ */
+
+export const commissionQuoteIllustrations = pgTable(
+  "commission_quote_illustrations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+
+    quoteId: uuid("quote_id")
+      .notNull()
+      .references(() => commissionQuotes.id, {
+        onDelete: "restrict",
+      }),
+
+    sequence: integer("sequence").notNull(),
+
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("commission_quote_illustrations_quote_sequence_unique").on(
+      table.quoteId,
+      table.sequence,
+    ),
+
+    uniqueIndex("commission_quote_illustrations_quote_id_id_unique").on(
+      table.quoteId,
+      table.id,
+    ),
+
+    index("commission_quote_illustrations_quote_id_idx").on(table.quoteId),
+
+    check(
+      "commission_quote_illustrations_sequence_check",
+      sql`${table.sequence} >= 1`,
+    ),
+  ],
+);
+
+/*
+ * ============================================================
+ * COMMISSION QUOTE ITEMS
+ * ============================================================
+ *
+ * Structured concepts included in a quote.
+ *
+ * Positive unit amounts represent services or additions.
+ * Negative unit amounts represent discounts or adjustments.
+ * The application layer validates that the quote total equals
+ * the sum of quantity * unitAmount for every item.
+ */
+
+export const commissionQuoteItems = pgTable(
+  "commission_quote_items",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+
+    quoteId: uuid("quote_id")
+      .notNull()
+      .references(() => commissionQuotes.id, {
+        onDelete: "restrict",
+      }),
+
+    illustrationId: uuid("illustration_id"),
+
+    sequence: integer("sequence").notNull(),
+
+    kind: quoteItemKindEnum("kind").notNull().default("legacy"),
+
+    pricingOptionId: uuid("pricing_option_id").references(
+      () => commissionPricingOptions.id,
+      {
+        onDelete: "restrict",
+      },
+    ),
+
+    pricingAdjustmentId: uuid("pricing_adjustment_id").references(
+      () => commissionPricingAdjustments.id,
+      {
+        onDelete: "restrict",
+      },
+    ),
+
+    calculationType: commissionPricingCalculationTypeEnum("calculation_type"),
+
+    calculationBasis:
+      commissionPricingCalculationBasisEnum("calculation_basis"),
+
+    percentageRate: numeric("percentage_rate", {
+      precision: 5,
+      scale: 2,
+    }),
+
+    internalNote: text("internal_note"),
+
+    label: varchar("label", {
+      length: 250,
+    }).notNull(),
+
+    description: text("description"),
+
+    quantity: integer("quantity").notNull().default(1),
+
+    /*
+     * May be negative for discounts and adjustments.
+     * PostgreSQL numeric is used instead of float/real.
+     */
+    unitAmount: numeric("unit_amount", {
+      precision: 12,
+      scale: 2,
+    }).notNull(),
+
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.quoteId, table.illustrationId],
+      foreignColumns: [
+        commissionQuoteIllustrations.quoteId,
+        commissionQuoteIllustrations.id,
+      ],
+      name: "commission_quote_items_illustration_fk",
+    }).onDelete("restrict"),
+
+    uniqueIndex("commission_quote_items_quote_sequence_unique").on(
+      table.quoteId,
+      table.sequence,
+    ),
+
+    index("commission_quote_items_quote_id_idx").on(table.quoteId),
+
+    index("commission_quote_items_illustration_id_idx").on(
+      table.illustrationId,
+    ),
+
+    index("commission_quote_items_pricing_option_idx").on(
+      table.pricingOptionId,
+    ),
+
+    index("commission_quote_items_pricing_adjustment_idx").on(
+      table.pricingAdjustmentId,
+    ),
+
+    check(
+      "commission_quote_items_sequence_check",
+      sql`
+        ${table.sequence} >= 1
+      `,
+    ),
+
+    check(
+      "commission_quote_items_quantity_check",
+      sql`
+        ${table.quantity} >= 1
+      `,
+    ),
+
+    check(
+      "commission_quote_items_pricing_source_check",
+      sql`
+        (
+          ${table.kind} = 'legacy'
+          AND ${table.pricingOptionId} IS NULL
+          AND ${table.pricingAdjustmentId} IS NULL
+          AND ${table.calculationType} IS NULL
+          AND ${table.calculationBasis} IS NULL
+          AND ${table.percentageRate} IS NULL
+          AND ${table.internalNote} IS NULL
+        )
+        OR
+        (
+          ${table.kind} = 'custom'
+          AND ${table.pricingOptionId} IS NULL
+          AND ${table.pricingAdjustmentId} IS NULL
+          AND ${table.calculationType} = 'fixed'
+          AND ${table.calculationBasis} = 'none'
+          AND ${table.percentageRate} IS NULL
+        )
+        OR
+        (
+          ${table.kind} = 'base'
+          AND ${table.pricingOptionId} IS NOT NULL
+          AND ${table.pricingAdjustmentId} IS NULL
+          AND ${table.calculationType} = 'fixed'
+          AND ${table.calculationBasis} = 'none'
+          AND ${table.percentageRate} IS NULL
+        )
+        OR
+        (
+          ${table.kind} IN ('extra', 'license')
+          AND ${table.pricingOptionId} IS NOT NULL
+          AND ${table.pricingAdjustmentId} IS NOT NULL
+          AND ${table.calculationType} IS NOT NULL
+          AND ${table.calculationBasis} IS NOT NULL
+          AND (
+            (
+              ${table.calculationType} = 'fixed'
+              AND ${table.calculationBasis} = 'none'
+              AND ${table.percentageRate} IS NULL
+            )
+            OR
+            (
+              ${table.calculationType} = 'percentage'
+              AND ${table.calculationBasis} != 'none'
+              AND ${table.percentageRate} IS NOT NULL
+              AND ${table.percentageRate} >= 0
+              AND ${table.percentageRate} <= 100
+            )
+          )
+        )
+        OR
+        (
+          ${table.kind} = 'discount'
+          AND ${table.pricingOptionId} IS NULL
+          AND ${table.pricingAdjustmentId} IS NOT NULL
+          AND ${table.calculationType} IS NOT NULL
+          AND ${table.calculationBasis} IS NOT NULL
+          AND (
+            (
+              ${table.calculationType} = 'fixed'
+              AND ${table.calculationBasis} = 'none'
+              AND ${table.percentageRate} IS NULL
+            )
+            OR
+            (
+              ${table.calculationType} = 'percentage'
+              AND ${table.calculationBasis} != 'none'
+              AND ${table.percentageRate} IS NOT NULL
+              AND ${table.percentageRate} >= 0
+              AND ${table.percentageRate} <= 100
+            )
+          )
+        )
+      `,
+    ),
+  ],
+);
+
+/*
+ * ============================================================
+ * COMMISSION DELIVERABLES
+ * ============================================================
+ *
+ * A deliverable is a piece of work included in a Commission.
+ *
+ * Examples:
+ * - Illustration 1 (quantity: 1)
+ * - Illustration 2 (quantity: 1)
+ * - Character designs (quantity: 10)
+ *
+ * Deliverables are associated with the accepted Quote.
+ * Their sequence is their display order, not an automatic
+ * workflow transition.
+ */
+export const commissionDeliverables = pgTable(
+  "commission_deliverables",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+
+    commissionId: uuid("commission_id")
+      .notNull()
+      .references(() => commissions.id, {
+        onDelete: "restrict",
+      }),
+
+    quoteId: uuid("quote_id")
+      .notNull()
+      .references(() => commissionQuotes.id, {
+        onDelete: "restrict",
+      }),
+
+    sequence: integer("sequence").notNull(),
+
+    title: varchar("title", { length: 150 }).notNull(),
+
+    description: text("description"),
+
+    quantity: integer("quantity").notNull().default(1),
+
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.commissionId, table.quoteId],
+      foreignColumns: [commissionQuotes.commissionId, commissionQuotes.id],
+      name: "commission_deliverables_quote_commission_fk",
+    }).onDelete("restrict"),
+
+    uniqueIndex("commission_deliverables_id_commission_quote_unique").on(
+      table.id,
+      table.commissionId,
+      table.quoteId,
+    ),
+
+    uniqueIndex("commission_deliverables_quote_sequence_unique").on(
+      table.quoteId,
+      table.sequence,
+    ),
+
+    index("commission_deliverables_commission_id_idx").on(table.commissionId),
+
+    index("commission_deliverables_quote_id_idx").on(table.quoteId),
+
+    check(
+      "commission_deliverables_sequence_check",
+      sql`${table.sequence} >= 1`,
+    ),
+
+    check(
+      "commission_deliverables_quantity_check",
+      sql`${table.quantity} >= 1`,
+    ),
+
+    check(
+      "commission_deliverables_title_check",
+      sql`char_length(trim(${table.title})) > 0`,
+    ),
+  ],
+);
+
+/*
+ * ============================================================
+ * COMMISSION PAYMENT INSTALLMENTS
+ * ============================================================
+ */
+
+export const commissionPaymentInstallments = pgTable(
+  "commission_payment_installments",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+
+    commissionId: uuid("commission_id")
+      .notNull()
+      .references(() => commissions.id, {
+        onDelete: "restrict",
+      }),
+
+    quoteId: uuid("quote_id")
+      .notNull()
+      .references(() => commissionQuotes.id, {
+        onDelete: "restrict",
+      }),
+
+    /*
+     * Optional deliverable association.
+     *
+     * null -> payment for the overall project
+     * UUID -> payment associated with a specific deliverable
+     */
+    deliverableId: uuid("deliverable_id").references(
+      () => commissionDeliverables.id,
+      {
+        onDelete: "restrict",
+      },
+    ),
+
+    /*
+     * Display/payment order:
+     *
+     * 1 -> initial payment
+     * 2 -> after sketch
+     * 3 -> before final delivery
+     */
+    sequence: integer("sequence").notNull(),
+
+    label: varchar("label", { length: 150 }).notNull(),
+
+    /*
+     * Optional because custom plans may define only
+     * explicit amounts.
+     *
+     * Examples:
+     * 100.00
+     * 50.00
+     * 40.00
+     * 30.00
+     */
+    percentage: numeric("percentage", {
+      precision: 5,
+      scale: 2,
+    }),
+
+    amount: numeric("amount", {
+      precision: 12,
+      scale: 2,
+    }).notNull(),
+
+    currency: varchar("currency", { length: 3 }).notNull(),
+
+    trigger: installmentTriggerEnum("trigger").notNull(),
+
+    customTriggerNote: text("custom_trigger_note"),
+
+    status: installmentStatusEnum("status").notNull().default("pending"),
+
+    dueAt: timestamp("due_at", {
+      withTimezone: true,
+    }),
+
+    becameDueAt: timestamp("became_due_at", {
+      withTimezone: true,
+    }),
+
+    paidAt: timestamp("paid_at", {
+      withTimezone: true,
+    }),
+
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.deliverableId, table.commissionId, table.quoteId],
+      foreignColumns: [
+        commissionDeliverables.id,
+        commissionDeliverables.commissionId,
+        commissionDeliverables.quoteId,
+      ],
+      name: "commission_installments_deliverable_scope_fk",
+    }).onDelete("restrict"),
+
+    uniqueIndex("commission_installments_quote_sequence_unique").on(
+      table.quoteId,
+      table.sequence,
+    ),
+
+    index("commission_installments_commission_id_idx").on(table.commissionId),
+
+    index("commission_installments_quote_id_idx").on(table.quoteId),
+
+    index("commission_installments_deliverable_id_idx").on(table.deliverableId),
+
+    index("commission_installments_status_idx").on(table.status),
+
+    index("commission_installments_due_at_idx").on(table.dueAt),
+
+    check(
+      "commission_installments_sequence_check",
+      sql`
+          ${table.sequence} >= 1
+        `,
+    ),
+
+    check(
+      "commission_installments_amount_check",
+      sql`
+          ${table.amount} >= 0
+        `,
+    ),
+
+    check(
+      "commission_installments_percentage_check",
+      sql`
+          ${table.percentage}
+          IS NULL
+          OR (
+            ${table.percentage} > 0
+            AND ${table.percentage} <= 100
+          )
+        `,
+    ),
+
+    check(
+      "commission_installments_currency_check",
+      sql`
+          ${table.currency}
+          =
+          upper(${table.currency})
+        `,
+    ),
+
+    /*
+     * A custom trigger must explain what causes the
+     * installment to become due.
+     */
+    check(
+      "commission_installments_custom_trigger_check",
+      sql`
+          ${table.trigger} != 'custom'
+          OR ${table.customTriggerNote} IS NOT NULL
+        `,
+    ),
+
+    /*
+     * paidAt only makes sense for an installment whose
+     * current state is paid.
+     */
+    check(
+      "commission_installments_paid_at_check",
+      sql`
+          ${table.paidAt} IS NULL
+          OR ${table.status} = 'paid'
+        `,
+    ),
+  ],
+);
+
+/*
+ * ============================================================
+ * COMMISSION PAYMENTS
+ * ============================================================
+ *
+ * Installments describe what the client is expected to pay.
+ *
+ * Payments describe money that was actually recorded.
+ *
+ * One installment may therefore have multiple payments:
+ *
+ * Installment #1: $500
+ *   -> Payment A: $300
+ *   -> Payment B: $200
+ */
+
+export const commissionPayments = pgTable(
+  "commission_payments",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+
+    commissionId: uuid("commission_id")
+      .notNull()
+      .references(() => commissions.id, {
+        onDelete: "restrict",
+      }),
+
+    /*
+     * Nullable because not every financial movement must
+     * belong to an installment.
+     *
+     * Examples:
+     * - additional payment
+     * - refund
+     * - manual adjustment
+     */
+    installmentId: uuid("installment_id").references(
+      () => commissionPaymentInstallments.id,
+      {
+        onDelete: "restrict",
+      },
+    ),
+
+    type: paymentTypeEnum("type").notNull(),
+
+    status: paymentStatusEnum("status").notNull().default("pending"),
+
+    /*
+     * Amounts are always stored as positive values.
+     *
+     * Whether the movement represents incoming money or
+     * a refund is expressed through payment.type rather
+     * than a negative number.
+     */
+    amount: numeric("amount", {
+      precision: 12,
+      scale: 2,
+    }).notNull(),
+
+    currency: varchar("currency", { length: 3 }).notNull(),
+
+    method: paymentMethodEnum("method"),
+
+    /*
+     * Used when method = other, or when we want to retain
+     * the provider's human-readable name.
+     *
+     * Example:
+     * "Mercado Pago"
+     */
+    methodLabel: varchar("method_label", { length: 150 }),
+
+    /*
+     * Provider/bank transaction identifier.
+     *
+     * We intentionally do not make this globally unique
+     * because reference formats differ between providers
+     * and some manually-recorded payments may not have one.
+     */
+    transactionReference: varchar("transaction_reference", { length: 250 }),
+
+    /*
+     * The date at which the payment was actually received
+     * or financially recognised.
+     */
+    paidAt: timestamp("paid_at", {
+      withTimezone: true,
+    }),
+
+    notes: text("notes"),
+
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("commission_payments_commission_id_idx").on(table.commissionId),
+
+    index("commission_payments_installment_id_idx").on(table.installmentId),
+
+    index("commission_payments_status_idx").on(table.status),
+
+    index("commission_payments_paid_at_idx").on(table.paidAt),
+
+    check(
+      "commission_payments_amount_check",
+      sql`
+          ${table.amount} > 0
+        `,
+    ),
+
+    check(
+      "commission_payments_currency_check",
+      sql`
+          ${table.currency}
+          =
+          upper(${table.currency})
+        `,
+    ),
+
+    /*
+     * A custom payment method must explain which provider
+     * or mechanism was used.
+     */
+    check(
+      "commission_payments_method_label_check",
+      sql`
+          ${table.method} != 'other'
+          OR ${table.methodLabel} IS NOT NULL
+        `,
+    ),
+
+    /*
+     * paidAt only makes sense once a payment has actually
+     * existed as a confirmed financial transaction.
+     *
+     * Refunded/partially-refunded payments preserve the
+     * original paidAt timestamp.
+     */
+    check(
+      "commission_payments_paid_at_check",
+      sql`
+          ${table.paidAt} IS NULL
+          OR ${table.status} IN (
+            'confirmed',
+            'partially_refunded',
+            'refunded'
+          )
+        `,
+    ),
+  ],
+);
+
+/*
+ * ============================================================
+ * COMMISSION PAYMENT EVIDENCE
+ * ============================================================
+ *
+ * Private supporting files related to a payment.
+ *
+ * Examples:
+ * - PayPal screenshot
+ * - bank transfer receipt
+ * - Wise transaction confirmation
+ *
+ * The binary file itself is stored in private R2.
+ * PostgreSQL stores only metadata and integrity information.
+ */
+
+export const commissionPaymentEvidence = pgTable(
+  "commission_payment_evidence",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+
+    paymentId: uuid("payment_id")
+      .notNull()
+      .references(() => commissionPayments.id, {
+        onDelete: "restrict",
+      }),
+
+    /*
+     * Private R2 object key.
+     *
+     * Example:
+     * commissions/COM-20260831-A1B2C3/
+     * payment-evidence/<uuid>.png
+     */
+    storageKey: text("storage_key").notNull(),
+
+    originalFilename: varchar("original_filename", { length: 500 }).notNull(),
+
+    mimeType: varchar("mime_type", { length: 150 }).notNull(),
+
+    sizeBytes: integer("size_bytes").notNull(),
+
+    /*
+     * SHA-256 hexadecimal digest = 64 characters.
+     *
+     * This lets us later prove that the stored evidence
+     * has not silently changed.
+     */
+    contentSha256: varchar("content_sha256", { length: 64 }).notNull(),
+
+    uploadedAt: timestamp("uploaded_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("commission_payment_evidence_payment_id_idx").on(table.paymentId),
+
+    uniqueIndex("commission_payment_evidence_storage_key_unique").on(
+      table.storageKey,
+    ),
+
+    check(
+      "commission_payment_evidence_size_check",
+      sql`
+          ${table.sizeBytes} > 0
+        `,
+    ),
+
+    /*
+     * A hexadecimal SHA-256 digest must contain exactly
+     * 64 characters.
+     *
+     * Actual hexadecimal validation can additionally be
+     * enforced when uploading the file.
+     */
+    check(
+      "commission_payment_evidence_sha256_length_check",
+      sql`
+          char_length(
+            ${table.contentSha256}
+          ) = 64
+        `,
+    ),
+  ],
+);
+
+/*
+ * ============================================================
+ * COMMISSION DOCUMENTS
+ * ============================================================
+ *
+ * Generated commercial and contractual documents.
+ *
+ * Examples:
+ * - Commission Agreement
+ * - Payment Acknowledgement
+ * - Completion Summary
+ *
+ * Generated files are intended to be immutable in private R2.
+ */
+
+export const commissionDocuments = pgTable(
+  "commission_documents",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+
+    commissionId: uuid("commission_id")
+      .notNull()
+      .references(() => commissions.id, {
+        onDelete: "restrict",
+      }),
+
+    type: documentTypeEnum("type").notNull(),
+
+    documentNumber: varchar("document_number", { length: 100 }),
+
+    version: integer("version").notNull(),
+
+    status: documentStatusEnum("status").notNull().default("draft"),
+
+    /*
+     * Nullable while the document is only a draft record.
+     * Once generated, it points to an immutable private
+     * R2 object.
+     */
+    storageKey: text("storage_key"),
+
+    contentSha256: varchar("content_sha256", { length: 64 }),
+
+    recipientEmail: varchar("recipient_email", { length: 320 }),
+
+    generatedAt: timestamp("generated_at", {
+      withTimezone: true,
+    }),
+
+    sentAt: timestamp("sent_at", {
+      withTimezone: true,
+    }),
+
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("commission_documents_commission_type_version_unique").on(
+      table.commissionId,
+      table.type,
+      table.version,
+    ),
+
+    index("commission_documents_commission_id_idx").on(table.commissionId),
+
+    index("commission_documents_status_idx").on(table.status),
+
+    check(
+      "commission_documents_version_check",
+      sql`
+          ${table.version} >= 1
+        `,
+    ),
+
+    check(
+      "commission_documents_sha256_check",
+      sql`
+          ${table.contentSha256} IS NULL
+          OR char_length(
+            ${table.contentSha256}
+          ) = 64
+        `,
+    ),
+
+    /*
+     * Once a document reaches a generated/send state,
+     * the corresponding immutable file must exist.
+     */
+    check(
+      "commission_documents_generated_file_check",
+      sql`
+          ${table.status} = 'draft'
+          OR (
+            ${table.storageKey} IS NOT NULL
+            AND ${table.contentSha256} IS NOT NULL
+            AND ${table.generatedAt} IS NOT NULL
+          )
+        `,
+    ),
+  ],
+);
+
+/*
+ * ============================================================
+ * COMMISSION AGREEMENTS
+ * ============================================================
+ *
+ * Stores the contractual acceptance record.
+ *
+ * The actual immutable PDF is represented by documentId.
+ */
+
+export const commissionAgreements = pgTable(
+  "commission_agreements",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+
+    commissionId: uuid("commission_id")
+      .notNull()
+      .references(() => commissions.id, {
+        onDelete: "restrict",
+      }),
+
+    quoteId: uuid("quote_id")
+      .notNull()
+      .references(() => commissionQuotes.id, {
+        onDelete: "restrict",
+      }),
+
+    documentId: uuid("document_id").references(() => commissionDocuments.id, {
+      onDelete: "restrict",
+    }),
+
+    executedDocumentId: uuid("executed_document_id").references(
+      () => commissionDocuments.id,
+      {
+        onDelete: "restrict",
+      },
+    ),
+
+    /*
+     * Internal revision sequence for this commission.
+     *
+     * Example:
+     * Agreement record 1
+     * Agreement record 2
+     */
+    version: integer("version").notNull(),
+
+    /*
+     * Human/legal template versions.
+     *
+     * Examples:
+     * termsVersion = "2027.1"
+     * agreementVersion = "1.0"
+     */
+    termsVersion: varchar("terms_version", { length: 50 }).notNull(),
+
+    agreementVersion: varchar("agreement_version", { length: 50 }).notNull(),
+
+    agreementData: jsonb("agreement_data"),
+
+    status: agreementStatusEnum("status").notNull().default("draft"),
+
+    publicTokenHash: varchar("public_token_hash", {
+      length: 64,
+    }),
+
+    publicTokenCreatedAt: timestamp("public_token_created_at", {
+      withTimezone: true,
+    }),
+
+    publicTokenRevokedAt: timestamp("public_token_revoked_at", {
+      withTimezone: true,
+    }),
+
+    acceptedByName: varchar("accepted_by_name", { length: 200 }),
+
+    acceptedByEmail: varchar("accepted_by_email", { length: 320 }),
+
+    acceptanceMethod: acceptanceMethodEnum("acceptance_method"),
+
+    acceptanceStatementVersion: varchar("acceptance_statement_version", {
+      length: 50,
+    }),
+
+    sentAt: timestamp("sent_at", {
+      withTimezone: true,
+    }),
+
+    acceptedAt: timestamp("accepted_at", {
+      withTimezone: true,
+    }),
+
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("commission_agreements_commission_version_unique").on(
+      table.commissionId,
+      table.version,
+    ),
+
+    uniqueIndex("commission_agreements_commission_active_unique")
+      .on(table.commissionId)
+      .where(
+        sql`
+          ${table.status} IN ('draft', 'sent')
+        `,
+      ),
+
+    index("commission_agreements_commission_id_idx").on(table.commissionId),
+
+    index("commission_agreements_quote_id_idx").on(table.quoteId),
+
+    index("commission_agreements_status_idx").on(table.status),
+
+    uniqueIndex("commission_agreements_public_token_hash_unique").on(
+      table.publicTokenHash,
+    ),
+
+    uniqueIndex("commission_agreements_executed_document_id_unique")
+      .on(table.executedDocumentId)
+      .where(sql`${table.executedDocumentId} IS NOT NULL`),
+
+    check(
+      "commission_agreements_version_check",
+      sql`
+          ${table.version} >= 1
+        `,
+    ),
+
+    check(
+      "commission_agreements_public_token_state_check",
+      sql`
+        (
+          ${table.publicTokenHash} IS NULL
+          AND ${table.publicTokenCreatedAt} IS NULL
+          AND ${table.publicTokenRevokedAt} IS NULL
+        )
+        OR
+        (
+          ${table.publicTokenHash} IS NOT NULL
+          AND ${table.publicTokenCreatedAt} IS NOT NULL
+          AND char_length(${table.publicTokenHash}) = 64
+        )
+      `,
+    ),
+
+    /*
+     * An accepted agreement must identify who accepted it,
+     * how, and when.
+     */
+    check(
+      "commission_agreements_acceptance_check",
+      sql`
+        ${table.status} != 'accepted'
+        OR (
+          ${table.acceptedByName} IS NOT NULL
+          AND ${table.acceptedByEmail} IS NOT NULL
+          AND ${table.acceptanceMethod} IS NOT NULL
+          AND ${table.acceptedAt} IS NOT NULL
+          AND (
+            ${table.acceptanceMethod} != 'electronic'
+            OR ${table.acceptanceStatementVersion} IS NOT NULL
+          )
+        )
+      `,
+    ),
+  ],
+);
+
+/*
+ * ============================================================
+ * COMMISSION APPROVALS
+ * ============================================================
+ */
+
+export const commissionApprovals = pgTable(
+  "commission_approvals",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+
+    commissionId: uuid("commission_id")
+      .notNull()
+      .references(() => commissions.id, {
+        onDelete: "restrict",
+      }),
+
+    type: approvalTypeEnum("type").notNull(),
+
+    /*
+     * Useful for sketch/final revisions.
+     *
+     * Example:
+     * sketch revision 1
+     * sketch revision 2
+     */
+    revisionNumber: integer("revision_number"),
+
+    status: approvalStatusEnum("status").notNull().default("pending"),
+
+    clientName: varchar("client_name", { length: 200 }).notNull(),
+
+    clientEmail: varchar("client_email", { length: 320 }).notNull(),
+
+    requestedAt: timestamp("requested_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+
+    respondedAt: timestamp("responded_at", {
+      withTimezone: true,
+    }),
+
+    clientNote: text("client_note"),
+
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("commission_approvals_commission_id_idx").on(table.commissionId),
+
+    index("commission_approvals_status_idx").on(table.status),
+
+    check(
+      "commission_approvals_revision_number_check",
+      sql`
+          ${table.revisionNumber}
+          IS NULL
+          OR ${table.revisionNumber} >= 1
+        `,
+    ),
+
+    check(
+      "commission_approvals_response_check",
+      sql`
+          ${table.respondedAt} IS NULL
+          OR ${table.status} != 'pending'
+        `,
+    ),
+  ],
+);
+
+/*
+ * ============================================================
+ * COMMISSION STATUS HISTORY
+ * ============================================================
+ *
+ * Immutable audit trail of workflow transitions.
+ */
+
+export const commissionStatusHistory = pgTable(
+  "commission_status_history",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+
+    commissionId: uuid("commission_id")
+      .notNull()
+      .references(() => commissions.id, {
+        onDelete: "restrict",
+      }),
+
+    /*
+     * Null is allowed for the initial transition:
+     *
+     * null -> received
+     */
+    fromStatus: commissionStatusEnum("from_status"),
+
+    toStatus: commissionStatusEnum("to_status").notNull(),
+
+    /*
+     * Who originated the business action.
+     *
+     * This is different from who clicked the admin button.
+     */
+    initiatedBy: commissionActorEnum("initiated_by").notNull(),
+
+    reason: varchar("reason", { length: 150 }),
+
+    note: text("note"),
+
+    /*
+     * Neon Auth / administrative account that physically
+     * recorded the transition.
+     */
+    changedByAdminUserId: varchar("changed_by_admin_user_id", { length: 255 }),
+
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("commission_status_history_commission_created_idx").on(
+      table.commissionId,
+      table.createdAt,
+    ),
+
+    index("commission_status_history_to_status_idx").on(table.toStatus),
+
+    check(
+      "commission_status_history_transition_check",
+      sql`
+          ${table.fromStatus} IS NULL
+          OR ${table.fromStatus} != ${table.toStatus}
+        `,
+    ),
+  ],
+);
+
+/*
+ * ============================================================
+ * COMMISSION EVENTS
+ * ============================================================
+ *
+ * General commission timeline.
+ *
+ * Important structured business events that do not
+ * necessarily change Commission.status.
+ */
+
+export const commissionEvents = pgTable(
+  "commission_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+
+    commissionId: uuid("commission_id")
+      .notNull()
+      .references(() => commissions.id, {
+        onDelete: "restrict",
+      }),
+
+    type: commissionEventTypeEnum("type").notNull(),
+
+    actor: commissionActorEnum("actor").notNull(),
+
+    title: varchar("title", { length: 250 }).notNull(),
+
+    description: text("description"),
+
+    /*
+     * Optional supporting metadata.
+     *
+     * Important business data should still live in its
+     * normal relational table.
+     */
+    metadata: jsonb("metadata"),
+
+    createdByAdminUserId: varchar("created_by_admin_user_id", { length: 255 }),
+
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("commission_events_commission_created_idx").on(
+      table.commissionId,
+      table.createdAt,
+    ),
+
+    index("commission_events_type_idx").on(table.type),
+  ],
+);
+
+/*
+ * ============================================================
+ * COMMISSION EMAIL THREADS
+ * ============================================================
+ *
+ * One client-facing email thread belongs to one commission.
+ *
+ * The thread stores only the stable root identity. We
+ * intentionally do not store a "latest message" pointer because
+ * replies may happen directly between the client and artist
+ * outside the application.
+ */
+
+export const commissionEmailThreads = pgTable(
+  "commission_email_threads",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+
+    commissionId: uuid("commission_id")
+      .notNull()
+      .references(() => commissions.id, {
+        onDelete: "restrict",
+      }),
+
+    /*
+     * Stable subject used for the client conversation.
+     *
+     * Example:
+     * Fefierys Art — Your project — COM-20260915-ABC123
+     */
+    subject: varchar("subject", {
+      length: 350,
+    }).notNull(),
+
+    /*
+     * Provider identifier returned for the email that created
+     * the client thread.
+     *
+     * This is not the RFC Message-ID header.
+     */
+    rootProviderEmailId: varchar("root_provider_email_id", {
+      length: 255,
+    }),
+
+    /*
+     * RFC Message-ID of the first client-facing email.
+     *
+     * Future messages use this value when building
+     * In-Reply-To / References headers.
+     */
+    rootMessageId: text("root_message_id"),
+
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("commission_email_threads_commission_unique").on(
+      table.commissionId,
+    ),
+
+    uniqueIndex("commission_email_threads_commission_id_id_unique").on(
+      table.commissionId,
+      table.id,
+    ),
+
+    uniqueIndex("commission_email_threads_root_provider_email_unique").on(
+      table.rootProviderEmailId,
+    ),
+
+    uniqueIndex("commission_email_threads_root_message_unique").on(
+      table.rootMessageId,
+    ),
+
+    check(
+      "commission_email_threads_subject_check",
+      sql`
+        char_length(
+          btrim(${table.subject})
+        ) > 0
+      `,
+    ),
+
+    check(
+      "commission_email_threads_root_state_check",
+      sql`
+        (
+          ${table.rootProviderEmailId} IS NULL
+          AND ${table.rootMessageId} IS NULL
+        )
+        OR
+        (
+          ${table.rootProviderEmailId} IS NOT NULL
+        )
+      `,
+    ),
+  ],
+);
+
+/*
+ * ============================================================
+ * COMMISSION EMAIL MESSAGES
+ * ============================================================
+ *
+ * Persistent record of commission-related email communication.
+ *
+ * Client-thread messages belong to commissionEmailThreads.
+ * Internal artist notifications intentionally do not.
+ *
+ * The table stores delivery state so failed messages can later
+ * be retried without losing the original business action.
+ */
+
+export const commissionEmailMessages = pgTable(
+  "commission_email_messages",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+
+    commissionId: uuid("commission_id")
+      .notNull()
+      .references(() => commissions.id, {
+        onDelete: "restrict",
+      }),
+
+    threadId: uuid("thread_id"),
+
+    /*
+     * Present for quote-related messages.
+     *
+     * Other communication types may not belong to a quote.
+     */
+    quoteId: uuid("quote_id"),
+
+    scope: commissionEmailScopeEnum("scope").notNull(),
+
+    direction: commissionEmailDirectionEnum("direction")
+      .notNull()
+      .default("outbound"),
+
+    kind: commissionEmailKindEnum("kind").notNull(),
+
+    actor: commissionActorEnum("actor").notNull(),
+
+    deliveryStatus: commissionEmailDeliveryStatusEnum("delivery_status")
+      .notNull()
+      .default("queued"),
+
+    senderEmail: varchar("sender_email", {
+      length: 320,
+    }).notNull(),
+
+    recipientEmail: varchar("recipient_email", {
+      length: 320,
+    }).notNull(),
+
+    replyToEmail: varchar("reply_to_email", {
+      length: 320,
+    }),
+
+    subject: varchar("subject", {
+      length: 350,
+    }).notNull(),
+
+    /*
+     * Human-readable communication body or summary.
+     *
+     * We do not need to persist the generated HTML template.
+     * This field gives Admin an auditable representation of
+     * what was communicated.
+     */
+    messageText: text("message_text"),
+
+    /*
+     * Provider-specific email identifier.
+     *
+     * Example: the identifier returned by Resend.
+     */
+    providerEmailId: varchar("provider_email_id", {
+      length: 255,
+    }),
+
+    /*
+     * RFC Message-ID returned by the email provider.
+     */
+    providerMessageId: text("provider_message_id"),
+
+    /*
+     * RFC threading headers used for this message.
+     */
+    inReplyToMessageId: text("in_reply_to_message_id"),
+
+    referencesHeader: text("references_header"),
+
+    /*
+     * Delivery attempt information.
+     *
+     * The message row itself is the stable logical message.
+     * Retrying delivery does not create a second business
+     * communication record.
+     */
+    attemptCount: integer("attempt_count").notNull().default(0),
+
+    lastAttemptAt: timestamp("last_attempt_at", {
+      withTimezone: true,
+    }),
+
+    sentAt: timestamp("sent_at", {
+      withTimezone: true,
+    }),
+
+    failedAt: timestamp("failed_at", {
+      withTimezone: true,
+    }),
+
+    /*
+     * Safe diagnostic text only.
+     *
+     * Tokens, secure URLs, credentials and complete provider
+     * payloads must never be persisted here.
+     */
+    failureMessage: text("failure_message"),
+
+    createdByAdminUserId: varchar("created_by_admin_user_id", {
+      length: 255,
+    }),
+
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.commissionId, table.threadId],
+      foreignColumns: [
+        commissionEmailThreads.commissionId,
+        commissionEmailThreads.id,
+      ],
+      name: "commission_email_messages_commission_thread_fk",
+    }).onDelete("restrict"),
+
+    foreignKey({
+      columns: [table.commissionId, table.quoteId],
+      foreignColumns: [commissionQuotes.commissionId, commissionQuotes.id],
+      name: "commission_email_messages_commission_quote_fk",
+    }).onDelete("restrict"),
+
+    index("commission_email_messages_commission_created_idx").on(
+      table.commissionId,
+      table.createdAt,
+    ),
+
+    index("commission_email_messages_thread_created_idx").on(
+      table.threadId,
+      table.createdAt,
+    ),
+
+    index("commission_email_messages_delivery_status_idx").on(
+      table.deliveryStatus,
+    ),
+
+    index("commission_email_messages_quote_idx").on(table.quoteId),
+
+    uniqueIndex("commission_email_messages_provider_email_unique").on(
+      table.providerEmailId,
+    ),
+
+    uniqueIndex("commission_email_messages_provider_message_unique").on(
+      table.providerMessageId,
+    ),
+
+    check(
+      "commission_email_messages_attempt_count_check",
+      sql`
+        ${table.attemptCount} >= 0
+      `,
+    ),
+
+    check(
+      "commission_email_messages_subject_check",
+      sql`
+        char_length(
+          btrim(${table.subject})
+        ) > 0
+      `,
+    ),
+
+    /*
+     * Client conversation messages must belong to the
+     * commission's email thread.
+     *
+     * Internal notifications must never accidentally join
+     * the client's conversation.
+     */
+    check(
+      "commission_email_messages_scope_thread_check",
+      sql`
+        (
+          ${table.scope} = 'client_thread'
+          AND ${table.threadId} IS NOT NULL
+        )
+        OR
+        (
+          ${table.scope} = 'internal_notification'
+          AND ${table.threadId} IS NULL
+        )
+      `,
+    ),
+
+    check(
+      "commission_email_messages_delivery_state_check",
+      sql`
+        (
+          ${table.direction} = 'outbound'
+          AND (
+            (
+              ${table.deliveryStatus} = 'queued'
+              AND ${table.sentAt} IS NULL
+              AND ${table.failedAt} IS NULL
+              AND ${table.attemptCount} = 0
+              AND ${table.lastAttemptAt} IS NULL
+            )
+            OR
+            (
+              ${table.deliveryStatus} = 'sending'
+              AND ${table.sentAt} IS NULL
+              AND ${table.failedAt} IS NULL
+              AND ${table.attemptCount} > 0
+              AND ${table.lastAttemptAt} IS NOT NULL
+            )
+            OR
+            (
+              ${table.deliveryStatus} = 'sent'
+              AND ${table.sentAt} IS NOT NULL
+              AND ${table.failedAt} IS NULL
+              AND ${table.attemptCount} > 0
+              AND ${table.lastAttemptAt} IS NOT NULL
+            )
+            OR
+            (
+              ${table.deliveryStatus} = 'failed'
+              AND ${table.sentAt} IS NULL
+              AND ${table.failedAt} IS NOT NULL
+              AND ${table.attemptCount} > 0
+              AND ${table.lastAttemptAt} IS NOT NULL
+            )
+          )
+        )
+        OR
+        (
+          ${table.direction} = 'inbound'
+          AND ${table.deliveryStatus} = 'received'
+          AND ${table.sentAt} IS NULL
+          AND ${table.failedAt} IS NULL
+          AND ${table.attemptCount} = 0
+          AND ${table.lastAttemptAt} IS NULL
+        )
+      `,
+    ),
+
+    /*
+     * Internal notifications are never threaded with the
+     * client conversation.
+     */
+    check(
+      "commission_email_messages_internal_thread_headers_check",
+      sql`
+        ${table.scope} != 'internal_notification'
+        OR (
+          ${table.inReplyToMessageId} IS NULL
+          AND ${table.referencesHeader} IS NULL
+        )
+      `,
+    ),
+  ],
+);
+
+/*
+ * ============================================================
+ * COMMISSION TAX DOCUMENTS
+ * ============================================================
+ *
+ * References to official tax/accounting documents.
+ *
+ * The platform does not assume that every commission always
+ * uses the same Chilean tax document type. That depends on
+ * Fefierys' tax situation at the time.
+ */
+
+export const commissionTaxDocuments = pgTable(
+  "commission_tax_documents",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+
+    commissionId: uuid("commission_id")
+      .notNull()
+      .references(() => commissions.id, {
+        onDelete: "restrict",
+      }),
+
+    paymentId: uuid("payment_id").references(() => commissionPayments.id, {
+      onDelete: "restrict",
+    }),
+
+    /*
+     * Examples:
+     *
+     * typeCode  = "BHE"
+     * typeLabel = "Boleta de Honorarios Electrónica"
+     *
+     * These are deliberately not PostgreSQL enums.
+     */
+    typeCode: varchar("type_code", { length: 50 }).notNull(),
+
+    typeLabel: varchar("type_label", { length: 200 }).notNull(),
+
+    documentNumber: varchar("document_number", { length: 150 }).notNull(),
+
+    currency: varchar("currency", { length: 3 }).notNull(),
+
+    amount: numeric("amount", {
+      precision: 12,
+      scale: 2,
+    }).notNull(),
+
+    issuedAt: timestamp("issued_at", {
+      withTimezone: true,
+    }).notNull(),
+
+    /*
+     * Optional private copy of the official document.
+     */
+    storageKey: text("storage_key"),
+
+    contentSha256: varchar("content_sha256", { length: 64 }),
+
+    /*
+     * Identifier/URL/reference from an external tax or
+     * accounting system when appropriate.
+     */
+    externalReference: text("external_reference"),
+
+    notes: text("notes"),
+
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("commission_tax_documents_commission_id_idx").on(table.commissionId),
+
+    index("commission_tax_documents_payment_id_idx").on(table.paymentId),
+
+    index("commission_tax_documents_issued_at_idx").on(table.issuedAt),
+
+    check(
+      "commission_tax_documents_amount_check",
+      sql`
+          ${table.amount} > 0
+        `,
+    ),
+
+    check(
+      "commission_tax_documents_currency_check",
+      sql`
+          ${table.currency}
+          =
+          upper(${table.currency})
+        `,
+    ),
+
+    check(
+      "commission_tax_documents_sha256_check",
+      sql`
+          ${table.contentSha256} IS NULL
+          OR char_length(
+            ${table.contentSha256}
+          ) = 64
+        `,
+    ),
+
+    /*
+     * If a private file is registered, its integrity hash
+     * must also be registered.
+     */
+    check(
+      "commission_tax_documents_file_hash_check",
+      sql`
+          ${table.storageKey} IS NULL
+          OR ${table.contentSha256} IS NOT NULL
+        `,
+    ),
+  ],
+);

@@ -97,9 +97,6 @@ async function queryPortfolioSectionBySlug(
           id:
             artworks.id,
 
-          legacyId:
-            artworks.legacyId,
-
           slug:
             artworks.slug,
 
@@ -375,18 +372,10 @@ async function queryPortfolioSectionBySlug(
      * that contract yet.
      */
 
-    if (
-      row.artwork.legacyId ===
-      null
-    ) {
-      throw new Error(
-        `Published artwork "${row.artwork.slug}" has no legacyId`
-      );
-    }
 
     category.artworks.push({
       id:
-        row.artwork.legacyId,
+        row.artwork.id,
 
       slug:
         row.artwork.slug,
@@ -436,7 +425,7 @@ export const getPortfolioSectionBySlug =
  * - nav label
  * - order
  *
- * We are NOT wiring Navbar to DB yet.
+ * The database is the runtime source of truth.
  */
 
 export interface PortfolioNavigationItem {
@@ -478,3 +467,108 @@ Promise<PortfolioNavigationItem[]> {
     })
   );
 }
+
+/*
+ * ============================================================
+ * PORTFOLIO SITEMAP
+ * ============================================================
+ *
+ * Lightweight public portfolio hierarchy used by sitemap.xml.
+ *
+ * This intentionally returns only the slugs required to build
+ * public URLs.
+ *
+ * The database is the runtime source of truth.
+ */
+
+export interface PortfolioSitemapEntry {
+  sectionSlug: string;
+  groupSlug: string | null;
+  categorySlug: string | null;
+  artworkSlug: string | null;
+}
+
+async function queryPortfolioSitemapEntries():
+Promise<PortfolioSitemapEntry[]> {
+  return db
+    .select({
+      sectionSlug:
+        portfolioSections.slug,
+
+      groupSlug:
+        portfolioGroups.slug,
+
+      categorySlug:
+        portfolioCategories.slug,
+
+      artworkSlug:
+        artworks.slug,
+    })
+    .from(
+      portfolioSections
+    )
+    .leftJoin(
+      portfolioGroups,
+      and(
+        eq(
+          portfolioGroups.sectionId,
+          portfolioSections.id
+        ),
+        eq(
+          portfolioGroups.isVisible,
+          true
+        )
+      )
+    )
+    .leftJoin(
+      portfolioCategories,
+      and(
+        eq(
+          portfolioCategories.groupId,
+          portfolioGroups.id
+        ),
+        eq(
+          portfolioCategories.isVisible,
+          true
+        )
+      )
+    )
+    .leftJoin(
+      artworks,
+      and(
+        eq(
+          artworks.categoryId,
+          portfolioCategories.id
+        ),
+        eq(
+          artworks.status,
+          "published"
+        )
+      )
+    )
+    .where(
+      eq(
+        portfolioSections.isVisible,
+        true
+      )
+    )
+    .orderBy(
+      asc(
+        portfolioSections.sortOrder
+      ),
+      asc(
+        portfolioGroups.sortOrder
+      ),
+      asc(
+        portfolioCategories.sortOrder
+      ),
+      asc(
+        artworks.sortOrder
+      )
+    );
+}
+
+export const getPortfolioSitemapEntries =
+  cache(
+    queryPortfolioSitemapEntries
+  );

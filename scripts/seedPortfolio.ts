@@ -11,9 +11,41 @@ import {
   portfolioSections as portfolioSectionsData,
 } from "../data/portfolio";
 
+import type {
+  Artwork,
+} from "../data/portfolio/types";
+
 config({
   path: ".env.local",
 });
+
+/*
+ * ============================================================
+ * LEGACY ARTWORK ID
+ * ============================================================
+ *
+ * The static portfolio files are historical seed fixtures.
+ * Their artwork IDs must remain numeric because they are stored
+ * in artworks.legacyId.
+ *
+ * Runtime portfolio data can use PostgreSQL UUIDs, but this seed
+ * intentionally accepts only the original numeric IDs.
+ */
+
+function getLegacyArtworkId(
+  artwork: Artwork
+): number {
+  if (
+    typeof artwork.id !==
+    "number"
+  ) {
+    throw new Error(
+      `Historical seed artwork "${artwork.slug}" must have a numeric legacy id`
+    );
+  }
+
+  return artwork.id;
+}
 
 /*
  * ============================================================
@@ -144,18 +176,23 @@ function validatePortfolioSource() {
             artwork.slug
           );
 
+          const legacyId =
+            getLegacyArtworkId(
+              artwork
+            );
+
           if (
             artworkLegacyIds.has(
-              artwork.id
+              legacyId
             )
           ) {
             throw new Error(
-              `Duplicate artwork id "${artwork.id}" in category "${category.id}"`
+              `Duplicate artwork legacy id "${legacyId}" in category "${category.id}"`
             );
           }
 
           artworkLegacyIds.add(
-            artwork.id
+            legacyId
           );
 
           if (
@@ -464,6 +501,11 @@ async function main() {
             );
           }
 
+          const legacyId =
+            getLegacyArtworkId(
+              artwork
+            );
+
           await db
             .insert(artworks)
             .values({
@@ -471,7 +513,7 @@ async function main() {
                 categoryRow.id,
 
               legacyId:
-                artwork.id,
+                legacyId,
 
               slug:
                 artwork.slug,

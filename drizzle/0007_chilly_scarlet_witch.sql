@@ -1,0 +1,2 @@
+ALTER TYPE "public"."commission_event_type" ADD VALUE 'quote_updated' BEFORE 'quote_sent';--> statement-breakpoint
+ALTER TYPE "public"."commission_event_type" ADD VALUE 'quote_superseded' BEFORE 'agreement_created';

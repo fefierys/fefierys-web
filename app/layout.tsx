@@ -6,8 +6,7 @@ import NavbarServer from '@/components/NavbarServer';
 import Footer from "@/components/Footer";
 import Background from "@/components/Background";
 
-import { Analytics } from "@vercel/analytics/react";
-import { SpeedInsights } from "@vercel/speed-insights/next";
+import SiteObservability from "@/components/SiteObservability";
 
 const lexend = Lexend({
   subsets: ["latin"],
@@ -106,9 +105,7 @@ export default function RootLayout({
 
         {children}
 
-        <Analytics />
-
-        <SpeedInsights />
+        <SiteObservability />
 
         <Footer />
       </body>
