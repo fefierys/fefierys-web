@@ -37,6 +37,7 @@ export const commissionStatusEnum = pgEnum("commission_status", [
   "awaiting_client_details",
   "quoting",
   "awaiting_quote_response",
+  "awaiting_agreement",
   "awaiting_payment",
   "in_progress",
   "sketch_review",
@@ -225,6 +226,7 @@ export const commissionEventTypeEnum = pgEnum("commission_event_type", [
 export const documentTypeEnum = pgEnum("document_type", [
   "quote",
   "commission_agreement",
+  "commission_agreement_executed",
   "commission_confirmation",
   "payment_acknowledgement",
   "commission_amendment",
@@ -254,7 +256,7 @@ export const commissionEmailDirectionEnum = pgEnum(
 
 export const commissionEmailDeliveryStatusEnum = pgEnum(
   "commission_email_delivery_status",
-  ["queued", "sending", "sent", "failed"],
+  ["queued", "sending", "sent", "failed", "received"],
 );
 
 export const commissionEmailKindEnum = pgEnum("commission_email_kind", [
@@ -1159,6 +1161,98 @@ export const commissionQuoteItems = pgTable(
 
 /*
  * ============================================================
+ * COMMISSION DELIVERABLES
+ * ============================================================
+ *
+ * A deliverable is a piece of work included in a Commission.
+ *
+ * Examples:
+ * - Illustration 1 (quantity: 1)
+ * - Illustration 2 (quantity: 1)
+ * - Character designs (quantity: 10)
+ *
+ * Deliverables are associated with the accepted Quote.
+ * Their sequence is their display order, not an automatic
+ * workflow transition.
+ */
+export const commissionDeliverables = pgTable(
+  "commission_deliverables",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+
+    commissionId: uuid("commission_id")
+      .notNull()
+      .references(() => commissions.id, {
+        onDelete: "restrict",
+      }),
+
+    quoteId: uuid("quote_id")
+      .notNull()
+      .references(() => commissionQuotes.id, {
+        onDelete: "restrict",
+      }),
+
+    sequence: integer("sequence").notNull(),
+
+    title: varchar("title", { length: 150 }).notNull(),
+
+    description: text("description"),
+
+    quantity: integer("quantity").notNull().default(1),
+
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.commissionId, table.quoteId],
+      foreignColumns: [commissionQuotes.commissionId, commissionQuotes.id],
+      name: "commission_deliverables_quote_commission_fk",
+    }).onDelete("restrict"),
+
+    uniqueIndex("commission_deliverables_id_commission_quote_unique").on(
+      table.id,
+      table.commissionId,
+      table.quoteId,
+    ),
+
+    uniqueIndex("commission_deliverables_quote_sequence_unique").on(
+      table.quoteId,
+      table.sequence,
+    ),
+
+    index("commission_deliverables_commission_id_idx").on(table.commissionId),
+
+    index("commission_deliverables_quote_id_idx").on(table.quoteId),
+
+    check(
+      "commission_deliverables_sequence_check",
+      sql`${table.sequence} >= 1`,
+    ),
+
+    check(
+      "commission_deliverables_quantity_check",
+      sql`${table.quantity} >= 1`,
+    ),
+
+    check(
+      "commission_deliverables_title_check",
+      sql`char_length(trim(${table.title})) > 0`,
+    ),
+  ],
+);
+
+/*
+ * ============================================================
  * COMMISSION PAYMENT INSTALLMENTS
  * ============================================================
  */
@@ -1179,6 +1273,19 @@ export const commissionPaymentInstallments = pgTable(
       .references(() => commissionQuotes.id, {
         onDelete: "restrict",
       }),
+
+    /*
+     * Optional deliverable association.
+     *
+     * null -> payment for the overall project
+     * UUID -> payment associated with a specific deliverable
+     */
+    deliverableId: uuid("deliverable_id").references(
+      () => commissionDeliverables.id,
+      {
+        onDelete: "restrict",
+      },
+    ),
 
     /*
      * Display/payment order:
@@ -1244,6 +1351,16 @@ export const commissionPaymentInstallments = pgTable(
       .defaultNow(),
   },
   (table) => [
+    foreignKey({
+      columns: [table.deliverableId, table.commissionId, table.quoteId],
+      foreignColumns: [
+        commissionDeliverables.id,
+        commissionDeliverables.commissionId,
+        commissionDeliverables.quoteId,
+      ],
+      name: "commission_installments_deliverable_scope_fk",
+    }).onDelete("restrict"),
+
     uniqueIndex("commission_installments_quote_sequence_unique").on(
       table.quoteId,
       table.sequence,
@@ -1252,6 +1369,8 @@ export const commissionPaymentInstallments = pgTable(
     index("commission_installments_commission_id_idx").on(table.commissionId),
 
     index("commission_installments_quote_id_idx").on(table.quoteId),
+
+    index("commission_installments_deliverable_id_idx").on(table.deliverableId),
 
     index("commission_installments_status_idx").on(table.status),
 
@@ -1715,6 +1834,13 @@ export const commissionAgreements = pgTable(
       onDelete: "restrict",
     }),
 
+    executedDocumentId: uuid("executed_document_id").references(
+      () => commissionDocuments.id,
+      {
+        onDelete: "restrict",
+      },
+    ),
+
     /*
      * Internal revision sequence for this commission.
      *
@@ -1735,13 +1861,31 @@ export const commissionAgreements = pgTable(
 
     agreementVersion: varchar("agreement_version", { length: 50 }).notNull(),
 
+    agreementData: jsonb("agreement_data"),
+
     status: agreementStatusEnum("status").notNull().default("draft"),
+
+    publicTokenHash: varchar("public_token_hash", {
+      length: 64,
+    }),
+
+    publicTokenCreatedAt: timestamp("public_token_created_at", {
+      withTimezone: true,
+    }),
+
+    publicTokenRevokedAt: timestamp("public_token_revoked_at", {
+      withTimezone: true,
+    }),
 
     acceptedByName: varchar("accepted_by_name", { length: 200 }),
 
     acceptedByEmail: varchar("accepted_by_email", { length: 320 }),
 
     acceptanceMethod: acceptanceMethodEnum("acceptance_method"),
+
+    acceptanceStatementVersion: varchar("acceptance_statement_version", {
+      length: 50,
+    }),
 
     sentAt: timestamp("sent_at", {
       withTimezone: true,
@@ -1769,17 +1913,50 @@ export const commissionAgreements = pgTable(
       table.version,
     ),
 
+    uniqueIndex("commission_agreements_commission_active_unique")
+      .on(table.commissionId)
+      .where(
+        sql`
+          ${table.status} IN ('draft', 'sent')
+        `,
+      ),
+
     index("commission_agreements_commission_id_idx").on(table.commissionId),
 
     index("commission_agreements_quote_id_idx").on(table.quoteId),
 
     index("commission_agreements_status_idx").on(table.status),
 
+    uniqueIndex("commission_agreements_public_token_hash_unique").on(
+      table.publicTokenHash,
+    ),
+
+    uniqueIndex("commission_agreements_executed_document_id_unique")
+      .on(table.executedDocumentId)
+      .where(sql`${table.executedDocumentId} IS NOT NULL`),
+
     check(
       "commission_agreements_version_check",
       sql`
           ${table.version} >= 1
         `,
+    ),
+
+    check(
+      "commission_agreements_public_token_state_check",
+      sql`
+        (
+          ${table.publicTokenHash} IS NULL
+          AND ${table.publicTokenCreatedAt} IS NULL
+          AND ${table.publicTokenRevokedAt} IS NULL
+        )
+        OR
+        (
+          ${table.publicTokenHash} IS NOT NULL
+          AND ${table.publicTokenCreatedAt} IS NOT NULL
+          AND char_length(${table.publicTokenHash}) = 64
+        )
+      `,
     ),
 
     /*
@@ -1789,14 +1966,18 @@ export const commissionAgreements = pgTable(
     check(
       "commission_agreements_acceptance_check",
       sql`
-          ${table.status} != 'accepted'
-          OR (
-            ${table.acceptedByName} IS NOT NULL
-            AND ${table.acceptedByEmail} IS NOT NULL
-            AND ${table.acceptanceMethod} IS NOT NULL
-            AND ${table.acceptedAt} IS NOT NULL
+        ${table.status} != 'accepted'
+        OR (
+          ${table.acceptedByName} IS NOT NULL
+          AND ${table.acceptedByEmail} IS NOT NULL
+          AND ${table.acceptanceMethod} IS NOT NULL
+          AND ${table.acceptedAt} IS NOT NULL
+          AND (
+            ${table.acceptanceMethod} != 'electronic'
+            OR ${table.acceptanceStatementVersion} IS NOT NULL
           )
-        `,
+        )
+      `,
     ),
   ],
 );
@@ -2336,33 +2517,49 @@ export const commissionEmailMessages = pgTable(
       "commission_email_messages_delivery_state_check",
       sql`
         (
-          ${table.deliveryStatus} = 'queued'
-          AND ${table.sentAt} IS NULL
-          AND ${table.failedAt} IS NULL
+          ${table.direction} = 'outbound'
+          AND (
+            (
+              ${table.deliveryStatus} = 'queued'
+              AND ${table.sentAt} IS NULL
+              AND ${table.failedAt} IS NULL
+              AND ${table.attemptCount} = 0
+              AND ${table.lastAttemptAt} IS NULL
+            )
+            OR
+            (
+              ${table.deliveryStatus} = 'sending'
+              AND ${table.sentAt} IS NULL
+              AND ${table.failedAt} IS NULL
+              AND ${table.attemptCount} > 0
+              AND ${table.lastAttemptAt} IS NOT NULL
+            )
+            OR
+            (
+              ${table.deliveryStatus} = 'sent'
+              AND ${table.sentAt} IS NOT NULL
+              AND ${table.failedAt} IS NULL
+              AND ${table.attemptCount} > 0
+              AND ${table.lastAttemptAt} IS NOT NULL
+            )
+            OR
+            (
+              ${table.deliveryStatus} = 'failed'
+              AND ${table.sentAt} IS NULL
+              AND ${table.failedAt} IS NOT NULL
+              AND ${table.attemptCount} > 0
+              AND ${table.lastAttemptAt} IS NOT NULL
+            )
+          )
         )
         OR
         (
-          ${table.deliveryStatus} = 'sending'
+          ${table.direction} = 'inbound'
+          AND ${table.deliveryStatus} = 'received'
           AND ${table.sentAt} IS NULL
           AND ${table.failedAt} IS NULL
-          AND ${table.attemptCount} > 0
-          AND ${table.lastAttemptAt} IS NOT NULL
-        )
-        OR
-        (
-          ${table.deliveryStatus} = 'sent'
-          AND ${table.sentAt} IS NOT NULL
-          AND ${table.failedAt} IS NULL
-          AND ${table.attemptCount} > 0
-          AND ${table.lastAttemptAt} IS NOT NULL
-        )
-        OR
-        (
-          ${table.deliveryStatus} = 'failed'
-          AND ${table.sentAt} IS NULL
-          AND ${table.failedAt} IS NOT NULL
-          AND ${table.attemptCount} > 0
-          AND ${table.lastAttemptAt} IS NOT NULL
+          AND ${table.attemptCount} = 0
+          AND ${table.lastAttemptAt} IS NULL
         )
       `,
     ),

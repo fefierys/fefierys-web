@@ -16,6 +16,12 @@ export const COMMISSION_KANBAN_COLUMNS = [
     statuses: ["quoting", "awaiting_quote_response"],
   },
   {
+    id: "agreement",
+    label: "Agreement",
+    description: "Agreement preparation and client acceptance",
+    statuses: ["awaiting_agreement"],
+  },
+  {
     id: "payment",
     label: "Payment",
     description: "Commissions waiting for payment",

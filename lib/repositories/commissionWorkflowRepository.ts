@@ -65,6 +65,36 @@ export async function transitionCommissionStatus(
     };
   }
 
+  if (
+    input.fromStatus === "awaiting_quote_response" &&
+    input.toStatus === "awaiting_agreement"
+  ) {
+    return {
+      outcome: "invalid",
+      validation: {
+        valid: false,
+        code: "transition_not_allowed",
+        message:
+          "The commission can move to awaiting agreement only after the quote has been accepted.",
+      },
+    };
+  }
+
+  if (
+    input.fromStatus === "awaiting_agreement" &&
+    input.toStatus === "awaiting_payment"
+  ) {
+    return {
+      outcome: "invalid",
+      validation: {
+        valid: false,
+        code: "transition_not_allowed",
+        message:
+          "The commission can move to awaiting payment only after the agreement has been accepted.",
+      },
+    };
+  }
+
   const changedByAdminUserId = input.changedByAdminUserId.trim();
 
   if (!changedByAdminUserId) {
