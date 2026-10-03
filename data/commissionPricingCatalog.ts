@@ -200,7 +200,7 @@ function merchandising(value: string) {
 }
 
 export const INITIAL_COMMISSION_PRICING_VERSION_NAME =
-  "Fefierys catalog 2026.1";
+  "Fefierys catalog 2026.2";
 
 export const INITIAL_COMMISSION_PRICING_SERVICES: InitialCommissionPricingService[] =
   [
@@ -803,3 +803,21 @@ export const INITIAL_INDIE_AUTHOR_DISCOUNT: InitialCommissionPricingAdjustment =
     requiresInternalNote: true,
     stackable: false,
   };
+
+export const INITIAL_CUSTOM_DISCOUNT: InitialCommissionPricingAdjustment = {
+  calculationBasis: "none",
+  calculationType: "fixed",
+  code: "custom-discount",
+  description:
+    "A manually selected fixed-amount discount for special agreements or other cases not covered by a predefined discount.",
+  fixedAmount: "0",
+  kind: "discount",
+  maxQuantity: 1,
+  isValueEditable: true,
+  minimumPercentageRate: null,
+  maximumPercentageRate: null,
+  name: "Custom Discount",
+  percentageRate: null,
+  requiresInternalNote: true,
+  stackable: false,
+};

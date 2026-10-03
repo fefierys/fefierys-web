@@ -157,8 +157,12 @@ export async function createCommissionQuoteDraft(
   const version = (latestQuoteRows[0]?.version ?? 0) + 1;
   const createdAt = new Date();
 
+  const serializedIllustrations = JSON.stringify(
+    pricingSnapshot?.illustrations ?? [],
+  );
+
   try {
-    const [createdQuoteRows, createdItemRows, , eventRows] = await db.batch([
+    const [createdQuoteRows, , createdItemRows, , eventRows] = await db.batch([
       db
         .insert(commissionQuotes)
         .select(
@@ -264,11 +268,33 @@ export async function createCommissionQuoteDraft(
         )
         .returning(),
 
+      db.execute(sql`
+        INSERT INTO commission_quote_illustrations (
+          id,
+          quote_id,
+          sequence,
+          created_at
+        )
+        SELECT
+          input_illustration.id,
+          ${quoteId}::uuid,
+          input_illustration.sequence,
+          ${createdAt}
+        FROM jsonb_to_recordset(
+          ${serializedIllustrations}::jsonb
+        ) AS input_illustration(
+          id uuid,
+          sequence integer
+        )
+      `),
+
       db
         .insert(commissionQuoteItems)
         .values(
           validation.items.map<NewCommissionQuoteItem>((item, index) => ({
             quoteId,
+            illustrationId:
+              pricingSnapshot?.items[index]?.illustrationId ?? null,
             sequence: item.sequence,
             kind: pricingSnapshot?.items[index]?.kind ?? "legacy",
             pricingOptionId:
@@ -440,7 +466,7 @@ export async function createCommissionQuoteDraft(
 
 interface UpdateCommissionQuoteDraftWriteRow extends Record<string, unknown> {
   quoteId: string;
-  eventId: string;
+  writeGuard: number;
 }
 
 async function classifyQuoteDraftUpdateFailure(quoteId: string): Promise<
@@ -534,11 +560,14 @@ export async function updateCommissionQuoteDraft(
   }
 
   const eventId = randomUUID();
-  const updatedAt = new Date();
+  const updatedAt = new Date(
+    Math.max(Date.now(), input.expectedUpdatedAt.getTime() + 1),
+  );
 
   const serializedItems = JSON.stringify(
     validation.items.map((item, index) => ({
       sequence: item.sequence,
+      illustration_id: pricingSnapshot?.items[index]?.illustrationId ?? null,
       kind: pricingSnapshot?.items[index]?.kind ?? "legacy",
       pricing_option_id: pricingSnapshot?.items[index]?.pricingOptionId ?? null,
       pricing_adjustment_id:
@@ -555,6 +584,10 @@ export async function updateCommissionQuoteDraft(
     })),
   );
 
+  const serializedIllustrations = JSON.stringify(
+    pricingSnapshot?.illustrations ?? [],
+  );
+
   const eventMetadata = JSON.stringify({
     quoteId: input.quoteId,
     currency: validation.currency,
@@ -565,215 +598,259 @@ export async function updateCommissionQuoteDraft(
   });
 
   try {
-    const writeResult = await db.execute<UpdateCommissionQuoteDraftWriteRow>(
-      sql`
-          WITH
-          input_items AS MATERIALIZED (
-            SELECT
-              input_item.sequence,
-              input_item.kind,
-              input_item.pricing_option_id,
-              input_item.pricing_adjustment_id,
-              input_item.calculation_type,
-              input_item.calculation_basis,
-              input_item.percentage_rate,
-              input_item.internal_note,
-              input_item.label,
-              input_item.description,
-              input_item.quantity,
-              input_item.unit_amount
+    // db.batch executes the ordered statements as one Neon HTTP transaction.
+    // A stale/invalid update raises an SQL error in the first statement,
+    // rolling back the entire batch rather than allowing later writes.
+    const [writeResult] = await db.batch([
+      db.execute<UpdateCommissionQuoteDraftWriteRow>(sql`
+        WITH updated_quote AS (
+          UPDATE commission_quotes AS quote
+          SET
+            base_subtotal = ${pricingSnapshot?.baseSubtotal ?? null}::numeric,
+            pre_discount_subtotal = ${pricingSnapshot?.preDiscountSubtotal ?? null}::numeric,
+            discount_total = ${pricingSnapshot?.discountTotal ?? null}::numeric,
+            currency = ${validation.currency},
+            total_amount = ${validation.totalAmount}::numeric,
+            description = ${validation.description},
+            notes = ${validation.notes},
+            valid_until = ${validation.validUntil},
+            updated_at = ${updatedAt}
+          FROM commissions AS commission
+          WHERE
+            quote.id = ${input.quoteId}::uuid
+            AND quote.status = 'draft'
+            AND quote.updated_at = ${input.expectedUpdatedAt}
+            AND (
+              (
+                ${pricingSnapshot === null}
+                AND quote.pricing_mode = 'legacy'
+                AND quote.pricing_version_id IS NULL
+              )
+              OR
+              (
+                ${pricingSnapshot !== null}
+                AND quote.pricing_mode =
+                  ${pricingSnapshot?.pricingMode ?? "legacy"}::quote_pricing_mode
+                AND quote.pricing_version_id IS NOT DISTINCT FROM
+                  ${pricingSnapshot?.pricingVersionId ?? null}::uuid
+              )
+            )
+            AND commission.id = quote.commission_id
+            AND commission.status = 'quoting'
+            AND (
+              ${Boolean(pricingSnapshot?.illustrations.length)}
+              OR NOT EXISTS (
+                SELECT 1
+                FROM commission_quote_illustrations AS existing
+                WHERE existing.quote_id = quote.id
+              )
+            )
+          RETURNING quote.id
+        )
+        SELECT
+          MAX(updated_quote.id::text) AS "quoteId",
+          1 / COUNT(*)::integer AS "writeGuard"
+        FROM updated_quote
+      `),
+
+      // Temporarily free all current positions without changing UUIDs.
+      // The offset is larger than the existing maximum, so no unique
+      // (quote_id, sequence) pair can collide during the move.
+      db.execute(sql`
+        UPDATE commission_quote_illustrations AS illustration
+        SET sequence = illustration.sequence + (
+          SELECT
+            COALESCE(MAX(existing.sequence), 0)
+            + ${pricingSnapshot?.illustrations.length ?? 0}
+            + 1
+          FROM commission_quote_illustrations AS existing
+          WHERE existing.quote_id = ${input.quoteId}::uuid
+        )
+        WHERE illustration.quote_id = ${input.quoteId}::uuid
+      `),
+
+      // Newly added illustrations can now take their final positions.
+      db.execute(sql`
+        INSERT INTO commission_quote_illustrations (
+          id,
+          quote_id,
+          sequence,
+          created_at
+        )
+        SELECT
+          incoming.id,
+          ${input.quoteId}::uuid,
+          incoming.sequence,
+          ${updatedAt}
+        FROM jsonb_to_recordset(
+          ${serializedIllustrations}::jsonb
+        ) AS incoming(
+          id uuid,
+          sequence integer
+        )
+        WHERE NOT EXISTS (
+          SELECT 1
+          FROM commission_quote_illustrations AS existing
+          WHERE existing.quote_id = ${input.quoteId}::uuid
+            AND existing.id = incoming.id
+        )
+      `),
+
+      // Upsert by item sequence to keep IDs of surviving quote items.
+      // All referenced illustrations exist by this point.
+      db.execute(sql`
+        INSERT INTO commission_quote_items (
+          id,
+          quote_id,
+          sequence,
+          illustration_id,
+          kind,
+          pricing_option_id,
+          pricing_adjustment_id,
+          calculation_type,
+          calculation_basis,
+          percentage_rate,
+          internal_note,
+          label,
+          description,
+          quantity,
+          unit_amount,
+          created_at,
+          updated_at
+        )
+        SELECT
+          gen_random_uuid(),
+          ${input.quoteId}::uuid,
+          incoming.sequence,
+          incoming.illustration_id,
+          incoming.kind::quote_item_kind,
+          incoming.pricing_option_id,
+          incoming.pricing_adjustment_id,
+          incoming.calculation_type::commission_pricing_calculation_type,
+          incoming.calculation_basis::commission_pricing_calculation_basis,
+          incoming.percentage_rate,
+          incoming.internal_note,
+          incoming.label,
+          incoming.description,
+          incoming.quantity,
+          incoming.unit_amount,
+          ${updatedAt},
+          ${updatedAt}
+        FROM jsonb_to_recordset(
+          ${serializedItems}::jsonb
+        ) AS incoming(
+          sequence integer,
+          illustration_id uuid,
+          kind text,
+          pricing_option_id uuid,
+          pricing_adjustment_id uuid,
+          calculation_type text,
+          calculation_basis text,
+          percentage_rate numeric(5, 2),
+          internal_note text,
+          label text,
+          description text,
+          quantity integer,
+          unit_amount numeric(12, 2)
+        )
+        WHERE TRUE
+        ON CONFLICT (quote_id, sequence)
+        DO UPDATE SET
+          illustration_id = EXCLUDED.illustration_id,
+          kind = EXCLUDED.kind,
+          pricing_option_id = EXCLUDED.pricing_option_id,
+          pricing_adjustment_id = EXCLUDED.pricing_adjustment_id,
+          calculation_type = EXCLUDED.calculation_type,
+          calculation_basis = EXCLUDED.calculation_basis,
+          percentage_rate = EXCLUDED.percentage_rate,
+          internal_note = EXCLUDED.internal_note,
+          label = EXCLUDED.label,
+          description = EXCLUDED.description,
+          quantity = EXCLUDED.quantity,
+          unit_amount = EXCLUDED.unit_amount,
+          updated_at = EXCLUDED.updated_at
+      `),
+
+      // Discard item rows outside the new snapshot before removing their
+      // illustrations, satisfying the restrictive composite foreign key.
+      db.execute(sql`
+        DELETE FROM commission_quote_items AS item
+        WHERE item.quote_id = ${input.quoteId}::uuid
+          AND NOT EXISTS (
+            SELECT 1
             FROM jsonb_to_recordset(
               ${serializedItems}::jsonb
-            ) AS input_item(
-              sequence integer,
-              kind text,
-              pricing_option_id uuid,
-              pricing_adjustment_id uuid,
-              calculation_type text,
-              calculation_basis text,
-              percentage_rate numeric(5, 2),
-              internal_note text,
-              label text,
-              description text,
-              quantity integer,
-              unit_amount numeric(12, 2)
-            )
-          ),
-
-          updated_quote AS (
-            UPDATE commission_quotes AS quote
-            SET
-              base_subtotal = ${pricingSnapshot?.baseSubtotal ?? null}::numeric,
-              pre_discount_subtotal = ${pricingSnapshot?.preDiscountSubtotal ?? null}::numeric,
-              discount_total = ${pricingSnapshot?.discountTotal ?? null}::numeric,
-              currency = ${validation.currency},
-              total_amount =
-                ${validation.totalAmount}::numeric,
-              description = ${validation.description},
-              notes = ${validation.notes},
-              valid_until = ${validation.validUntil},
-              updated_at = ${updatedAt}
-            FROM commissions AS commission
-            WHERE
-              quote.id = ${input.quoteId}::uuid
-              AND quote.status = 'draft'
-              AND quote.updated_at =
-                ${input.expectedUpdatedAt}
-              AND (
-                (
-                  ${pricingSnapshot === null}
-                  AND quote.pricing_mode = 'legacy'
-                  AND quote.pricing_version_id IS NULL
-                )
-                OR
-                (
-                  ${pricingSnapshot !== null}
-                  AND quote.pricing_mode =
-                    ${pricingSnapshot?.pricingMode ?? "legacy"}::quote_pricing_mode
-                  AND quote.pricing_version_id IS NOT DISTINCT FROM
-                    ${pricingSnapshot?.pricingVersionId ?? null}::uuid
-                )
-              )
-              AND commission.id =
-                quote.commission_id
-              AND commission.status = 'quoting'
-            RETURNING
-              quote.id,
-              quote.commission_id,
-              quote.version
-          ),
-
-          upserted_items AS (
-            INSERT INTO commission_quote_items (
-              id,
-              quote_id,
-              sequence,
-              kind,
-              pricing_option_id,
-              pricing_adjustment_id,
-              calculation_type,
-              calculation_basis,
-              percentage_rate,
-              internal_note,
-              label,
-              description,
-              quantity,
-              unit_amount,
-              created_at,
-              updated_at
-            )
-            SELECT
-              gen_random_uuid(),
-              updated_quote.id,
-              input_items.sequence,
-              input_items.kind::quote_item_kind,
-              input_items.pricing_option_id,
-              input_items.pricing_adjustment_id,
-              input_items.calculation_type::commission_pricing_calculation_type,
-              input_items.calculation_basis::commission_pricing_calculation_basis,
-              input_items.percentage_rate,
-              input_items.internal_note,
-              input_items.label,
-              input_items.description,
-              input_items.quantity,
-              input_items.unit_amount,
-              ${updatedAt},
-              ${updatedAt}
-            FROM updated_quote
-            CROSS JOIN input_items
-            ON CONFLICT (
-              quote_id,
-              sequence
-            )
-            DO UPDATE SET
-              kind = EXCLUDED.kind,
-              pricing_option_id = EXCLUDED.pricing_option_id,
-              pricing_adjustment_id = EXCLUDED.pricing_adjustment_id,
-              calculation_type = EXCLUDED.calculation_type,
-              calculation_basis = EXCLUDED.calculation_basis,
-              percentage_rate = EXCLUDED.percentage_rate,
-              internal_note = EXCLUDED.internal_note,
-              label = EXCLUDED.label,
-              description = EXCLUDED.description,
-              quantity = EXCLUDED.quantity,
-              unit_amount = EXCLUDED.unit_amount,
-              updated_at = EXCLUDED.updated_at
-            RETURNING id
-          ),
-
-          deleted_items AS (
-            DELETE FROM commission_quote_items
-            USING updated_quote
-            WHERE
-              commission_quote_items.quote_id =
-                updated_quote.id
-              AND NOT EXISTS (
-                SELECT 1
-                FROM input_items
-                WHERE
-                  input_items.sequence =
-                    commission_quote_items.sequence
-              )
-            RETURNING commission_quote_items.id
-          ),
-
-          updated_commission AS (
-            UPDATE commissions AS commission
-            SET updated_at = ${updatedAt}
-            FROM updated_quote
-            WHERE
-              commission.id =
-                updated_quote.commission_id
-            RETURNING commission.id
-          ),
-
-          created_event AS (
-            INSERT INTO commission_events (
-              id,
-              commission_id,
-              type,
-              actor,
-              title,
-              description,
-              metadata,
-              created_by_admin_user_id,
-              created_at
-            )
-            SELECT
-              ${eventId}::uuid,
-              updated_quote.commission_id,
-              'quote_updated'::commission_event_type,
-              'artist'::commission_actor,
-              'Quote v'
-                || updated_quote.version
-                || ' updated',
-              ${validation.description},
-              ${eventMetadata}::jsonb,
-              ${updatedByAdminUserId},
-              ${updatedAt}
-            FROM updated_quote
-            RETURNING id
+            ) AS incoming(sequence integer)
+            WHERE incoming.sequence = item.sequence
           )
+      `),
 
-          SELECT
-            updated_quote.id AS "quoteId",
-            created_event.id AS "eventId",
-            (
-              SELECT count(*)
-              FROM upserted_items
-            ) AS "upsertedItemCount",
-            (
-              SELECT count(*)
-              FROM deleted_items
-            ) AS "deletedItemCount",
-            (
-              SELECT count(*)
-              FROM updated_commission
-            ) AS "updatedCommissionCount"
-          FROM updated_quote
-          CROSS JOIN created_event
-        `,
-    );
+      db.execute(sql`
+        DELETE FROM commission_quote_illustrations AS illustration
+        WHERE illustration.quote_id = ${input.quoteId}::uuid
+          AND NOT EXISTS (
+            SELECT 1
+            FROM jsonb_to_recordset(
+              ${serializedIllustrations}::jsonb
+            ) AS incoming(id uuid)
+            WHERE incoming.id = illustration.id
+          )
+      `),
+
+      // Restore final positions for retained illustrations. New ones are
+      // already in place; all old ones remain above the final range.
+      db.execute(sql`
+        UPDATE commission_quote_illustrations AS illustration
+        SET sequence = incoming.sequence
+        FROM jsonb_to_recordset(
+          ${serializedIllustrations}::jsonb
+        ) AS incoming(
+          id uuid,
+          sequence integer
+        )
+        WHERE illustration.quote_id = ${input.quoteId}::uuid
+          AND illustration.id = incoming.id
+          AND illustration.sequence <> incoming.sequence
+      `),
+
+      db.execute(sql`
+        UPDATE commissions AS commission
+        SET updated_at = ${updatedAt}
+        WHERE commission.id = (
+          SELECT quote.commission_id
+          FROM commission_quotes AS quote
+          WHERE quote.id = ${input.quoteId}::uuid
+        )
+          AND commission.status = 'quoting'
+      `),
+
+      db.execute(sql`
+        INSERT INTO commission_events (
+          id,
+          commission_id,
+          type,
+          actor,
+          title,
+          description,
+          metadata,
+          created_by_admin_user_id,
+          created_at
+        )
+        SELECT
+          ${eventId}::uuid,
+          quote.commission_id,
+          'quote_updated'::commission_event_type,
+          'artist'::commission_actor,
+          'Quote v' || quote.version || ' updated',
+          ${validation.description},
+          ${eventMetadata}::jsonb,
+          ${updatedByAdminUserId},
+          ${updatedAt}
+        FROM commission_quotes AS quote
+        WHERE quote.id = ${input.quoteId}::uuid
+        RETURNING id
+      `),
+    ]);
 
     const writeRow = writeResult.rows[0];
 

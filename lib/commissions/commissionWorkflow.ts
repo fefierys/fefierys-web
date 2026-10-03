@@ -55,9 +55,14 @@ export const COMMISSION_STATUS_TRANSITIONS = {
 
   awaiting_quote_response: [
     "quoting",
-    "awaiting_payment",
+    "awaiting_agreement",
     "declined",
     "expired",
+    "cancelled",
+  ],
+
+  awaiting_agreement: [
+    "awaiting_payment",
     "cancelled",
   ],
 

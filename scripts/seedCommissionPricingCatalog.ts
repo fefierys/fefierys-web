@@ -5,6 +5,7 @@ import { config } from "dotenv";
 import {
   INITIAL_COMMISSION_PRICING_SERVICES,
   INITIAL_COMMISSION_PRICING_VERSION_NAME,
+  INITIAL_CUSTOM_DISCOUNT,
   INITIAL_INDIE_AUTHOR_DISCOUNT,
 } from "../data/commissionPricingCatalog";
 
@@ -74,6 +75,7 @@ async function main(): Promise<void> {
   const now = new Date();
   const versionId = randomUUID();
   const indieDiscountId = randomUUID();
+  const customDiscountId = randomUUID();
   const serviceIdByCode = new Map(
     INITIAL_COMMISSION_PRICING_SERVICES.map((service) => [
       service.code,
@@ -190,6 +192,29 @@ async function main(): Promise<void> {
     visibility: "admin_only",
   });
 
+  adjustmentValues.push({
+    calculationBasis: INITIAL_CUSTOM_DISCOUNT.calculationBasis,
+    calculationType: INITIAL_CUSTOM_DISCOUNT.calculationType,
+    code: INITIAL_CUSTOM_DISCOUNT.code,
+    createdAt: now,
+    description: INITIAL_CUSTOM_DISCOUNT.description,
+    fixedAmount: INITIAL_CUSTOM_DISCOUNT.fixedAmount,
+    id: customDiscountId,
+    kind: INITIAL_CUSTOM_DISCOUNT.kind,
+    isValueEditable: INITIAL_CUSTOM_DISCOUNT.isValueEditable,
+    maxQuantity: INITIAL_CUSTOM_DISCOUNT.maxQuantity,
+    maximumPercentageRate: INITIAL_CUSTOM_DISCOUNT.maximumPercentageRate,
+    minimumPercentageRate: INITIAL_CUSTOM_DISCOUNT.minimumPercentageRate,
+    name: INITIAL_CUSTOM_DISCOUNT.name,
+    percentageRate: INITIAL_CUSTOM_DISCOUNT.percentageRate,
+    pricingVersionId: versionId,
+    requiresInternalNote: INITIAL_CUSTOM_DISCOUNT.requiresInternalNote,
+    sortOrder: 1010,
+    stackable: INITIAL_CUSTOM_DISCOUNT.stackable,
+    updatedAt: now,
+    visibility: "admin_only",
+  });
+
   for (const service of INITIAL_COMMISSION_PRICING_SERVICES) {
     for (const pricingOption of service.options) {
       const optionId = optionIdByKey.get(
@@ -211,6 +236,13 @@ async function main(): Promise<void> {
         createdAt: now,
         id: randomUUID(),
         pricingAdjustmentId: indieDiscountId,
+        pricingOptionId: optionId,
+      });
+
+      applicabilityValues.push({
+        createdAt: now,
+        id: randomUUID(),
+        pricingAdjustmentId: customDiscountId,
         pricingOptionId: optionId,
       });
     }

@@ -106,6 +106,41 @@
       "when": 1789493485290,
       "tag": "0014_high_mandroid",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1790125377979,
+      "tag": "0015_quote-illustrations",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1790992270797,
+      "tag": "0016_crazy_iceman",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1790996605868,
+      "tag": "0017_fine_morlun",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1791002863077,
+      "tag": "0018_modern_ogun",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1791011275772,
+      "tag": "0019_lazy_mojo",
+      "breakpoints": true
     }
   ]
 }

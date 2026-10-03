@@ -316,11 +316,34 @@ export async function supersedeCommissionQuote(
               version
           ),
 
+          created_illustrations AS (
+            INSERT INTO commission_quote_illustrations (
+              id,
+              quote_id,
+              sequence,
+              created_at
+            )
+            SELECT
+              gen_random_uuid(),
+              created_draft.id,
+              illustration.sequence,
+              ${supersededAt}
+            FROM created_draft
+            INNER JOIN commission_quote_illustrations AS illustration
+              ON illustration.quote_id =
+                ${input.quoteId}::uuid
+            RETURNING
+              id,
+              quote_id,
+              sequence
+          ),
+
           created_items AS (
             INSERT INTO commission_quote_items (
               id,
               quote_id,
               sequence,
+              illustration_id,
               kind,
               pricing_option_id,
               pricing_adjustment_id,
@@ -339,6 +362,7 @@ export async function supersedeCommissionQuote(
               gen_random_uuid(),
               created_draft.id,
               item.sequence,
+              copied_illustration.id,
               item.kind,
               item.pricing_option_id,
               item.pricing_adjustment_id,
@@ -356,6 +380,16 @@ export async function supersedeCommissionQuote(
             INNER JOIN commission_quote_items AS item
               ON item.quote_id =
                 ${input.quoteId}::uuid
+            LEFT JOIN commission_quote_illustrations AS source_illustration
+              ON source_illustration.quote_id =
+                ${input.quoteId}::uuid
+              AND source_illustration.id =
+                item.illustration_id
+            LEFT JOIN created_illustrations AS copied_illustration
+              ON copied_illustration.quote_id =
+                created_draft.id
+              AND copied_illustration.sequence =
+                source_illustration.sequence
             RETURNING id
           ),
 

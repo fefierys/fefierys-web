@@ -25,7 +25,8 @@ interface CommissionQuotePanelProps {
   quotes: CommissionQuoteWithItems[];
 }
 
-type ModalMode = "create" | "edit" | "expire" | "revise" | "send" | "view" | null;
+type ModalMode =
+  "create" | "edit" | "expire" | "revise" | "send" | "view" | null;
 
 const QUOTE_STATUS_STYLES = {
   draft: "border-sky-200/20 bg-sky-200/10 text-sky-100",
@@ -338,8 +339,6 @@ export default function CommissionQuotePanel({
             />
           )}
 
-
-
         {mode === "view" && selectedQuote && (
           <div className="min-w-0">
             <div className="flex flex-col gap-4 rounded-2xl border border-white/10 bg-white/[0.04] p-4 sm:flex-row sm:items-start sm:justify-between">
@@ -371,33 +370,149 @@ export default function CommissionQuotePanel({
             )}
 
             <div className="mt-5 space-y-3">
-              {selectedQuote.items.map((item) => (
-                <article
-                  className="rounded-2xl border border-white/10 bg-white/[0.04] p-4"
-                  key={item.id}
-                >
-                  <div className="flex min-w-0 items-start justify-between gap-4">
-                    <div className="min-w-0">
-                      <h4 className="break-words font-medium text-white/85">
-                        {item.label}
+              {selectedQuote.illustrations.length > 0 ? (
+                <>
+                  {selectedQuote.illustrations.map((illustration) => {
+                    const illustrationItems = selectedQuote.items.filter(
+                      (item) => item.illustrationId === illustration.id,
+                    );
+
+                    const baseItem = illustrationItems.find(
+                      (item) => item.kind === "base",
+                    );
+
+                    return (
+                      <article
+                        className="rounded-2xl border border-white/10 bg-white/[0.04] p-4"
+                        key={illustration.id}
+                      >
+                        <div>
+                          <h4 className="font-medium text-white/90">
+                            {baseItem?.label ??
+                              `Illustration ${illustration.sequence}`}
+                          </h4>
+
+                          {baseItem?.description && (
+                            <p className="mt-1 text-xs leading-relaxed text-white/50">
+                              {baseItem.description}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="mt-4 space-y-3 border-t border-white/10 pt-3">
+                          {illustrationItems.map((item) => (
+                            <div key={item.id}>
+                              <div className="flex min-w-0 items-start justify-between gap-4">
+                                <div className="min-w-0">
+                                  <p className="text-sm text-white/80">
+                                    {item.kind === "base"
+                                      ? "Base illustration"
+                                      : item.label}
+                                  </p>
+                                  <p className="mt-1 text-xs text-white/45">
+                                    {item.quantity} × {item.unitAmount}{" "}
+                                    {selectedQuote.quote.currency}
+                                  </p>
+                                </div>
+
+                                <p className="shrink-0 text-sm tabular-nums text-white/85">
+                                  {formatLineAmount(
+                                    item.quantity,
+                                    item.unitAmount,
+                                  )}{" "}
+                                  {selectedQuote.quote.currency}
+                                </p>
+                              </div>
+
+                              {item.kind !== "base" && item.description && (
+                                <p className="mt-2 text-xs leading-relaxed text-white/50">
+                                  {item.description}
+                                </p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </article>
+                    );
+                  })}
+
+                  {selectedQuote.items.some(
+                    (item) => item.illustrationId === null,
+                  ) && (
+                    <article className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                      <h4 className="font-medium text-white/90">
+                        Additional charges and global discount
                       </h4>
-                      <p className="mt-1 text-xs text-white/45">
-                        {item.quantity} × {item.unitAmount}{" "}
+
+                      <div className="mt-4 space-y-3 border-t border-white/10 pt-3">
+                        {selectedQuote.items
+                          .filter((item) => item.illustrationId === null)
+                          .map((item) => (
+                            <div key={item.id}>
+                              <div className="flex min-w-0 items-start justify-between gap-4">
+                                <div className="min-w-0">
+                                  <p className="text-sm text-white/80">
+                                    {item.label}
+                                  </p>
+
+                                  <p className="mt-1 text-xs text-white/45">
+                                    {item.kind === "discount" &&
+                                    item.calculationType === "percentage" &&
+                                    item.percentageRate
+                                      ? `${Number(item.percentageRate)}% of pre-discount subtotal`
+                                      : `${item.quantity} × ${item.unitAmount} ${selectedQuote.quote.currency}`}
+                                  </p>
+                                </div>
+
+                                <p className="shrink-0 text-sm tabular-nums text-white/85">
+                                  {formatLineAmount(
+                                    item.quantity,
+                                    item.unitAmount,
+                                  )}{" "}
+                                  {selectedQuote.quote.currency}
+                                </p>
+                              </div>
+
+                              {item.description && (
+                                <p className="mt-2 text-xs leading-relaxed text-white/50">
+                                  {item.description}
+                                </p>
+                              )}
+                            </div>
+                          ))}
+                      </div>
+                    </article>
+                  )}
+                </>
+              ) : (
+                selectedQuote.items.map((item) => (
+                  <article
+                    className="rounded-2xl border border-white/10 bg-white/[0.04] p-4"
+                    key={item.id}
+                  >
+                    <div className="flex min-w-0 items-start justify-between gap-4">
+                      <div className="min-w-0">
+                        <h4 className="break-words font-medium text-white/85">
+                          {item.label}
+                        </h4>
+                        <p className="mt-1 text-xs text-white/45">
+                          {item.quantity} × {item.unitAmount}{" "}
+                          {selectedQuote.quote.currency}
+                        </p>
+                      </div>
+                      <p className="shrink-0 text-sm text-white/80">
+                        {formatLineAmount(item.quantity, item.unitAmount)}{" "}
                         {selectedQuote.quote.currency}
                       </p>
                     </div>
-                    <p className="shrink-0 text-sm text-white/80">
-                      {formatLineAmount(item.quantity, item.unitAmount)}{" "}
-                      {selectedQuote.quote.currency}
-                    </p>
-                  </div>
-                  {item.description && (
-                    <p className="mt-3 whitespace-pre-wrap text-sm text-white/60">
-                      {item.description}
-                    </p>
-                  )}
-                </article>
-              ))}
+                    {item.description && (
+                      <p className="mt-3 whitespace-pre-wrap text-sm text-white/60">
+                        {item.description}
+                      </p>
+                    )}
+                  </article>
+                ))
+              )}
             </div>
 
             <dl className="mt-5 grid gap-4 rounded-2xl border border-white/10 p-4 text-sm sm:grid-cols-2">
@@ -429,7 +544,6 @@ export default function CommissionQuotePanel({
                 </p>
               </div>
             )}
-
           </div>
         )}
       </CommissionAdminModal>

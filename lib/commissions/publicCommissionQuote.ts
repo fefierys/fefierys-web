@@ -5,8 +5,18 @@ export type PublicCommissionQuoteStatus =
   | "expired"
   | "superseded";
 
+export interface PublicCommissionQuoteIllustration {
+  sequence: number;
+}
+
 export interface PublicCommissionQuoteItem {
   sequence: number;
+  illustrationSequence: number | null;
+
+  kind: string;
+  calculationType: string | null;
+  percentageRate: string | null;
+
   label: string;
   description: string | null;
   quantity: number;
@@ -32,5 +42,6 @@ export interface PublicCommissionQuote {
   declinedAt: Date | null;
   expiredAt: Date | null;
 
+  illustrations: PublicCommissionQuoteIllustration[];
   items: PublicCommissionQuoteItem[];
 }

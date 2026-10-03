@@ -88,6 +88,7 @@ export async function getAdminCommissionKanban(
   const [
     inboxRows,
     quoteRows,
+    agreementRows,
     paymentRows,
     productionRows,
     sketchRows,
@@ -101,11 +102,13 @@ export async function getAdminCommissionKanban(
     selectColumn(COMMISSION_KANBAN_COLUMNS[4].statuses, limit),
     selectColumn(COMMISSION_KANBAN_COLUMNS[5].statuses, limit),
     selectColumn(COMMISSION_KANBAN_COLUMNS[6].statuses, limit),
+    selectColumn(COMMISSION_KANBAN_COLUMNS[7].statuses, limit),
   ]);
 
   return {
     inbox: toColumn(inboxRows, limit),
     quote: toColumn(quoteRows, limit),
+    agreement: toColumn(agreementRows, limit),
     payment: toColumn(paymentRows, limit),
     production: toColumn(productionRows, limit),
     sketch: toColumn(sketchRows, limit),

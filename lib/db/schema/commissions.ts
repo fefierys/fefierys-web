@@ -37,6 +37,7 @@ export const commissionStatusEnum = pgEnum("commission_status", [
   "awaiting_client_details",
   "quoting",
   "awaiting_quote_response",
+  "awaiting_agreement",
   "awaiting_payment",
   "in_progress",
   "sketch_review",
@@ -64,7 +65,7 @@ export const commissionRequestSourceEnum = pgEnum("commission_request_source", [
 
 export const commissionServiceClassificationEnum = pgEnum(
   "commission_service_classification",
-  ["unclassified", "catalog", "custom"],
+  ["unclassified", "catalog", "bulk", "custom"],
 );
 
 export const commissionCloseReasonEnum = pgEnum("commission_close_reason", [
@@ -225,6 +226,7 @@ export const commissionEventTypeEnum = pgEnum("commission_event_type", [
 export const documentTypeEnum = pgEnum("document_type", [
   "quote",
   "commission_agreement",
+  "commission_agreement_executed",
   "commission_confirmation",
   "payment_acknowledgement",
   "commission_amendment",
@@ -242,55 +244,41 @@ export const documentStatusEnum = pgEnum("document_status", [
   "voided",
 ]);
 
-export const commissionEmailScopeEnum = pgEnum(
-  "commission_email_scope",
-  [
-    "client_thread",
-    "internal_notification",
-  ],
-);
+export const commissionEmailScopeEnum = pgEnum("commission_email_scope", [
+  "client_thread",
+  "internal_notification",
+]);
 
 export const commissionEmailDirectionEnum = pgEnum(
   "commission_email_direction",
-  [
-    "outbound",
-    "inbound",
-  ],
+  ["outbound", "inbound"],
 );
 
 export const commissionEmailDeliveryStatusEnum = pgEnum(
   "commission_email_delivery_status",
-  [
-    "queued",
-    "sending",
-    "sent",
-    "failed",
-  ],
+  ["queued", "sending", "sent", "failed", "received"],
 );
 
-export const commissionEmailKindEnum = pgEnum(
-  "commission_email_kind",
-  [
-    "inquiry_confirmation",
-    "internal_inquiry_notification",
+export const commissionEmailKindEnum = pgEnum("commission_email_kind", [
+  "inquiry_confirmation",
+  "internal_inquiry_notification",
 
-    "client_details_request",
-    "general_message",
+  "client_details_request",
+  "general_message",
 
-    "quote_ready",
+  "quote_ready",
 
-    "agreement_ready",
+  "agreement_ready",
 
-    "payment_request",
-    "payment_confirmation",
+  "payment_request",
+  "payment_confirmation",
 
-    "sketch_review",
-    "final_review",
-    "final_delivery",
+  "sketch_review",
+  "final_review",
+  "final_delivery",
 
-    "commission_completed",
-  ],
-);
+  "commission_completed",
+]);
 
 /*
  * ============================================================
@@ -518,6 +506,14 @@ export const commissions = pgTable(
         )
         OR
         (
+          ${table.serviceClassification} = 'bulk'
+          AND ${table.pricingServiceId} IS NULL
+          AND ${table.pricingOptionId} IS NULL
+          AND ${table.classifiedAt} IS NOT NULL
+          AND ${table.classifiedBy} IS NOT NULL
+        )
+        OR
+        (
           ${table.serviceClassification} = 'custom'
           AND ${table.pricingServiceId} IS NULL
           AND ${table.pricingOptionId} IS NULL
@@ -630,13 +626,13 @@ export const commissionQuotes = pgTable(
     status: quoteStatusEnum("status").notNull().default("draft"),
 
     /*
-    * Public quote access uses an opaque bearer token.
-    *
-    * Only the SHA-256 hash is persisted. The plaintext token is
-    * generated server-side and must never be stored in the database.
-    *
-    * One token belongs to one specific quote version.
-    */
+     * Public quote access uses an opaque bearer token.
+     *
+     * Only the SHA-256 hash is persisted. The plaintext token is
+     * generated server-side and must never be stored in the database.
+     *
+     * One token belongs to one specific quote version.
+     */
     publicTokenHash: varchar("public_token_hash", { length: 64 }),
 
     publicTokenCreatedAt: timestamp("public_token_created_at", {
@@ -905,6 +901,57 @@ export const commissionQuotes = pgTable(
 
 /*
  * ============================================================
+ * COMMISSION QUOTE ILLUSTRATIONS
+ * ============================================================
+ *
+ * Each row represents one illustration within a quote.
+ *
+ * A quote may contain several illustrations of the same
+ * catalog option. Extras and licenses will later reference
+ * the specific illustration to which they apply.
+ */
+
+export const commissionQuoteIllustrations = pgTable(
+  "commission_quote_illustrations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+
+    quoteId: uuid("quote_id")
+      .notNull()
+      .references(() => commissionQuotes.id, {
+        onDelete: "restrict",
+      }),
+
+    sequence: integer("sequence").notNull(),
+
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("commission_quote_illustrations_quote_sequence_unique").on(
+      table.quoteId,
+      table.sequence,
+    ),
+
+    uniqueIndex("commission_quote_illustrations_quote_id_id_unique").on(
+      table.quoteId,
+      table.id,
+    ),
+
+    index("commission_quote_illustrations_quote_id_idx").on(table.quoteId),
+
+    check(
+      "commission_quote_illustrations_sequence_check",
+      sql`${table.sequence} >= 1`,
+    ),
+  ],
+);
+
+/*
+ * ============================================================
  * COMMISSION QUOTE ITEMS
  * ============================================================
  *
@@ -926,6 +973,8 @@ export const commissionQuoteItems = pgTable(
       .references(() => commissionQuotes.id, {
         onDelete: "restrict",
       }),
+
+    illustrationId: uuid("illustration_id"),
 
     sequence: integer("sequence").notNull(),
 
@@ -987,12 +1036,25 @@ export const commissionQuoteItems = pgTable(
       .defaultNow(),
   },
   (table) => [
+    foreignKey({
+      columns: [table.quoteId, table.illustrationId],
+      foreignColumns: [
+        commissionQuoteIllustrations.quoteId,
+        commissionQuoteIllustrations.id,
+      ],
+      name: "commission_quote_items_illustration_fk",
+    }).onDelete("restrict"),
+
     uniqueIndex("commission_quote_items_quote_sequence_unique").on(
       table.quoteId,
       table.sequence,
     ),
 
     index("commission_quote_items_quote_id_idx").on(table.quoteId),
+
+    index("commission_quote_items_illustration_id_idx").on(
+      table.illustrationId,
+    ),
 
     index("commission_quote_items_pricing_option_idx").on(
       table.pricingOptionId,
@@ -1048,8 +1110,31 @@ export const commissionQuoteItems = pgTable(
         )
         OR
         (
-          ${table.kind} IN ('extra', 'license', 'discount')
+          ${table.kind} IN ('extra', 'license')
           AND ${table.pricingOptionId} IS NOT NULL
+          AND ${table.pricingAdjustmentId} IS NOT NULL
+          AND ${table.calculationType} IS NOT NULL
+          AND ${table.calculationBasis} IS NOT NULL
+          AND (
+            (
+              ${table.calculationType} = 'fixed'
+              AND ${table.calculationBasis} = 'none'
+              AND ${table.percentageRate} IS NULL
+            )
+            OR
+            (
+              ${table.calculationType} = 'percentage'
+              AND ${table.calculationBasis} != 'none'
+              AND ${table.percentageRate} IS NOT NULL
+              AND ${table.percentageRate} >= 0
+              AND ${table.percentageRate} <= 100
+            )
+          )
+        )
+        OR
+        (
+          ${table.kind} = 'discount'
+          AND ${table.pricingOptionId} IS NULL
           AND ${table.pricingAdjustmentId} IS NOT NULL
           AND ${table.calculationType} IS NOT NULL
           AND ${table.calculationBasis} IS NOT NULL
@@ -1076,6 +1161,98 @@ export const commissionQuoteItems = pgTable(
 
 /*
  * ============================================================
+ * COMMISSION DELIVERABLES
+ * ============================================================
+ *
+ * A deliverable is a piece of work included in a Commission.
+ *
+ * Examples:
+ * - Illustration 1 (quantity: 1)
+ * - Illustration 2 (quantity: 1)
+ * - Character designs (quantity: 10)
+ *
+ * Deliverables are associated with the accepted Quote.
+ * Their sequence is their display order, not an automatic
+ * workflow transition.
+ */
+export const commissionDeliverables = pgTable(
+  "commission_deliverables",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+
+    commissionId: uuid("commission_id")
+      .notNull()
+      .references(() => commissions.id, {
+        onDelete: "restrict",
+      }),
+
+    quoteId: uuid("quote_id")
+      .notNull()
+      .references(() => commissionQuotes.id, {
+        onDelete: "restrict",
+      }),
+
+    sequence: integer("sequence").notNull(),
+
+    title: varchar("title", { length: 150 }).notNull(),
+
+    description: text("description"),
+
+    quantity: integer("quantity").notNull().default(1),
+
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.commissionId, table.quoteId],
+      foreignColumns: [commissionQuotes.commissionId, commissionQuotes.id],
+      name: "commission_deliverables_quote_commission_fk",
+    }).onDelete("restrict"),
+
+    uniqueIndex("commission_deliverables_id_commission_quote_unique").on(
+      table.id,
+      table.commissionId,
+      table.quoteId,
+    ),
+
+    uniqueIndex("commission_deliverables_quote_sequence_unique").on(
+      table.quoteId,
+      table.sequence,
+    ),
+
+    index("commission_deliverables_commission_id_idx").on(table.commissionId),
+
+    index("commission_deliverables_quote_id_idx").on(table.quoteId),
+
+    check(
+      "commission_deliverables_sequence_check",
+      sql`${table.sequence} >= 1`,
+    ),
+
+    check(
+      "commission_deliverables_quantity_check",
+      sql`${table.quantity} >= 1`,
+    ),
+
+    check(
+      "commission_deliverables_title_check",
+      sql`char_length(trim(${table.title})) > 0`,
+    ),
+  ],
+);
+
+/*
+ * ============================================================
  * COMMISSION PAYMENT INSTALLMENTS
  * ============================================================
  */
@@ -1096,6 +1273,19 @@ export const commissionPaymentInstallments = pgTable(
       .references(() => commissionQuotes.id, {
         onDelete: "restrict",
       }),
+
+    /*
+     * Optional deliverable association.
+     *
+     * null -> payment for the overall project
+     * UUID -> payment associated with a specific deliverable
+     */
+    deliverableId: uuid("deliverable_id").references(
+      () => commissionDeliverables.id,
+      {
+        onDelete: "restrict",
+      },
+    ),
 
     /*
      * Display/payment order:
@@ -1161,6 +1351,16 @@ export const commissionPaymentInstallments = pgTable(
       .defaultNow(),
   },
   (table) => [
+    foreignKey({
+      columns: [table.deliverableId, table.commissionId, table.quoteId],
+      foreignColumns: [
+        commissionDeliverables.id,
+        commissionDeliverables.commissionId,
+        commissionDeliverables.quoteId,
+      ],
+      name: "commission_installments_deliverable_scope_fk",
+    }).onDelete("restrict"),
+
     uniqueIndex("commission_installments_quote_sequence_unique").on(
       table.quoteId,
       table.sequence,
@@ -1169,6 +1369,8 @@ export const commissionPaymentInstallments = pgTable(
     index("commission_installments_commission_id_idx").on(table.commissionId),
 
     index("commission_installments_quote_id_idx").on(table.quoteId),
+
+    index("commission_installments_deliverable_id_idx").on(table.deliverableId),
 
     index("commission_installments_status_idx").on(table.status),
 
@@ -1632,6 +1834,13 @@ export const commissionAgreements = pgTable(
       onDelete: "restrict",
     }),
 
+    executedDocumentId: uuid("executed_document_id").references(
+      () => commissionDocuments.id,
+      {
+        onDelete: "restrict",
+      },
+    ),
+
     /*
      * Internal revision sequence for this commission.
      *
@@ -1652,13 +1861,31 @@ export const commissionAgreements = pgTable(
 
     agreementVersion: varchar("agreement_version", { length: 50 }).notNull(),
 
+    agreementData: jsonb("agreement_data"),
+
     status: agreementStatusEnum("status").notNull().default("draft"),
+
+    publicTokenHash: varchar("public_token_hash", {
+      length: 64,
+    }),
+
+    publicTokenCreatedAt: timestamp("public_token_created_at", {
+      withTimezone: true,
+    }),
+
+    publicTokenRevokedAt: timestamp("public_token_revoked_at", {
+      withTimezone: true,
+    }),
 
     acceptedByName: varchar("accepted_by_name", { length: 200 }),
 
     acceptedByEmail: varchar("accepted_by_email", { length: 320 }),
 
     acceptanceMethod: acceptanceMethodEnum("acceptance_method"),
+
+    acceptanceStatementVersion: varchar("acceptance_statement_version", {
+      length: 50,
+    }),
 
     sentAt: timestamp("sent_at", {
       withTimezone: true,
@@ -1686,17 +1913,50 @@ export const commissionAgreements = pgTable(
       table.version,
     ),
 
+    uniqueIndex("commission_agreements_commission_active_unique")
+      .on(table.commissionId)
+      .where(
+        sql`
+          ${table.status} IN ('draft', 'sent')
+        `,
+      ),
+
     index("commission_agreements_commission_id_idx").on(table.commissionId),
 
     index("commission_agreements_quote_id_idx").on(table.quoteId),
 
     index("commission_agreements_status_idx").on(table.status),
 
+    uniqueIndex("commission_agreements_public_token_hash_unique").on(
+      table.publicTokenHash,
+    ),
+
+    uniqueIndex("commission_agreements_executed_document_id_unique")
+      .on(table.executedDocumentId)
+      .where(sql`${table.executedDocumentId} IS NOT NULL`),
+
     check(
       "commission_agreements_version_check",
       sql`
           ${table.version} >= 1
         `,
+    ),
+
+    check(
+      "commission_agreements_public_token_state_check",
+      sql`
+        (
+          ${table.publicTokenHash} IS NULL
+          AND ${table.publicTokenCreatedAt} IS NULL
+          AND ${table.publicTokenRevokedAt} IS NULL
+        )
+        OR
+        (
+          ${table.publicTokenHash} IS NOT NULL
+          AND ${table.publicTokenCreatedAt} IS NOT NULL
+          AND char_length(${table.publicTokenHash}) = 64
+        )
+      `,
     ),
 
     /*
@@ -1706,14 +1966,18 @@ export const commissionAgreements = pgTable(
     check(
       "commission_agreements_acceptance_check",
       sql`
-          ${table.status} != 'accepted'
-          OR (
-            ${table.acceptedByName} IS NOT NULL
-            AND ${table.acceptedByEmail} IS NOT NULL
-            AND ${table.acceptanceMethod} IS NOT NULL
-            AND ${table.acceptedAt} IS NOT NULL
+        ${table.status} != 'accepted'
+        OR (
+          ${table.acceptedByName} IS NOT NULL
+          AND ${table.acceptedByEmail} IS NOT NULL
+          AND ${table.acceptanceMethod} IS NOT NULL
+          AND ${table.acceptedAt} IS NOT NULL
+          AND (
+            ${table.acceptanceMethod} != 'electronic'
+            OR ${table.acceptanceStatementVersion} IS NOT NULL
           )
-        `,
+        )
+      `,
     ),
   ],
 );
@@ -1941,9 +2205,7 @@ export const commissionEvents = pgTable(
 export const commissionEmailThreads = pgTable(
   "commission_email_threads",
   {
-    id: uuid("id")
-      .defaultRandom()
-      .primaryKey(),
+    id: uuid("id").defaultRandom().primaryKey(),
 
     commissionId: uuid("commission_id")
       .notNull()
@@ -1967,12 +2229,9 @@ export const commissionEmailThreads = pgTable(
      *
      * This is not the RFC Message-ID header.
      */
-    rootProviderEmailId: varchar(
-      "root_provider_email_id",
-      {
-        length: 255,
-      },
-    ),
+    rootProviderEmailId: varchar("root_provider_email_id", {
+      length: 255,
+    }),
 
     /*
      * RFC Message-ID of the first client-facing email.
@@ -1995,28 +2254,20 @@ export const commissionEmailThreads = pgTable(
       .defaultNow(),
   },
   (table) => [
-    uniqueIndex(
-      "commission_email_threads_commission_unique",
-    ).on(
+    uniqueIndex("commission_email_threads_commission_unique").on(
       table.commissionId,
     ),
 
-    uniqueIndex(
-      "commission_email_threads_commission_id_id_unique",
-    ).on(
+    uniqueIndex("commission_email_threads_commission_id_id_unique").on(
       table.commissionId,
       table.id,
     ),
 
-    uniqueIndex(
-      "commission_email_threads_root_provider_email_unique",
-    ).on(
+    uniqueIndex("commission_email_threads_root_provider_email_unique").on(
       table.rootProviderEmailId,
     ),
 
-    uniqueIndex(
-      "commission_email_threads_root_message_unique",
-    ).on(
+    uniqueIndex("commission_email_threads_root_message_unique").on(
       table.rootMessageId,
     ),
 
@@ -2062,9 +2313,7 @@ export const commissionEmailThreads = pgTable(
 export const commissionEmailMessages = pgTable(
   "commission_email_messages",
   {
-    id: uuid("id")
-      .defaultRandom()
-      .primaryKey(),
+    id: uuid("id").defaultRandom().primaryKey(),
 
     commissionId: uuid("commission_id")
       .notNull()
@@ -2081,55 +2330,31 @@ export const commissionEmailMessages = pgTable(
      */
     quoteId: uuid("quote_id"),
 
-    scope:
-      commissionEmailScopeEnum(
-        "scope",
-      ).notNull(),
+    scope: commissionEmailScopeEnum("scope").notNull(),
 
-    direction:
-      commissionEmailDirectionEnum(
-        "direction",
-      )
-        .notNull()
-        .default("outbound"),
+    direction: commissionEmailDirectionEnum("direction")
+      .notNull()
+      .default("outbound"),
 
-    kind:
-      commissionEmailKindEnum(
-        "kind",
-      ).notNull(),
+    kind: commissionEmailKindEnum("kind").notNull(),
 
-    actor:
-      commissionActorEnum(
-        "actor",
-      ).notNull(),
+    actor: commissionActorEnum("actor").notNull(),
 
-    deliveryStatus:
-      commissionEmailDeliveryStatusEnum(
-        "delivery_status",
-      )
-        .notNull()
-        .default("queued"),
+    deliveryStatus: commissionEmailDeliveryStatusEnum("delivery_status")
+      .notNull()
+      .default("queued"),
 
-    senderEmail: varchar(
-      "sender_email",
-      {
-        length: 320,
-      },
-    ).notNull(),
+    senderEmail: varchar("sender_email", {
+      length: 320,
+    }).notNull(),
 
-    recipientEmail: varchar(
-      "recipient_email",
-      {
-        length: 320,
-      },
-    ).notNull(),
+    recipientEmail: varchar("recipient_email", {
+      length: 320,
+    }).notNull(),
 
-    replyToEmail: varchar(
-      "reply_to_email",
-      {
-        length: 320,
-      },
-    ),
+    replyToEmail: varchar("reply_to_email", {
+      length: 320,
+    }),
 
     subject: varchar("subject", {
       length: 350,
@@ -2142,39 +2367,28 @@ export const commissionEmailMessages = pgTable(
      * This field gives Admin an auditable representation of
      * what was communicated.
      */
-    messageText: text(
-      "message_text",
-    ),
+    messageText: text("message_text"),
 
     /*
      * Provider-specific email identifier.
      *
      * Example: the identifier returned by Resend.
      */
-    providerEmailId: varchar(
-      "provider_email_id",
-      {
-        length: 255,
-      },
-    ),
+    providerEmailId: varchar("provider_email_id", {
+      length: 255,
+    }),
 
     /*
      * RFC Message-ID returned by the email provider.
      */
-    providerMessageId: text(
-      "provider_message_id",
-    ),
+    providerMessageId: text("provider_message_id"),
 
     /*
      * RFC threading headers used for this message.
      */
-    inReplyToMessageId: text(
-      "in_reply_to_message_id",
-    ),
+    inReplyToMessageId: text("in_reply_to_message_id"),
 
-    referencesHeader: text(
-      "references_header",
-    ),
+    referencesHeader: text("references_header"),
 
     /*
      * Delivery attempt information.
@@ -2183,29 +2397,19 @@ export const commissionEmailMessages = pgTable(
      * Retrying delivery does not create a second business
      * communication record.
      */
-    attemptCount: integer(
-      "attempt_count",
-    )
-      .notNull()
-      .default(0),
+    attemptCount: integer("attempt_count").notNull().default(0),
 
-    lastAttemptAt: timestamp(
-      "last_attempt_at",
-      {
-        withTimezone: true,
-      },
-    ),
+    lastAttemptAt: timestamp("last_attempt_at", {
+      withTimezone: true,
+    }),
 
     sentAt: timestamp("sent_at", {
       withTimezone: true,
     }),
 
-    failedAt: timestamp(
-      "failed_at",
-      {
-        withTimezone: true,
-      },
-    ),
+    failedAt: timestamp("failed_at", {
+      withTimezone: true,
+    }),
 
     /*
      * Safe diagnostic text only.
@@ -2213,41 +2417,27 @@ export const commissionEmailMessages = pgTable(
      * Tokens, secure URLs, credentials and complete provider
      * payloads must never be persisted here.
      */
-    failureMessage: text(
-      "failure_message",
-    ),
+    failureMessage: text("failure_message"),
 
-    createdByAdminUserId: varchar(
-      "created_by_admin_user_id",
-      {
-        length: 255,
-      },
-    ),
+    createdByAdminUserId: varchar("created_by_admin_user_id", {
+      length: 255,
+    }),
 
-    createdAt: timestamp(
-      "created_at",
-      {
-        withTimezone: true,
-      },
-    )
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+    })
       .notNull()
       .defaultNow(),
 
-    updatedAt: timestamp(
-      "updated_at",
-      {
-        withTimezone: true,
-      },
-    )
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+    })
       .notNull()
       .defaultNow(),
   },
   (table) => [
     foreignKey({
-      columns: [
-        table.commissionId,
-        table.threadId,
-      ],
+      columns: [table.commissionId, table.threadId],
       foreignColumns: [
         commissionEmailThreads.commissionId,
         commissionEmailThreads.id,
@@ -2256,52 +2446,32 @@ export const commissionEmailMessages = pgTable(
     }).onDelete("restrict"),
 
     foreignKey({
-      columns: [
-        table.commissionId,
-        table.quoteId,
-      ],
-      foreignColumns: [
-        commissionQuotes.commissionId,
-        commissionQuotes.id,
-      ],
+      columns: [table.commissionId, table.quoteId],
+      foreignColumns: [commissionQuotes.commissionId, commissionQuotes.id],
       name: "commission_email_messages_commission_quote_fk",
     }).onDelete("restrict"),
 
-    index(
-      "commission_email_messages_commission_created_idx",
-    ).on(
+    index("commission_email_messages_commission_created_idx").on(
       table.commissionId,
       table.createdAt,
     ),
 
-    index(
-      "commission_email_messages_thread_created_idx",
-    ).on(
+    index("commission_email_messages_thread_created_idx").on(
       table.threadId,
       table.createdAt,
     ),
 
-    index(
-      "commission_email_messages_delivery_status_idx",
-    ).on(
+    index("commission_email_messages_delivery_status_idx").on(
       table.deliveryStatus,
     ),
 
-    index(
-      "commission_email_messages_quote_idx",
-    ).on(
-      table.quoteId,
-    ),
+    index("commission_email_messages_quote_idx").on(table.quoteId),
 
-    uniqueIndex(
-      "commission_email_messages_provider_email_unique",
-    ).on(
+    uniqueIndex("commission_email_messages_provider_email_unique").on(
       table.providerEmailId,
     ),
 
-    uniqueIndex(
-      "commission_email_messages_provider_message_unique",
-    ).on(
+    uniqueIndex("commission_email_messages_provider_message_unique").on(
       table.providerMessageId,
     ),
 
@@ -2347,33 +2517,49 @@ export const commissionEmailMessages = pgTable(
       "commission_email_messages_delivery_state_check",
       sql`
         (
-          ${table.deliveryStatus} = 'queued'
-          AND ${table.sentAt} IS NULL
-          AND ${table.failedAt} IS NULL
+          ${table.direction} = 'outbound'
+          AND (
+            (
+              ${table.deliveryStatus} = 'queued'
+              AND ${table.sentAt} IS NULL
+              AND ${table.failedAt} IS NULL
+              AND ${table.attemptCount} = 0
+              AND ${table.lastAttemptAt} IS NULL
+            )
+            OR
+            (
+              ${table.deliveryStatus} = 'sending'
+              AND ${table.sentAt} IS NULL
+              AND ${table.failedAt} IS NULL
+              AND ${table.attemptCount} > 0
+              AND ${table.lastAttemptAt} IS NOT NULL
+            )
+            OR
+            (
+              ${table.deliveryStatus} = 'sent'
+              AND ${table.sentAt} IS NOT NULL
+              AND ${table.failedAt} IS NULL
+              AND ${table.attemptCount} > 0
+              AND ${table.lastAttemptAt} IS NOT NULL
+            )
+            OR
+            (
+              ${table.deliveryStatus} = 'failed'
+              AND ${table.sentAt} IS NULL
+              AND ${table.failedAt} IS NOT NULL
+              AND ${table.attemptCount} > 0
+              AND ${table.lastAttemptAt} IS NOT NULL
+            )
+          )
         )
         OR
         (
-          ${table.deliveryStatus} = 'sending'
+          ${table.direction} = 'inbound'
+          AND ${table.deliveryStatus} = 'received'
           AND ${table.sentAt} IS NULL
           AND ${table.failedAt} IS NULL
-          AND ${table.attemptCount} > 0
-          AND ${table.lastAttemptAt} IS NOT NULL
-        )
-        OR
-        (
-          ${table.deliveryStatus} = 'sent'
-          AND ${table.sentAt} IS NOT NULL
-          AND ${table.failedAt} IS NULL
-          AND ${table.attemptCount} > 0
-          AND ${table.lastAttemptAt} IS NOT NULL
-        )
-        OR
-        (
-          ${table.deliveryStatus} = 'failed'
-          AND ${table.sentAt} IS NULL
-          AND ${table.failedAt} IS NOT NULL
-          AND ${table.attemptCount} > 0
-          AND ${table.lastAttemptAt} IS NOT NULL
+          AND ${table.attemptCount} = 0
+          AND ${table.lastAttemptAt} IS NULL
         )
       `,
     ),

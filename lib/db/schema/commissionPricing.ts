@@ -382,6 +382,7 @@ export const commissionPricingOptions = pgTable(
  * - Merchandising: fixed amount.
  * - Indie Author Discount: percentage of pre_discount_subtotal.
  * - Future volume discount: percentage of base_items.
+ * - Custom Discount: editable fixed amount.
  *
  * maxQuantity = 1 means it may be selected once.
  * maxQuantity = null means no catalog-level maximum is imposed.
@@ -531,14 +532,24 @@ export const commissionPricingAdjustments = pgTable(
         OR
         (
           ${table.isValueEditable} = true
-          AND ${table.calculationType} = 'percentage'
-          AND ${table.minimumPercentageRate} IS NOT NULL
-          AND ${table.maximumPercentageRate} IS NOT NULL
-          AND ${table.minimumPercentageRate} >= 0
-          AND ${table.maximumPercentageRate} <= 100
-          AND ${table.maximumPercentageRate} >= ${table.minimumPercentageRate}
-          AND ${table.percentageRate} >= ${table.minimumPercentageRate}
-          AND ${table.percentageRate} <= ${table.maximumPercentageRate}
+          AND (
+            (
+              ${table.calculationType} = 'percentage'
+              AND ${table.minimumPercentageRate} IS NOT NULL
+              AND ${table.maximumPercentageRate} IS NOT NULL
+              AND ${table.minimumPercentageRate} >= 0
+              AND ${table.maximumPercentageRate} <= 100
+              AND ${table.maximumPercentageRate} >= ${table.minimumPercentageRate}
+              AND ${table.percentageRate} >= ${table.minimumPercentageRate}
+              AND ${table.percentageRate} <= ${table.maximumPercentageRate}
+            )
+            OR
+            (
+              ${table.calculationType} = 'fixed'
+              AND ${table.minimumPercentageRate} IS NULL
+              AND ${table.maximumPercentageRate} IS NULL
+            )
+          )
         )
       `,
     ),
