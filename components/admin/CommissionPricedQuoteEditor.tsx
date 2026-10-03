@@ -8,6 +8,7 @@ import {
   updateCommissionQuoteDraftAction,
   type CommissionQuoteActionState,
 } from "@/app/admin/(protected)/commissions/actions";
+import { MAX_COMMISSION_QUOTE_ITEM_QUANTITY } from "@/lib/commissions/commissionQuote";
 import { buildCommissionQuotePricingSnapshot } from "@/lib/commissions/commissionQuotePricing";
 import type {
   CommissionQuotePricingEditorAdjustment,
@@ -40,6 +41,11 @@ interface EditableAdjustment {
   selected: boolean;
 }
 
+interface EditableIllustration {
+  id: string;
+  adjustments: Record<string, EditableAdjustment>;
+}
+
 const initialActionState: CommissionQuoteActionState = {
   message: null,
   outcome: "idle",
@@ -57,6 +63,70 @@ function createCustomItem(): EditableCustomItem {
     quantity: "1",
     unitAmount: "0.00",
   };
+}
+
+function getInitialBaseQuantity(
+  draft?: CommissionQuoteWithItems | null,
+): string {
+  if (draft && draft.illustrations.length > 0) {
+    return draft.illustrations.length.toString();
+  }
+
+  return (
+    draft?.items.find((item) => item.kind === "base")?.quantity.toString() ??
+    "1"
+  );
+}
+
+function getInitialIllustrationIds(
+  draft?: CommissionQuoteWithItems | null,
+): string[] {
+  if (draft && draft.illustrations.length > 0) {
+    return draft.illustrations.map((illustration) => illustration.id);
+  }
+
+  const quantity = Number(getInitialBaseQuantity(draft));
+  const initialQuantity =
+    Number.isInteger(quantity) &&
+    quantity >= 1 &&
+    quantity <= MAX_COMMISSION_QUOTE_ITEM_QUANTITY
+      ? quantity
+      : 1;
+
+  return Array.from({ length: initialQuantity }, () => crypto.randomUUID());
+}
+
+function getInitialIllustrations(
+  adjustments: readonly CommissionQuotePricingEditorAdjustment[],
+  draft?: CommissionQuoteWithItems | null,
+): EditableIllustration[] {
+  return getInitialIllustrationIds(draft).map((id) => ({
+    id,
+    adjustments: Object.fromEntries(
+      adjustments
+        .filter((adjustment) => adjustment.kind !== "discount")
+        .map((adjustment) => {
+          const item = draft?.items.find(
+            (candidate) =>
+              candidate.illustrationId === id &&
+              candidate.pricingAdjustmentId === adjustment.id &&
+              (candidate.kind === "extra" || candidate.kind === "license"),
+          );
+
+          return [
+            adjustment.id,
+            {
+              internalNote: item?.internalNote ?? "",
+              percentageRate: percentageInputValue(
+                item?.percentageRate ?? adjustment.percentageRate,
+              ),
+              quantity: item?.quantity.toString() ?? "1",
+              selected: Boolean(item),
+            },
+          ];
+        }),
+    ),
+  }));
 }
 
 function getInitialCustomItems(
@@ -91,8 +161,9 @@ function getInitialAdjustments(
         adjustment.id,
         {
           internalNote: item?.internalNote ?? "",
-          percentageRate:
-            item?.percentageRate ?? adjustment.percentageRate ?? "",
+          percentageRate: percentageInputValue(
+            item?.percentageRate ?? adjustment.percentageRate,
+          ),
           quantity: item?.quantity.toString() ?? "1",
           selected: Boolean(item),
         },
@@ -164,6 +235,16 @@ function toIsoDate(value: string): string {
   return new Date(timestamp).toISOString();
 }
 
+function percentageInputValue(value: string | null | undefined): string {
+  if (!value) {
+    return "";
+  }
+
+  const numericValue = Number(value);
+
+  return Number.isFinite(numericValue) ? numericValue.toString() : value;
+}
+
 function adjustmentValue(adjustment: CommissionQuotePricingEditorAdjustment) {
   return adjustment.calculationType === "fixed"
     ? `${adjustment.fixedAmount ?? "0.00"} USD`
@@ -179,6 +260,15 @@ export default function CommissionPricedQuoteEditor({
 }: CommissionPricedQuoteEditorProps) {
   const formRef = useRef<HTMLFormElement>(null);
   const submitted = useRef(false);
+  const [baseQuantity, setBaseQuantity] = useState(() =>
+    getInitialBaseQuantity(draft),
+  );
+  const [illustrations, setIllustrations] = useState<EditableIllustration[]>(
+    () =>
+      config.mode === "catalog"
+        ? getInitialIllustrations(config.adjustments, draft)
+        : [],
+  );
   const [description, setDescription] = useState(
     draft?.quote.description ?? "",
   );
@@ -237,11 +327,16 @@ export default function CommissionPricedQuoteEditor({
       })),
     [customItems],
   );
-  const selectedAdjustments = useMemo(
+
+  const globalAdjustments = useMemo(
     () =>
       config.mode === "catalog"
         ? config.adjustments
-            .filter((adjustment) => adjustments[adjustment.id]?.selected)
+            .filter(
+              (adjustment) =>
+                adjustment.kind === "discount" &&
+                adjustments[adjustment.id]?.selected,
+            )
             .map((adjustment) => ({
               adjustmentId: adjustment.id,
               internalNote: adjustments[adjustment.id]?.internalNote || null,
@@ -252,38 +347,96 @@ export default function CommissionPricedQuoteEditor({
         : [],
     [adjustments, config],
   );
+
+  const illustrationSelections = useMemo(
+    () =>
+      config.mode === "catalog"
+        ? illustrations.map((illustration) => ({
+            id: illustration.id,
+            selectedAdjustments: config.adjustments
+              .filter(
+                (adjustment) =>
+                  adjustment.kind !== "discount" &&
+                  illustration.adjustments[adjustment.id]?.selected,
+              )
+              .map((adjustment) => ({
+                adjustmentId: adjustment.id,
+                internalNote:
+                  illustration.adjustments[adjustment.id]?.internalNote || null,
+                percentageRate:
+                  illustration.adjustments[adjustment.id]?.percentageRate ||
+                  null,
+                quantity: Number(
+                  illustration.adjustments[adjustment.id]?.quantity ?? "1",
+                ),
+              })),
+          }))
+        : [],
+    [config, illustrations],
+  );
+
   const pricingSelection = useMemo(
     () =>
       config.mode === "catalog"
         ? {
+            baseQuantity: Number(baseQuantity),
             customItems: normalizedCustomItems,
+            globalAdjustments,
+            illustrations: illustrationSelections,
             mode: "catalog" as const,
-            selectedAdjustments,
+            selectedAdjustments: [],
           }
         : {
             customItems: normalizedCustomItems,
             mode: "custom" as const,
           },
-    [config.mode, normalizedCustomItems, selectedAdjustments],
+    [
+      baseQuantity,
+      config.mode,
+      globalAdjustments,
+      illustrationSelections,
+      normalizedCustomItems,
+    ],
   );
 
-  const preview = useMemo(
-    () =>
-      config.mode === "catalog"
-        ? buildCommissionQuotePricingSnapshot({
-            adjustments: config.adjustments,
-            customItems: normalizedCustomItems,
-            mode: "catalog",
-            option: config.option,
-            pricingVersionId: config.pricingVersionId,
-            selectedAdjustments,
-          })
-        : buildCommissionQuotePricingSnapshot({
-            customItems: normalizedCustomItems,
-            mode: "custom",
-          }),
-    [config, normalizedCustomItems, selectedAdjustments],
-  );
+  const preview = useMemo(() => {
+    if (config.mode === "custom") {
+      return buildCommissionQuotePricingSnapshot({
+        customItems: normalizedCustomItems,
+        mode: "custom",
+      });
+    }
+
+    if (
+      !Number.isInteger(Number(baseQuantity)) ||
+      Number(baseQuantity) < 1 ||
+      illustrationSelections.length !== Number(baseQuantity)
+    ) {
+      return {
+        valid: false as const,
+        code: "base_quantity_invalid" as const,
+        message: `Enter a whole quantity between 1 and ${MAX_COMMISSION_QUOTE_ITEM_QUANTITY} for the main service.`,
+      };
+    }
+
+    return buildCommissionQuotePricingSnapshot({
+      adjustments: config.adjustments,
+      baseQuantity: Number(baseQuantity),
+      customItems: normalizedCustomItems,
+      globalAdjustments,
+      illustrations: illustrationSelections,
+      mode: "catalog",
+      option: config.option,
+      pricingVersionId: config.pricingVersionId,
+      selectedAdjustments: [],
+    });
+  }, [
+    baseQuantity,
+    config,
+    globalAdjustments,
+    illustrationSelections,
+    normalizedCustomItems,
+  ]);
 
   function updateCustomItem(
     key: string,
@@ -307,7 +460,59 @@ export default function CommissionPricedQuoteEditor({
     }));
   }
 
+  function updateIllustrationAdjustment(
+    illustrationId: string,
+    adjustmentId: string,
+    changes: Partial<EditableAdjustment>,
+  ): void {
+    setIllustrations((current) =>
+      current.map((illustration) => {
+        if (illustration.id !== illustrationId) {
+          return illustration;
+        }
+
+        const adjustmentDefinition =
+          config.mode === "catalog"
+            ? config.adjustments.find(
+                (candidate) => candidate.id === adjustmentId,
+              )
+            : undefined;
+
+        const existing = illustration.adjustments[adjustmentId];
+
+        return {
+          ...illustration,
+          adjustments: {
+            ...illustration.adjustments,
+            [adjustmentId]: {
+              internalNote: existing?.internalNote ?? "",
+              percentageRate:
+                existing?.percentageRate ??
+                adjustmentDefinition?.percentageRate ??
+                "",
+              quantity: existing?.quantity ?? "1",
+              selected: existing?.selected ?? false,
+              ...changes,
+            },
+          },
+        };
+      }),
+    );
+  }
+
   function handleSubmit(event: React.SubmitEvent<HTMLFormElement>): void {
+    if (
+      draft &&
+      config.mode === "catalog" &&
+      draft.illustrations.length === 0
+    ) {
+      event.preventDefault();
+      setClientError(
+        "This quote uses the previous pricing format. To avoid losing its existing adjustments, it cannot be saved with the new per-illustration editor. Leave this draft unchanged until its format is resolved.",
+      );
+      return;
+    }
+
     if (submitted.current || !preview.valid) {
       event.preventDefault();
       setClientError(
@@ -379,105 +584,304 @@ export default function CommissionPricedQuoteEditor({
                 {config.option.baseAmount} USD
               </strong>
             </div>
+            <label className="mt-4 block max-w-40 text-xs text-white/60">
+              Quantity
+              <input
+                className="mt-1.5 w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white"
+                disabled={pending}
+                inputMode="numeric"
+                max={MAX_COMMISSION_QUOTE_ITEM_QUANTITY}
+                min={1}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setBaseQuantity(value);
+
+                  const nextQuantity = Number(value);
+
+                  if (
+                    !Number.isInteger(nextQuantity) ||
+                    nextQuantity < 1 ||
+                    nextQuantity > MAX_COMMISSION_QUOTE_ITEM_QUANTITY
+                  ) {
+                    return;
+                  }
+
+                  setIllustrations((current) => {
+                    if (nextQuantity <= current.length) {
+                      return current.slice(0, nextQuantity);
+                    }
+
+                    return [
+                      ...current,
+                      ...Array.from(
+                        { length: nextQuantity - current.length },
+                        (): EditableIllustration => ({
+                          id: crypto.randomUUID(),
+                          adjustments: {},
+                        }),
+                      ),
+                    ];
+                  });
+                }}
+                required
+                step={1}
+                type="number"
+                value={baseQuantity}
+              />
+            </label>
           </section>
 
-          {config.adjustments.length > 0 && (
+          {illustrations.map((illustration, index) => (
+            <section
+              className="mt-5 rounded-2xl border border-white/10 bg-white/[0.04] p-4"
+              key={illustration.id}
+            >
+              <h4 className="text-sm font-medium text-white/90">
+                Illustration {index + 1}
+              </h4>
+
+              <p className="mt-1 text-xs text-white/50">
+                Select the extras and licenses for this illustration.
+              </p>
+
+              <div className="mt-4 space-y-3">
+                {config.adjustments
+                  .filter((adjustment) => adjustment.kind !== "discount")
+                  .map((adjustment) => {
+                    const value = illustration.adjustments[adjustment.id];
+
+                    return (
+                      <div
+                        className="rounded-xl border border-white/10 bg-white/[0.03] p-3"
+                        key={adjustment.id}
+                      >
+                        <label className="flex cursor-pointer items-start gap-3">
+                          <input
+                            checked={value?.selected ?? false}
+                            className="mt-1 h-4 w-4 accent-[#aeb8ff]"
+                            disabled={pending}
+                            onChange={(event) =>
+                              updateIllustrationAdjustment(
+                                illustration.id,
+                                adjustment.id,
+                                { selected: event.target.checked },
+                              )
+                            }
+                            type="checkbox"
+                          />
+
+                          <span className="min-w-0 flex-1">
+                            <span className="flex justify-between gap-3 text-sm">
+                              <span>{adjustment.name}</span>
+                              <span className="shrink-0 text-white/65">
+                                {adjustmentValue(adjustment)}
+                              </span>
+                            </span>
+
+                            {adjustment.description && (
+                              <span className="mt-1 block text-xs leading-relaxed text-white/45">
+                                {adjustment.description}
+                              </span>
+                            )}
+                          </span>
+                        </label>
+
+                        {value?.selected && (
+                          <div className="mt-3 grid gap-3 border-t border-white/10 pt-3 sm:grid-cols-2">
+                            {adjustment.maxQuantity !== 1 && (
+                              <label className="text-xs text-white/60">
+                                Quantity
+                                <input
+                                  className="mt-1.5 w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white"
+                                  disabled={pending}
+                                  max={adjustment.maxQuantity ?? 10000}
+                                  min={1}
+                                  onChange={(event) =>
+                                    updateIllustrationAdjustment(
+                                      illustration.id,
+                                      adjustment.id,
+                                      { quantity: event.target.value },
+                                    )
+                                  }
+                                  type="number"
+                                  value={value.quantity}
+                                />
+                              </label>
+                            )}
+
+                            {adjustment.isValueEditable && (
+                              <label className="text-xs text-white/60">
+                                Percentage
+                                <input
+                                  className="mt-1.5 w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white"
+                                  disabled={pending}
+                                  inputMode="decimal"
+                                  max={adjustment.maximumPercentageRate ?? 100}
+                                  min={adjustment.minimumPercentageRate ?? 0}
+                                  onChange={(event) => {
+                                    const nextValue = event.target.value;
+
+                                    if (
+                                      nextValue !== "" &&
+                                      !Number.isInteger(Number(nextValue))
+                                    ) {
+                                      return;
+                                    }
+
+                                    updateIllustrationAdjustment(
+                                      illustration.id,
+                                      adjustment.id,
+                                      { percentageRate: nextValue },
+                                    );
+                                  }}
+                                  step={1}
+                                  type="number"
+                                  value={value.percentageRate}
+                                />
+                              </label>
+                            )}
+
+                            {adjustment.requiresInternalNote && (
+                              <label className="text-xs text-white/60 sm:col-span-2">
+                                Reason for this adjustment
+                                <textarea
+                                  className="mt-1.5 min-h-16 w-full resize-y rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white"
+                                  disabled={pending}
+                                  onChange={(event) =>
+                                    updateIllustrationAdjustment(
+                                      illustration.id,
+                                      adjustment.id,
+                                      { internalNote: event.target.value },
+                                    )
+                                  }
+                                  placeholder="Add a short note for your records."
+                                  value={value.internalNote}
+                                />
+                              </label>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+              </div>
+            </section>
+          ))}
+
+          {config.adjustments.some(
+            (adjustment) => adjustment.kind === "discount",
+          ) && (
             <section className="mt-5">
               <h4 className="text-sm font-medium text-white/90">
-                Extras, licenses and discounts
+                Global discount
               </h4>
               <div className="mt-3 space-y-3">
-                {config.adjustments.map((adjustment) => {
-                  const value = adjustments[adjustment.id];
-                  return (
-                    <div
-                      className="rounded-xl border border-white/10 bg-white/[0.03] p-3"
-                      key={adjustment.id}
-                    >
-                      <label className="flex cursor-pointer items-start gap-3">
-                        <input
-                          checked={value?.selected ?? false}
-                          className="mt-1 h-4 w-4 accent-[#aeb8ff]"
-                          disabled={pending}
-                          onChange={(event) =>
-                            updateAdjustment(adjustment.id, {
-                              selected: event.target.checked,
-                            })
-                          }
-                          type="checkbox"
-                        />
-                        <span className="min-w-0 flex-1">
-                          <span className="flex justify-between gap-3 text-sm">
-                            <span>{adjustment.name}</span>
-                            <span className="shrink-0 text-white/65">
-                              {adjustmentValue(adjustment)}
+                {config.adjustments
+                  .filter((adjustment) => adjustment.kind === "discount")
+                  .map((adjustment) => {
+                    const value = adjustments[adjustment.id];
+                    return (
+                      <div
+                        className="rounded-xl border border-white/10 bg-white/[0.03] p-3"
+                        key={adjustment.id}
+                      >
+                        <label className="flex cursor-pointer items-start gap-3">
+                          <input
+                            checked={value?.selected ?? false}
+                            className="mt-1 h-4 w-4 accent-[#aeb8ff]"
+                            disabled={pending}
+                            onChange={(event) =>
+                              updateAdjustment(adjustment.id, {
+                                selected: event.target.checked,
+                              })
+                            }
+                            type="checkbox"
+                          />
+                          <span className="min-w-0 flex-1">
+                            <span className="flex justify-between gap-3 text-sm">
+                              <span>{adjustment.name}</span>
+                              <span className="shrink-0 text-white/65">
+                                {adjustment.calculationType === "percentage" &&
+                                value?.selected
+                                  ? `${value.percentageRate || adjustment.percentageRate || "0"}%`
+                                  : adjustmentValue(adjustment)}
+                              </span>
                             </span>
+                            {adjustment.description && (
+                              <span className="mt-1 block text-xs leading-relaxed text-white/45">
+                                {adjustment.description}
+                              </span>
+                            )}
                           </span>
-                          {adjustment.description && (
-                            <span className="mt-1 block text-xs leading-relaxed text-white/45">
-                              {adjustment.description}
-                            </span>
-                          )}
-                        </span>
-                      </label>
+                        </label>
 
-                      {value?.selected && (
-                        <div className="mt-3 grid gap-3 border-t border-white/10 pt-3 sm:grid-cols-2">
-                          {adjustment.maxQuantity !== 1 && (
-                            <label className="text-xs text-white/60">
-                              Quantity
-                              <input
-                                className="mt-1.5 w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white"
-                                max={adjustment.maxQuantity ?? 10000}
-                                min={1}
-                                onChange={(event) =>
-                                  updateAdjustment(adjustment.id, {
-                                    quantity: event.target.value,
-                                  })
-                                }
-                                type="number"
-                                value={value.quantity}
-                              />
-                            </label>
-                          )}
-                          {adjustment.isValueEditable && (
-                            <label className="text-xs text-white/60">
-                              Percentage
-                              <input
-                                className="mt-1.5 w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white"
-                                inputMode="decimal"
-                                max={adjustment.maximumPercentageRate ?? 100}
-                                min={adjustment.minimumPercentageRate ?? 0}
-                                onChange={(event) =>
-                                  updateAdjustment(adjustment.id, {
-                                    percentageRate: event.target.value,
-                                  })
-                                }
-                                type="number"
-                                value={value.percentageRate}
-                              />
-                            </label>
-                          )}
-                          {adjustment.requiresInternalNote && (
-                            <label className="text-xs text-white/60 sm:col-span-2">
-                              Reason for this adjustment
-                              <textarea
-                                className="mt-1.5 min-h-16 w-full resize-y rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white"
-                                onChange={(event) =>
-                                  updateAdjustment(adjustment.id, {
-                                    internalNote: event.target.value,
-                                  })
-                                }
-                                placeholder="Add a short note for your records."
-                                value={value.internalNote}
-                              />
-                            </label>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                        {value?.selected && (
+                          <div className="mt-3 grid gap-3 border-t border-white/10 pt-3 sm:grid-cols-2">
+                            {adjustment.maxQuantity !== 1 && (
+                              <label className="text-xs text-white/60">
+                                Quantity
+                                <input
+                                  className="mt-1.5 w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white"
+                                  max={adjustment.maxQuantity ?? 10000}
+                                  min={1}
+                                  onChange={(event) =>
+                                    updateAdjustment(adjustment.id, {
+                                      quantity: event.target.value,
+                                    })
+                                  }
+                                  type="number"
+                                  value={value.quantity}
+                                />
+                              </label>
+                            )}
+                            {adjustment.isValueEditable && (
+                              <label className="text-xs text-white/60">
+                                Percentage
+                                <input
+                                  className="mt-1.5 w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white"
+                                  inputMode="decimal"
+                                  max={adjustment.maximumPercentageRate ?? 100}
+                                  min={adjustment.minimumPercentageRate ?? 0}
+                                  onChange={(event) => {
+                                    const nextValue = event.target.value;
+
+                                    if (
+                                      nextValue !== "" &&
+                                      !Number.isInteger(Number(nextValue))
+                                    ) {
+                                      return;
+                                    }
+
+                                    updateAdjustment(adjustment.id, {
+                                      percentageRate: nextValue,
+                                    });
+                                  }}
+                                  step={1}
+                                  type="number"
+                                  value={value.percentageRate}
+                                />
+                              </label>
+                            )}
+                            {adjustment.requiresInternalNote && (
+                              <label className="text-xs text-white/60 sm:col-span-2">
+                                Reason for this adjustment
+                                <textarea
+                                  className="mt-1.5 min-h-16 w-full resize-y rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white"
+                                  onChange={(event) =>
+                                    updateAdjustment(adjustment.id, {
+                                      internalNote: event.target.value,
+                                    })
+                                  }
+                                  placeholder="Add a short note for your records."
+                                  value={value.internalNote}
+                                />
+                              </label>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
               </div>
             </section>
           )}
@@ -615,26 +1019,94 @@ export default function CommissionPricedQuoteEditor({
       <section className="mt-5 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
         {preview.valid ? (
           <>
-            <div className="space-y-2 text-sm text-white/65">
-              {preview.snapshot.items.map((item) => (
-                <div
-                  className="flex justify-between gap-4"
-                  key={`${item.sequence}-${item.label}`}
-                >
-                  <span>{item.label}</span>
-                  <span className="shrink-0">{item.lineAmount} USD</span>
-                </div>
-              ))}
-            </div>
+            {config.mode === "catalog" ? (
+              <div className="space-y-3">
+                {preview.snapshot.illustrations.map((illustration, index) => (
+                  <div
+                    className="rounded-xl border border-white/10 bg-white/[0.03] p-3"
+                    key={illustration.id}
+                  >
+                    <h4 className="mb-3 text-sm font-semibold text-white">
+                      Illustration {index + 1}
+                      <span className="mt-1 block text-xs font-normal text-white/55">
+                        {config.option.quoteLabel}
+                      </span>
+                    </h4>
+
+                    <div className="space-y-2 border-t border-white/10 pt-3 text-sm text-white/70">
+                      {preview.snapshot.items
+                        .filter(
+                          (item) => item.illustrationId === illustration.id,
+                        )
+                        .map((item) => (
+                          <div
+                            className="flex items-start justify-between gap-4"
+                            key={item.sequence}
+                          >
+                            <span className="min-w-0">
+                              {item.kind === "base"
+                                ? "Base illustration"
+                                : item.label}
+                              {item.quantity > 1 && ` × ${item.quantity}`}
+                            </span>
+                            <span className="shrink-0 tabular-nums text-white/85">
+                              {item.lineAmount} USD
+                            </span>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                ))}
+
+                {preview.snapshot.items.some(
+                  (item) => item.illustrationId === null,
+                ) && (
+                  <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                    <h4 className="mb-3 text-sm font-semibold text-white">
+                      Additional charges and global discount
+                    </h4>
+
+                    <div className="space-y-2 border-t border-white/10 pt-3 text-sm text-white/70">
+                      {preview.snapshot.items
+                        .filter((item) => item.illustrationId === null)
+                        .map((item) => (
+                          <div
+                            className="flex items-start justify-between gap-4"
+                            key={item.sequence}
+                          >
+                            <span className="min-w-0">
+                              {item.label}
+                              {item.quantity > 1 && ` × ${item.quantity}`}
+                            </span>
+                            <span className="shrink-0 tabular-nums text-white/85">
+                              {item.lineAmount} USD
+                            </span>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-2 text-sm text-white/65">
+                {preview.snapshot.items.map((item) => (
+                  <div
+                    className="flex justify-between gap-4"
+                    key={item.sequence}
+                  >
+                    <span>{item.label}</span>
+                    <span className="shrink-0">{item.lineAmount} USD</span>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="mt-4 flex justify-between border-t border-white/10 pt-4">
               <strong>Draft total</strong>
               <strong>{preview.snapshot.totalAmount} USD</strong>
             </div>
           </>
         ) : (
-          <p className="text-sm text-white/55">
-            Complete the pricing details to see the final total.
-          </p>
+          <p className="text-sm text-white/55">{preview.message}</p>
         )}
       </section>
 

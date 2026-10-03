@@ -242,55 +242,41 @@ export const documentStatusEnum = pgEnum("document_status", [
   "voided",
 ]);
 
-export const commissionEmailScopeEnum = pgEnum(
-  "commission_email_scope",
-  [
-    "client_thread",
-    "internal_notification",
-  ],
-);
+export const commissionEmailScopeEnum = pgEnum("commission_email_scope", [
+  "client_thread",
+  "internal_notification",
+]);
 
 export const commissionEmailDirectionEnum = pgEnum(
   "commission_email_direction",
-  [
-    "outbound",
-    "inbound",
-  ],
+  ["outbound", "inbound"],
 );
 
 export const commissionEmailDeliveryStatusEnum = pgEnum(
   "commission_email_delivery_status",
-  [
-    "queued",
-    "sending",
-    "sent",
-    "failed",
-  ],
+  ["queued", "sending", "sent", "failed"],
 );
 
-export const commissionEmailKindEnum = pgEnum(
-  "commission_email_kind",
-  [
-    "inquiry_confirmation",
-    "internal_inquiry_notification",
+export const commissionEmailKindEnum = pgEnum("commission_email_kind", [
+  "inquiry_confirmation",
+  "internal_inquiry_notification",
 
-    "client_details_request",
-    "general_message",
+  "client_details_request",
+  "general_message",
 
-    "quote_ready",
+  "quote_ready",
 
-    "agreement_ready",
+  "agreement_ready",
 
-    "payment_request",
-    "payment_confirmation",
+  "payment_request",
+  "payment_confirmation",
 
-    "sketch_review",
-    "final_review",
-    "final_delivery",
+  "sketch_review",
+  "final_review",
+  "final_delivery",
 
-    "commission_completed",
-  ],
-);
+  "commission_completed",
+]);
 
 /*
  * ============================================================
@@ -630,13 +616,13 @@ export const commissionQuotes = pgTable(
     status: quoteStatusEnum("status").notNull().default("draft"),
 
     /*
-    * Public quote access uses an opaque bearer token.
-    *
-    * Only the SHA-256 hash is persisted. The plaintext token is
-    * generated server-side and must never be stored in the database.
-    *
-    * One token belongs to one specific quote version.
-    */
+     * Public quote access uses an opaque bearer token.
+     *
+     * Only the SHA-256 hash is persisted. The plaintext token is
+     * generated server-side and must never be stored in the database.
+     *
+     * One token belongs to one specific quote version.
+     */
     publicTokenHash: varchar("public_token_hash", { length: 64 }),
 
     publicTokenCreatedAt: timestamp("public_token_created_at", {
@@ -905,6 +891,57 @@ export const commissionQuotes = pgTable(
 
 /*
  * ============================================================
+ * COMMISSION QUOTE ILLUSTRATIONS
+ * ============================================================
+ *
+ * Each row represents one illustration within a quote.
+ *
+ * A quote may contain several illustrations of the same
+ * catalog option. Extras and licenses will later reference
+ * the specific illustration to which they apply.
+ */
+
+export const commissionQuoteIllustrations = pgTable(
+  "commission_quote_illustrations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+
+    quoteId: uuid("quote_id")
+      .notNull()
+      .references(() => commissionQuotes.id, {
+        onDelete: "restrict",
+      }),
+
+    sequence: integer("sequence").notNull(),
+
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("commission_quote_illustrations_quote_sequence_unique").on(
+      table.quoteId,
+      table.sequence,
+    ),
+
+    uniqueIndex("commission_quote_illustrations_quote_id_id_unique").on(
+      table.quoteId,
+      table.id,
+    ),
+
+    index("commission_quote_illustrations_quote_id_idx").on(table.quoteId),
+
+    check(
+      "commission_quote_illustrations_sequence_check",
+      sql`${table.sequence} >= 1`,
+    ),
+  ],
+);
+
+/*
+ * ============================================================
  * COMMISSION QUOTE ITEMS
  * ============================================================
  *
@@ -926,6 +963,8 @@ export const commissionQuoteItems = pgTable(
       .references(() => commissionQuotes.id, {
         onDelete: "restrict",
       }),
+
+    illustrationId: uuid("illustration_id"),
 
     sequence: integer("sequence").notNull(),
 
@@ -987,12 +1026,25 @@ export const commissionQuoteItems = pgTable(
       .defaultNow(),
   },
   (table) => [
+    foreignKey({
+      columns: [table.quoteId, table.illustrationId],
+      foreignColumns: [
+        commissionQuoteIllustrations.quoteId,
+        commissionQuoteIllustrations.id,
+      ],
+      name: "commission_quote_items_illustration_fk",
+    }).onDelete("restrict"),
+
     uniqueIndex("commission_quote_items_quote_sequence_unique").on(
       table.quoteId,
       table.sequence,
     ),
 
     index("commission_quote_items_quote_id_idx").on(table.quoteId),
+
+    index("commission_quote_items_illustration_id_idx").on(
+      table.illustrationId,
+    ),
 
     index("commission_quote_items_pricing_option_idx").on(
       table.pricingOptionId,
@@ -1941,9 +1993,7 @@ export const commissionEvents = pgTable(
 export const commissionEmailThreads = pgTable(
   "commission_email_threads",
   {
-    id: uuid("id")
-      .defaultRandom()
-      .primaryKey(),
+    id: uuid("id").defaultRandom().primaryKey(),
 
     commissionId: uuid("commission_id")
       .notNull()
@@ -1967,12 +2017,9 @@ export const commissionEmailThreads = pgTable(
      *
      * This is not the RFC Message-ID header.
      */
-    rootProviderEmailId: varchar(
-      "root_provider_email_id",
-      {
-        length: 255,
-      },
-    ),
+    rootProviderEmailId: varchar("root_provider_email_id", {
+      length: 255,
+    }),
 
     /*
      * RFC Message-ID of the first client-facing email.
@@ -1995,28 +2042,20 @@ export const commissionEmailThreads = pgTable(
       .defaultNow(),
   },
   (table) => [
-    uniqueIndex(
-      "commission_email_threads_commission_unique",
-    ).on(
+    uniqueIndex("commission_email_threads_commission_unique").on(
       table.commissionId,
     ),
 
-    uniqueIndex(
-      "commission_email_threads_commission_id_id_unique",
-    ).on(
+    uniqueIndex("commission_email_threads_commission_id_id_unique").on(
       table.commissionId,
       table.id,
     ),
 
-    uniqueIndex(
-      "commission_email_threads_root_provider_email_unique",
-    ).on(
+    uniqueIndex("commission_email_threads_root_provider_email_unique").on(
       table.rootProviderEmailId,
     ),
 
-    uniqueIndex(
-      "commission_email_threads_root_message_unique",
-    ).on(
+    uniqueIndex("commission_email_threads_root_message_unique").on(
       table.rootMessageId,
     ),
 
@@ -2062,9 +2101,7 @@ export const commissionEmailThreads = pgTable(
 export const commissionEmailMessages = pgTable(
   "commission_email_messages",
   {
-    id: uuid("id")
-      .defaultRandom()
-      .primaryKey(),
+    id: uuid("id").defaultRandom().primaryKey(),
 
     commissionId: uuid("commission_id")
       .notNull()
@@ -2081,55 +2118,31 @@ export const commissionEmailMessages = pgTable(
      */
     quoteId: uuid("quote_id"),
 
-    scope:
-      commissionEmailScopeEnum(
-        "scope",
-      ).notNull(),
+    scope: commissionEmailScopeEnum("scope").notNull(),
 
-    direction:
-      commissionEmailDirectionEnum(
-        "direction",
-      )
-        .notNull()
-        .default("outbound"),
+    direction: commissionEmailDirectionEnum("direction")
+      .notNull()
+      .default("outbound"),
 
-    kind:
-      commissionEmailKindEnum(
-        "kind",
-      ).notNull(),
+    kind: commissionEmailKindEnum("kind").notNull(),
 
-    actor:
-      commissionActorEnum(
-        "actor",
-      ).notNull(),
+    actor: commissionActorEnum("actor").notNull(),
 
-    deliveryStatus:
-      commissionEmailDeliveryStatusEnum(
-        "delivery_status",
-      )
-        .notNull()
-        .default("queued"),
+    deliveryStatus: commissionEmailDeliveryStatusEnum("delivery_status")
+      .notNull()
+      .default("queued"),
 
-    senderEmail: varchar(
-      "sender_email",
-      {
-        length: 320,
-      },
-    ).notNull(),
+    senderEmail: varchar("sender_email", {
+      length: 320,
+    }).notNull(),
 
-    recipientEmail: varchar(
-      "recipient_email",
-      {
-        length: 320,
-      },
-    ).notNull(),
+    recipientEmail: varchar("recipient_email", {
+      length: 320,
+    }).notNull(),
 
-    replyToEmail: varchar(
-      "reply_to_email",
-      {
-        length: 320,
-      },
-    ),
+    replyToEmail: varchar("reply_to_email", {
+      length: 320,
+    }),
 
     subject: varchar("subject", {
       length: 350,
@@ -2142,39 +2155,28 @@ export const commissionEmailMessages = pgTable(
      * This field gives Admin an auditable representation of
      * what was communicated.
      */
-    messageText: text(
-      "message_text",
-    ),
+    messageText: text("message_text"),
 
     /*
      * Provider-specific email identifier.
      *
      * Example: the identifier returned by Resend.
      */
-    providerEmailId: varchar(
-      "provider_email_id",
-      {
-        length: 255,
-      },
-    ),
+    providerEmailId: varchar("provider_email_id", {
+      length: 255,
+    }),
 
     /*
      * RFC Message-ID returned by the email provider.
      */
-    providerMessageId: text(
-      "provider_message_id",
-    ),
+    providerMessageId: text("provider_message_id"),
 
     /*
      * RFC threading headers used for this message.
      */
-    inReplyToMessageId: text(
-      "in_reply_to_message_id",
-    ),
+    inReplyToMessageId: text("in_reply_to_message_id"),
 
-    referencesHeader: text(
-      "references_header",
-    ),
+    referencesHeader: text("references_header"),
 
     /*
      * Delivery attempt information.
@@ -2183,29 +2185,19 @@ export const commissionEmailMessages = pgTable(
      * Retrying delivery does not create a second business
      * communication record.
      */
-    attemptCount: integer(
-      "attempt_count",
-    )
-      .notNull()
-      .default(0),
+    attemptCount: integer("attempt_count").notNull().default(0),
 
-    lastAttemptAt: timestamp(
-      "last_attempt_at",
-      {
-        withTimezone: true,
-      },
-    ),
+    lastAttemptAt: timestamp("last_attempt_at", {
+      withTimezone: true,
+    }),
 
     sentAt: timestamp("sent_at", {
       withTimezone: true,
     }),
 
-    failedAt: timestamp(
-      "failed_at",
-      {
-        withTimezone: true,
-      },
-    ),
+    failedAt: timestamp("failed_at", {
+      withTimezone: true,
+    }),
 
     /*
      * Safe diagnostic text only.
@@ -2213,41 +2205,27 @@ export const commissionEmailMessages = pgTable(
      * Tokens, secure URLs, credentials and complete provider
      * payloads must never be persisted here.
      */
-    failureMessage: text(
-      "failure_message",
-    ),
+    failureMessage: text("failure_message"),
 
-    createdByAdminUserId: varchar(
-      "created_by_admin_user_id",
-      {
-        length: 255,
-      },
-    ),
+    createdByAdminUserId: varchar("created_by_admin_user_id", {
+      length: 255,
+    }),
 
-    createdAt: timestamp(
-      "created_at",
-      {
-        withTimezone: true,
-      },
-    )
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+    })
       .notNull()
       .defaultNow(),
 
-    updatedAt: timestamp(
-      "updated_at",
-      {
-        withTimezone: true,
-      },
-    )
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+    })
       .notNull()
       .defaultNow(),
   },
   (table) => [
     foreignKey({
-      columns: [
-        table.commissionId,
-        table.threadId,
-      ],
+      columns: [table.commissionId, table.threadId],
       foreignColumns: [
         commissionEmailThreads.commissionId,
         commissionEmailThreads.id,
@@ -2256,52 +2234,32 @@ export const commissionEmailMessages = pgTable(
     }).onDelete("restrict"),
 
     foreignKey({
-      columns: [
-        table.commissionId,
-        table.quoteId,
-      ],
-      foreignColumns: [
-        commissionQuotes.commissionId,
-        commissionQuotes.id,
-      ],
+      columns: [table.commissionId, table.quoteId],
+      foreignColumns: [commissionQuotes.commissionId, commissionQuotes.id],
       name: "commission_email_messages_commission_quote_fk",
     }).onDelete("restrict"),
 
-    index(
-      "commission_email_messages_commission_created_idx",
-    ).on(
+    index("commission_email_messages_commission_created_idx").on(
       table.commissionId,
       table.createdAt,
     ),
 
-    index(
-      "commission_email_messages_thread_created_idx",
-    ).on(
+    index("commission_email_messages_thread_created_idx").on(
       table.threadId,
       table.createdAt,
     ),
 
-    index(
-      "commission_email_messages_delivery_status_idx",
-    ).on(
+    index("commission_email_messages_delivery_status_idx").on(
       table.deliveryStatus,
     ),
 
-    index(
-      "commission_email_messages_quote_idx",
-    ).on(
-      table.quoteId,
-    ),
+    index("commission_email_messages_quote_idx").on(table.quoteId),
 
-    uniqueIndex(
-      "commission_email_messages_provider_email_unique",
-    ).on(
+    uniqueIndex("commission_email_messages_provider_email_unique").on(
       table.providerEmailId,
     ),
 
-    uniqueIndex(
-      "commission_email_messages_provider_message_unique",
-    ).on(
+    uniqueIndex("commission_email_messages_provider_message_unique").on(
       table.providerMessageId,
     ),
 

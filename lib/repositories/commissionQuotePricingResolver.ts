@@ -4,6 +4,7 @@ import {
   buildCommissionQuotePricingSnapshot,
   type BuildCommissionQuotePricingSnapshotResult,
   type CommissionQuoteCustomItemSelection,
+  type CommissionQuoteIllustrationSelection,
   type CommissionQuotePricingSnapshot,
   type CommissionQuoteSelectedAdjustment,
 } from "@/lib/commissions/commissionQuotePricing";
@@ -22,7 +23,10 @@ export type CommissionQuotePricingSelection =
       mode: "custom";
     }
   | {
+      baseQuantity?: number;
       customItems: CommissionQuoteCustomItemSelection[];
+      globalAdjustments?: CommissionQuoteSelectedAdjustment[];
+      illustrations?: CommissionQuoteIllustrationSelection[];
       mode: "catalog";
       selectedAdjustments: CommissionQuoteSelectedAdjustment[];
     };
@@ -108,7 +112,10 @@ export async function resolveCommissionQuotePricingForCreate(input: {
   return toResolutionResult(
     buildCommissionQuotePricingSnapshot({
       adjustments: catalogOption.adjustments,
+      baseQuantity: input.selection.baseQuantity ?? 1,
       customItems: input.selection.customItems,
+      globalAdjustments: input.selection.globalAdjustments,
+      illustrations: input.selection.illustrations,
       mode: "catalog",
       option: catalogOption.option,
       pricingVersionId: catalogOption.version.id,
@@ -177,7 +184,10 @@ export async function resolveCommissionQuotePricingForUpdate(input: {
   return toResolutionResult(
     buildCommissionQuotePricingSnapshot({
       adjustments: catalogOption.adjustments,
+      baseQuantity: input.selection.baseQuantity ?? 1,
       customItems: input.selection.customItems,
+      globalAdjustments: input.selection.globalAdjustments,
+      illustrations: input.selection.illustrations,
       mode: "catalog",
       option: catalogOption.option,
       pricingVersionId: catalog.version.id,
@@ -189,6 +199,7 @@ export async function resolveCommissionQuotePricingForUpdate(input: {
 function toResolutionResult(
   result: BuildCommissionQuotePricingSnapshotResult,
 ): ResolveCommissionQuotePricingResult {
+  
   return result.valid
     ? {
         outcome: "resolved",

@@ -10,9 +10,13 @@ import {
   type CommissionCloseReason,
 } from "@/lib/commissions/commissionWorkflow";
 import { isCommissionStatus } from "@/lib/commissions/commissionStatus";
-import type { CommissionQuoteItemInput } from "@/lib/commissions/commissionQuote";
+import {
+  MAX_COMMISSION_QUOTE_ITEM_QUANTITY,
+  type CommissionQuoteItemInput,
+} from "@/lib/commissions/commissionQuote";
 import type {
   CommissionQuoteCustomItemSelection,
+  CommissionQuoteIllustrationSelection,
   CommissionQuoteSelectedAdjustment,
 } from "@/lib/commissions/commissionQuotePricing";
 import { transitionCommissionStatus } from "@/lib/repositories/commissionWorkflowRepository";
@@ -43,15 +47,9 @@ import {
 } from "@/lib/repositories/commissionQuotePricingResolver";
 
 import { requestCommissionClientDetails } from "@/lib/email/commissionClientDetailsRequestService";
-import {
-  sendCommissionClientMessage,
-} from "@/lib/email/commissionClientMessageService";
-import {
-  sendCommissionQuoteToClient,
-} from "@/lib/email/commissionQuoteSendService";
-import {
-  retryCommissionEmailMessage,
-} from "@/lib/email/commissionEmailRetryService";
+import { sendCommissionClientMessage } from "@/lib/email/commissionClientMessageService";
+import { sendCommissionQuoteToClient } from "@/lib/email/commissionQuoteSendService";
+import { retryCommissionEmailMessage } from "@/lib/email/commissionEmailRetryService";
 export interface CommissionStatusActionState {
   outcome: "idle" | "success" | "error" | "conflict";
   message: string | null;
@@ -63,23 +61,13 @@ export interface CommissionClientDetailsRequestActionState {
 }
 
 export interface CommissionClientMessageActionState {
-  outcome:
-    | "idle"
-    | "success"
-    | "warning"
-    | "error"
-    | "conflict";
+  outcome: "idle" | "success" | "warning" | "error" | "conflict";
 
   message: string | null;
 }
 
 export interface CommissionEmailRetryActionState {
-  outcome:
-    | "idle"
-    | "success"
-    | "warning"
-    | "error"
-    | "conflict";
+  outcome: "idle" | "success" | "warning" | "error" | "conflict";
 
   message: string | null;
 }
@@ -216,13 +204,55 @@ function parseCommissionQuotePricingSelection(
       record.selectedAdjustments,
     );
 
-    return selectedAdjustments
-      ? {
-          customItems,
-          mode: "catalog",
-          selectedAdjustments,
-        }
-      : "invalid";
+    const baseQuantity = record.baseQuantity;
+
+    if (
+      typeof baseQuantity !== "number" ||
+      !Number.isInteger(baseQuantity) ||
+      baseQuantity < 1 ||
+      baseQuantity > MAX_COMMISSION_QUOTE_ITEM_QUANTITY ||
+      !selectedAdjustments
+    ) {
+      return "invalid";
+    }
+
+    // Formato actual: una cantidad base y una lista compartida de ajustes.
+    if (
+      record.illustrations === undefined &&
+      record.globalAdjustments === undefined
+    ) {
+      return {
+        baseQuantity,
+        customItems,
+        mode: "catalog",
+        selectedAdjustments,
+      };
+    }
+
+    // Formato nuevo: ajustes individuales y descuento global.
+    const illustrations = parseQuoteIllustrations(record.illustrations);
+
+    const globalAdjustments = parseQuoteSelectedAdjustments(
+      record.globalAdjustments,
+    );
+
+    if (
+      !illustrations ||
+      !globalAdjustments ||
+      illustrations.length !== baseQuantity ||
+      selectedAdjustments.length !== 0
+    ) {
+      return "invalid";
+    }
+
+    return {
+      baseQuantity,
+      customItems,
+      globalAdjustments,
+      illustrations,
+      mode: "catalog",
+      selectedAdjustments: [],
+    };
   } catch {
     return "invalid";
   }
@@ -316,6 +346,58 @@ function parseQuoteSelectedAdjustments(
   }
 
   return adjustments;
+}
+
+function parseQuoteIllustrations(
+  value: unknown,
+): CommissionQuoteIllustrationSelection[] | null {
+  if (
+    !Array.isArray(value) ||
+    value.length < 1 ||
+    value.length > MAX_COMMISSION_QUOTE_ITEM_QUANTITY
+  ) {
+    return null;
+  }
+
+  const illustrations: CommissionQuoteIllustrationSelection[] = [];
+  const illustrationIds = new Set<string>();
+
+  for (const illustration of value) {
+    if (
+      !illustration ||
+      typeof illustration !== "object" ||
+      Array.isArray(illustration)
+    ) {
+      return null;
+    }
+
+    const record = illustration as Record<string, unknown>;
+
+    if (
+      typeof record.id !== "string" ||
+      !UUID_PATTERN.test(record.id) ||
+      illustrationIds.has(record.id)
+    ) {
+      return null;
+    }
+
+    const selectedAdjustments = parseQuoteSelectedAdjustments(
+      record.selectedAdjustments,
+    );
+
+    if (!selectedAdjustments) {
+      return null;
+    }
+
+    illustrationIds.add(record.id);
+
+    illustrations.push({
+      id: record.id,
+      selectedAdjustments,
+    });
+  }
+
+  return illustrations;
 }
 
 export async function updateCommissionStatusAction(
@@ -463,85 +545,52 @@ export async function sendCommissionClientMessageAction(
   _previousState: CommissionClientMessageActionState,
   formData: FormData,
 ): Promise<CommissionClientMessageActionState> {
-  const session =
-    await requireAdmin();
+  const session = await requireAdmin();
 
-  const commissionId =
-    getFormValue(
-      formData,
-      "commissionId",
-    );
+  const commissionId = getFormValue(formData, "commissionId");
 
-  const messageText =
-    getFormValue(
-      formData,
-      "messageText",
-    );
+  const messageText = getFormValue(formData, "messageText");
 
-  if (
-    !UUID_PATTERN.test(
-      commissionId,
-    )
-  ) {
+  if (!UUID_PATTERN.test(commissionId)) {
     return {
       outcome: "error",
-      message:
-        "The commission identifier is invalid.",
+      message: "The commission identifier is invalid.",
     };
   }
 
-  if (
-    !messageText ||
-    messageText.length >
-      MAX_NOTE_LENGTH
-  ) {
+  if (!messageText || messageText.length > MAX_NOTE_LENGTH) {
     return {
       outcome: "error",
-      message:
-        `The message must contain between 1 and ${MAX_NOTE_LENGTH} characters.`,
+      message: `The message must contain between 1 and ${MAX_NOTE_LENGTH} characters.`,
     };
   }
 
   try {
-    const result =
-      await sendCommissionClientMessage({
-        commissionId,
+    const result = await sendCommissionClientMessage({
+      commissionId,
 
-        messageText,
+      messageText,
 
-        createdByAdminUserId:
-          session.user.id,
-      });
+      createdByAdminUserId: session.user.id,
+    });
 
-    switch (
-      result.outcome
-    ) {
+    switch (result.outcome) {
       case "sent":
-        revalidateCommissionActivityPaths(
-          commissionId,
-        );
+        revalidateCommissionActivityPaths(commissionId);
 
         return {
           outcome: "success",
-          message:
-            "Message sent successfully.",
+          message: "Message sent successfully.",
         };
 
       case "delivery_failed":
-        console.error(
-          "Commission client message email delivery failed:",
-          {
-            messageId:
-              result.messageId,
+        console.error("Commission client message email delivery failed:", {
+          messageId: result.messageId,
 
-            failureMessage:
-              result.failureMessage,
-          },
-        );
+          failureMessage: result.failureMessage,
+        });
 
-        revalidateCommissionActivityPaths(
-          commissionId,
-        );
+        revalidateCommissionActivityPaths(commissionId);
 
         return {
           outcome: "warning",
@@ -550,25 +599,16 @@ export async function sendCommissionClientMessageAction(
         };
 
       case "delivery_pending":
-        revalidateCommissionActivityPaths(
-          commissionId,
-        );
+        revalidateCommissionActivityPaths(commissionId);
 
-        if (
-          result.currentStatus ===
-          "sent"
-        ) {
+        if (result.currentStatus === "sent") {
           return {
             outcome: "success",
-            message:
-              "Message sent successfully.",
+            message: "Message sent successfully.",
           };
         }
 
-        if (
-          result.currentStatus ===
-          "failed"
-        ) {
+        if (result.currentStatus === "failed") {
           return {
             outcome: "warning",
             message:
@@ -585,21 +625,17 @@ export async function sendCommissionClientMessageAction(
       case "invalid_message":
         return {
           outcome: "error",
-          message:
-            result.message,
+          message: result.message,
         };
 
       case "not_found":
         return {
           outcome: "error",
-          message:
-            "The commission no longer exists.",
+          message: "The commission no longer exists.",
         };
 
       case "thread_not_found":
-        revalidateCommissionActivityPaths(
-          commissionId,
-        );
+        revalidateCommissionActivityPaths(commissionId);
 
         return {
           outcome: "error",
@@ -608,9 +644,7 @@ export async function sendCommissionClientMessageAction(
         };
 
       case "thread_not_ready":
-        revalidateCommissionActivityPaths(
-          commissionId,
-        );
+        revalidateCommissionActivityPaths(commissionId);
 
         return {
           outcome: "conflict",
@@ -619,9 +653,7 @@ export async function sendCommissionClientMessageAction(
         };
 
       case "thread_blocked":
-        revalidateCommissionActivityPaths(
-          commissionId,
-        );
+        revalidateCommissionActivityPaths(commissionId);
 
         return {
           outcome: "conflict",
@@ -630,9 +662,7 @@ export async function sendCommissionClientMessageAction(
         };
 
       case "conflict":
-        revalidateCommissionActivityPaths(
-          commissionId,
-        );
+        revalidateCommissionActivityPaths(commissionId);
 
         return {
           outcome: "conflict",
@@ -641,10 +671,7 @@ export async function sendCommissionClientMessageAction(
         };
     }
   } catch (error) {
-    console.error(
-      "Failed to send commission client message:",
-      error,
-    );
+    console.error("Failed to send commission client message:", error);
 
     return {
       outcome: "error",
@@ -660,78 +687,47 @@ export async function retryCommissionEmailMessageAction(
 ): Promise<CommissionEmailRetryActionState> {
   await requireAdmin();
 
-  const commissionId =
-    getFormValue(
-      formData,
-      "commissionId",
-    );
+  const commissionId = getFormValue(formData, "commissionId");
 
-  const messageId =
-    getFormValue(
-      formData,
-      "messageId",
-    );
+  const messageId = getFormValue(formData, "messageId");
 
-  if (
-    !UUID_PATTERN.test(
-      commissionId,
-    )
-  ) {
+  if (!UUID_PATTERN.test(commissionId)) {
     return {
       outcome: "error",
-      message:
-        "The commission identifier is invalid.",
+      message: "The commission identifier is invalid.",
     };
   }
 
-  if (
-    !UUID_PATTERN.test(
-      messageId,
-    )
-  ) {
+  if (!UUID_PATTERN.test(messageId)) {
     return {
       outcome: "error",
-      message:
-        "The email message identifier is invalid.",
+      message: "The email message identifier is invalid.",
     };
   }
 
   try {
-    const result =
-      await retryCommissionEmailMessage({
-        commissionId,
-        messageId,
-      });
+    const result = await retryCommissionEmailMessage({
+      commissionId,
+      messageId,
+    });
 
-    switch (
-      result.outcome
-    ) {
+    switch (result.outcome) {
       case "sent":
-        revalidateCommissionActivityPaths(
-          commissionId,
-        );
+        revalidateCommissionActivityPaths(commissionId);
 
         return {
           outcome: "success",
-          message:
-            "Email sent successfully.",
+          message: "Email sent successfully.",
         };
 
       case "delivery_failed":
-        console.error(
-          "Commission email retry delivery failed:",
-          {
-            messageId:
-              result.messageId,
+        console.error("Commission email retry delivery failed:", {
+          messageId: result.messageId,
 
-            failureMessage:
-              result.failureMessage,
-          },
-        );
+          failureMessage: result.failureMessage,
+        });
 
-        revalidateCommissionActivityPaths(
-          commissionId,
-        );
+        revalidateCommissionActivityPaths(commissionId);
 
         return {
           outcome: "warning",
@@ -740,99 +736,70 @@ export async function retryCommissionEmailMessageAction(
         };
 
       case "delivery_pending":
-        revalidateCommissionActivityPaths(
-          commissionId,
-        );
+        revalidateCommissionActivityPaths(commissionId);
 
-        if (
-          result.currentStatus ===
-          "sent"
-        ) {
+        if (result.currentStatus === "sent") {
           return {
             outcome: "success",
-            message:
-              "Email sent successfully.",
+            message: "Email sent successfully.",
           };
         }
 
-        if (
-          result.currentStatus ===
-          "failed"
-        ) {
+        if (result.currentStatus === "failed") {
           return {
             outcome: "warning",
-            message:
-              "Email delivery is still failed. You can try again.",
+            message: "Email delivery is still failed. You can try again.",
           };
         }
 
         return {
           outcome: "warning",
-          message:
-            "Email delivery is still being finalized.",
+          message: "Email delivery is still being finalized.",
         };
 
       case "not_found":
-        revalidateCommissionActivityPaths(
-          commissionId,
-        );
+        revalidateCommissionActivityPaths(commissionId);
 
         return {
           outcome: "error",
-          message:
-            "The email message could not be found.",
+          message: "The email message could not be found.",
         };
 
       case "not_retryable":
-        revalidateCommissionActivityPaths(
-          commissionId,
-        );
+        revalidateCommissionActivityPaths(commissionId);
 
-        if (
-          result.currentStatus ===
-          "sent"
-        ) {
+        if (result.currentStatus === "sent") {
           return {
             outcome: "success",
-            message:
-              "This email has already been sent.",
+            message: "This email has already been sent.",
           };
         }
 
         return {
           outcome: "conflict",
-          message:
-            `This email cannot be retried while its delivery status is ${result.currentStatus}.`,
+          message: `This email cannot be retried while its delivery status is ${result.currentStatus}.`,
         };
 
       case "unsupported_kind":
         return {
           outcome: "error",
-          message:
-            "Retry is not available for this email type yet.",
+          message: "Retry is not available for this email type yet.",
         };
 
       case "retry_unavailable":
-        revalidateCommissionActivityPaths(
-          commissionId,
-        );
+        revalidateCommissionActivityPaths(commissionId);
 
         return {
           outcome: "error",
-          message:
-            result.message,
+          message: result.message,
         };
     }
   } catch (error) {
-    console.error(
-      "Failed to retry commission email:",
-      error,
-    );
+    console.error("Failed to retry commission email:", error);
 
     return {
       outcome: "error",
-      message:
-        "The email could not be retried. Please try again.",
+      message: "The email could not be retried. Please try again.",
     };
   }
 }
@@ -991,7 +958,8 @@ export async function requestCommissionClientDetailsAction(
 
     return {
       outcome: "error",
-      message: "The client details request could not be saved. Please try again.",
+      message:
+        "The client details request could not be saved. Please try again.",
     };
   }
 }
@@ -1534,56 +1502,30 @@ export async function sendCommissionQuoteAction(
   _previousState: CommissionQuoteActionState,
   formData: FormData,
 ): Promise<CommissionQuoteActionState> {
-  const session =
-    await requireAdmin();
+  const session = await requireAdmin();
 
-  const commissionId =
-    getFormValue(
-      formData,
-      "commissionId",
-    );
+  const commissionId = getFormValue(formData, "commissionId");
 
-  const quoteId =
-    getFormValue(
-      formData,
-      "quoteId",
-    );
+  const quoteId = getFormValue(formData, "quoteId");
 
-  const expectedUpdatedAt =
-    parseRequiredDate(
-      getFormValue(
-        formData,
-        "expectedUpdatedAt",
-      ),
-    );
+  const expectedUpdatedAt = parseRequiredDate(
+    getFormValue(formData, "expectedUpdatedAt"),
+  );
 
-  if (
-    !UUID_PATTERN.test(
-      commissionId,
-    ) ||
-    !UUID_PATTERN.test(
-      quoteId,
-    )
-  ) {
-    return quoteError(
-      "The commission or quote identifier is invalid.",
-    );
+  if (!UUID_PATTERN.test(commissionId) || !UUID_PATTERN.test(quoteId)) {
+    return quoteError("The commission or quote identifier is invalid.");
   }
 
   if (!expectedUpdatedAt) {
-    return quoteError(
-      "The quote version timestamp is invalid.",
-    );
+    return quoteError("The quote version timestamp is invalid.");
   }
 
   try {
-    const result =
-      await sendCommissionQuoteToClient({
-        quoteId,
-        expectedUpdatedAt,
-        sentByAdminUserId:
-          session.user.id,
-      });
+    const result = await sendCommissionQuoteToClient({
+      quoteId,
+      expectedUpdatedAt,
+      sentByAdminUserId: session.user.id,
+    });
 
     switch (result.outcome) {
       case "sent": {
@@ -1592,14 +1534,11 @@ export async function sendCommissionQuoteAction(
          * source of truth rather than the browser
          * supplied commission ID.
          */
-        revalidateCommissionActivityPaths(
-          result.commissionId,
-        );
+        revalidateCommissionActivityPaths(result.commissionId);
 
         return {
           outcome: "success",
-          message:
-            "Quote sent and emailed successfully.",
+          message: "Quote sent and emailed successfully.",
         };
       }
 
@@ -1609,20 +1548,13 @@ export async function sendCommissionQuoteAction(
          * email already exist atomically at this point.
          * The failed message remains persisted for retry.
          */
-        console.error(
-          "Commission quote email delivery failed:",
-          {
-            messageId:
-              result.messageId,
+        console.error("Commission quote email delivery failed:", {
+          messageId: result.messageId,
 
-            failureMessage:
-              result.failureMessage,
-          },
-        );
+          failureMessage: result.failureMessage,
+        });
 
-        revalidateCommissionActivityPaths(
-          result.commissionId,
-        );
+        revalidateCommissionActivityPaths(result.commissionId);
 
         return quoteError(
           "The quote was marked as sent, but the email could not be delivered. The failed email has been preserved for retry.",
@@ -1630,9 +1562,7 @@ export async function sendCommissionQuoteAction(
       }
 
       case "delivery_pending": {
-        revalidateCommissionActivityPaths(
-          result.commissionId,
-        );
+        revalidateCommissionActivityPaths(result.commissionId);
 
         return quoteError(
           "The quote was marked as sent, but email delivery is still pending. Refresh the page before taking further action.",
@@ -1640,14 +1570,10 @@ export async function sendCommissionQuoteAction(
       }
 
       case "invalid":
-        return quoteError(
-          result.validation.message,
-        );
+        return quoteError(result.validation.message);
 
       case "not_found":
-        return quoteError(
-          "The quote no longer exists.",
-        );
+        return quoteError("The quote no longer exists.");
 
       case "not_draft":
         return quoteConflict(
@@ -1686,23 +1612,16 @@ export async function sendCommissionQuoteAction(
         );
 
       case "conflict":
-        return quoteConflict(
-          commissionId,
-        );
+        return quoteConflict(commissionId);
     }
   } catch (error) {
     /*
      * Do not include request payloads, public quote
      * tokens or generated secure URLs in this log.
      */
-    console.error(
-      "Failed to send commission quote:",
-      error,
-    );
+    console.error("Failed to send commission quote:", error);
 
-    return quoteError(
-      "The quote could not be sent. Please try again.",
-    );
+    return quoteError("The quote could not be sent. Please try again.");
   }
 }
 

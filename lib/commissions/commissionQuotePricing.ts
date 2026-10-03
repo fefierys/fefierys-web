@@ -1,3 +1,5 @@
+import { MAX_COMMISSION_QUOTE_ITEM_QUANTITY } from "./commissionQuote";
+
 import {
   calculateCommissionPricing,
   type CommissionPricingAdjustmentInput,
@@ -38,6 +40,11 @@ export interface CommissionQuoteSelectedAdjustment {
   quantity: number;
 }
 
+export interface CommissionQuoteIllustrationSelection {
+  id: string;
+  selectedAdjustments: CommissionQuoteSelectedAdjustment[];
+}
+
 export interface CommissionQuoteCustomItemSelection extends CommissionPricingCustomItemInput {
   description?: string | null;
 }
@@ -56,6 +63,7 @@ export interface CommissionQuotePricingSnapshotItem {
   quantity: number;
   sequence: number;
   unitAmount: string;
+  illustrationId: string | null;
 }
 
 export interface CommissionQuotePricingSnapshot {
@@ -67,6 +75,10 @@ export interface CommissionQuotePricingSnapshot {
   pricingMode: "catalog" | "custom";
   pricingVersionId: string | null;
   totalAmount: string;
+  illustrations: {
+    id: string;
+    sequence: number;
+  }[];
 }
 
 export type BuildCommissionQuotePricingSnapshotResult =
@@ -85,13 +97,18 @@ export type BuildCommissionQuotePricingSnapshotResult =
         | "editable_percentage_required"
         | "percentage_not_editable"
         | "percentage_out_of_range"
-        | "pricing_invalid";
+        | "pricing_invalid"
+        | "base_quantity_invalid"
+        | "illustration_invalid";
       message: string;
     };
 
 interface CatalogPricingInput {
   adjustments: readonly CommissionQuoteCatalogAdjustmentSnapshot[];
+  baseQuantity?: number;
   customItems?: readonly CommissionQuoteCustomItemSelection[];
+  globalAdjustments?: readonly CommissionQuoteSelectedAdjustment[];
+  illustrations?: readonly CommissionQuoteIllustrationSelection[];
   mode: "catalog";
   option: CommissionQuoteCatalogOptionSnapshot;
   pricingVersionId: string;
@@ -136,6 +153,36 @@ export function buildCommissionQuotePricingSnapshot(
       code: "catalog_option_required",
       message: "Select a catalog service before preparing the quote.",
     };
+  }
+
+  const baseQuantity = input.illustrations?.length ?? input.baseQuantity ?? 1;
+
+  if (
+    !Number.isInteger(baseQuantity) ||
+    baseQuantity < 1 ||
+    baseQuantity > MAX_COMMISSION_QUOTE_ITEM_QUANTITY
+  ) {
+    return {
+      valid: false,
+      code: "base_quantity_invalid",
+      message: `Enter a whole quantity between 1 and ${MAX_COMMISSION_QUOTE_ITEM_QUANTITY} for the main service.`,
+    };
+  }
+
+  if (input.illustrations) {
+    const illustrationIds = new Set<string>();
+
+    for (const illustration of input.illustrations) {
+      if (!illustration.id.trim() || illustrationIds.has(illustration.id)) {
+        return {
+          valid: false,
+          code: "illustration_invalid",
+          message: "Each illustration must have a unique, non-empty ID.",
+        };
+      }
+
+      illustrationIds.add(illustration.id);
+    }
   }
 
   const adjustmentById = new Map(
@@ -187,10 +234,121 @@ export function buildCommissionQuotePricingSnapshot(
     });
   }
 
+  if (input.illustrations) {
+    for (const illustration of input.illustrations) {
+      const selectedAdjustmentIds = new Set<string>();
+
+      for (const selection of illustration.selectedAdjustments) {
+        if (selectedAdjustmentIds.has(selection.adjustmentId)) {
+          return {
+            valid: false,
+            code: "duplicate_adjustment",
+            message:
+              "The same adjustment cannot be selected twice for one illustration.",
+          };
+        }
+
+        selectedAdjustmentIds.add(selection.adjustmentId);
+
+        const adjustment = adjustmentById.get(selection.adjustmentId);
+
+        if (!adjustment || adjustment.kind === "discount") {
+          return {
+            valid: false,
+            code: "adjustment_not_allowed",
+            message: "Illustrations can only contain extras and licenses.",
+          };
+        }
+
+        const percentageValidation = resolvePercentageRate(
+          adjustment,
+          selection,
+        );
+
+        if (!percentageValidation.valid) {
+          return percentageValidation;
+        }
+
+        normalizedAdjustments.push({
+          baseItemKey: illustration.id,
+          calculationBasis: adjustment.calculationBasis,
+          calculationType: adjustment.calculationType,
+          fixedAmount: adjustment.fixedAmount,
+          internalNote: selection.internalNote,
+          key: `${illustration.id}:${adjustment.id}`,
+          kind: adjustment.kind,
+          label: adjustment.name,
+          maxQuantity: adjustment.maxQuantity,
+          percentageRate: percentageValidation.percentageRate,
+          quantity: selection.quantity,
+          requiresInternalNote: adjustment.requiresInternalNote,
+          stackable: adjustment.stackable,
+        });
+      }
+    }
+
+    const selectedGlobalAdjustmentIds = new Set<string>();
+
+    for (const selection of input.globalAdjustments ?? []) {
+      if (selectedGlobalAdjustmentIds.has(selection.adjustmentId)) {
+        return {
+          valid: false,
+          code: "duplicate_adjustment",
+          message: "The same global discount cannot be selected twice.",
+        };
+      }
+
+      selectedGlobalAdjustmentIds.add(selection.adjustmentId);
+
+      const adjustment = adjustmentById.get(selection.adjustmentId);
+
+      if (!adjustment || adjustment.kind !== "discount") {
+        return {
+          valid: false,
+          code: "adjustment_not_allowed",
+          message: "Only discounts can be applied globally.",
+        };
+      }
+
+      if (adjustment.calculationBasis !== "pre_discount_subtotal") {
+        return {
+          valid: false,
+          code: "adjustment_not_allowed",
+          message:
+            "A global discount must be calculated from the full pre-discount subtotal.",
+        };
+      }
+
+      const percentageValidation = resolvePercentageRate(adjustment, selection);
+
+      if (!percentageValidation.valid) {
+        return percentageValidation;
+      }
+
+      normalizedAdjustments.push({
+        baseItemKey: null,
+        calculationBasis: adjustment.calculationBasis,
+        calculationType: adjustment.calculationType,
+        fixedAmount: adjustment.fixedAmount,
+        internalNote: selection.internalNote,
+        key: `global:${adjustment.id}`,
+        kind: adjustment.kind,
+        label: adjustment.name,
+        maxQuantity: adjustment.maxQuantity,
+        percentageRate: percentageValidation.percentageRate,
+        quantity: selection.quantity,
+        requiresInternalNote: adjustment.requiresInternalNote,
+        stackable: adjustment.stackable,
+      });
+    }
+  }
+
   return calculateSnapshot({
     adjustments: normalizedAdjustments,
+    baseQuantity,
     catalogAdjustments: input.adjustments,
     customItems: input.customItems ?? [],
+    illustrations: input.illustrations,
     mode: "catalog",
     option: input.option,
     pricingVersionId: input.pricingVersionId.trim(),
@@ -199,23 +357,32 @@ export function buildCommissionQuotePricingSnapshot(
 
 function calculateSnapshot(input: {
   adjustments?: readonly CommissionPricingAdjustmentInput[];
+  baseQuantity?: number;
   catalogAdjustments?: readonly CommissionQuoteCatalogAdjustmentSnapshot[];
   customItems: readonly CommissionQuoteCustomItemSelection[];
   mode: "catalog" | "custom";
   option?: CommissionQuoteCatalogOptionSnapshot;
   pricingVersionId: string | null;
+  illustrations?: readonly CommissionQuoteIllustrationSelection[];
 }): BuildCommissionQuotePricingSnapshotResult {
   const calculation = calculateCommissionPricing({
     adjustments: input.adjustments ?? [],
     baseItems: input.option
-      ? [
-          {
-            key: input.option.id,
-            label: input.option.quoteLabel,
+      ? input.illustrations
+        ? input.illustrations.map((illustration, index) => ({
+            key: illustration.id,
+            label: `Illustration ${index + 1} — ${input.option!.quoteLabel}`,
             quantity: 1,
-            unitAmount: input.option.baseAmount,
-          },
-        ]
+            unitAmount: input.option!.baseAmount,
+          }))
+        : [
+            {
+              key: input.option.id,
+              label: input.option.quoteLabel,
+              quantity: input.baseQuantity ?? 1,
+              unitAmount: input.option.baseAmount,
+            },
+          ]
       : [],
     customItems: input.customItems,
   });
@@ -241,16 +408,33 @@ function calculateSnapshot(input: {
     (input.adjustments ?? []).map((adjustment) => [adjustment.key, adjustment]),
   );
 
+  const illustrationIds = new Set(
+    input.illustrations?.map((illustration) => illustration.id) ?? [],
+  );
+
   return {
     valid: true,
     snapshot: {
       baseSubtotal: calculation.baseSubtotal,
       currency: "USD",
+      illustrations:
+        input.illustrations?.map((illustration, index) => ({
+          id: illustration.id,
+          sequence: index + 1,
+        })) ?? [],
       discountTotal: calculation.discountTotal,
       items: calculation.items.map((item, index) => {
         const customItem = customItemByKey.get(item.key);
-        const adjustment = adjustmentById.get(item.key);
+
+        const catalogAdjustmentId = item.key.split(":").at(-1) ?? item.key;
+
+        const adjustment = adjustmentById.get(catalogAdjustmentId);
         const selectedAdjustment = selectedAdjustmentById.get(item.key);
+
+        const adjustmentIllustrationId =
+          input.illustrations?.find((illustration) =>
+            item.key.startsWith(`${illustration.id}:`),
+          )?.id ?? null;
 
         return {
           calculationBasis: item.calculationBasis,
@@ -277,6 +461,12 @@ function calculateSnapshot(input: {
           quantity: item.quantity,
           sequence: index + 1,
           unitAmount: item.unitAmount,
+          illustrationId:
+            item.kind === "base" && illustrationIds.has(item.key)
+              ? item.key
+              : item.kind === "extra" || item.kind === "license"
+                ? adjustmentIllustrationId
+                : null,
         };
       }),
       preDiscountSubtotal: calculation.preDiscountSubtotal,

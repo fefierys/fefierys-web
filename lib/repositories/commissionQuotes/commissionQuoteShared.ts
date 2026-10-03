@@ -2,6 +2,7 @@ import { asc, desc, eq, inArray } from "drizzle-orm";
 
 import { db } from "../../db";
 import {
+  commissionQuoteIllustrations,
   commissionQuoteItems,
   commissionQuotes,
   commissions,
@@ -16,7 +17,7 @@ import type { CommissionStatus } from "../commissionAdminRepository";
 export async function getCommissionQuoteById(
   quoteId: string,
 ): Promise<CommissionQuoteWithItems | null> {
-  const [quoteRows, itemRows] = await db.batch([
+  const [quoteRows, itemRows, illustrationRows] = await db.batch([
     db
       .select()
       .from(commissionQuotes)
@@ -31,6 +32,15 @@ export async function getCommissionQuoteById(
         asc(commissionQuoteItems.sequence),
         asc(commissionQuoteItems.id),
       ),
+
+    db
+      .select()
+      .from(commissionQuoteIllustrations)
+      .where(eq(commissionQuoteIllustrations.quoteId, quoteId))
+      .orderBy(
+        asc(commissionQuoteIllustrations.sequence),
+        asc(commissionQuoteIllustrations.id),
+      ),
   ]);
 
   const quote = quoteRows[0];
@@ -42,6 +52,7 @@ export async function getCommissionQuoteById(
   return {
     quote,
     items: itemRows,
+    illustrations: illustrationRows,
   };
 }
 
@@ -60,15 +71,27 @@ export async function getCommissionQuotes(
 
   const quoteIds = quoteRows.map((quote) => quote.id);
 
-  const itemRows = await db
-    .select()
-    .from(commissionQuoteItems)
-    .where(inArray(commissionQuoteItems.quoteId, quoteIds))
-    .orderBy(
-      asc(commissionQuoteItems.quoteId),
-      asc(commissionQuoteItems.sequence),
-      asc(commissionQuoteItems.id),
-    );
+  const [itemRows, illustrationRows] = await db.batch([
+    db
+      .select()
+      .from(commissionQuoteItems)
+      .where(inArray(commissionQuoteItems.quoteId, quoteIds))
+      .orderBy(
+        asc(commissionQuoteItems.quoteId),
+        asc(commissionQuoteItems.sequence),
+        asc(commissionQuoteItems.id),
+      ),
+
+    db
+      .select()
+      .from(commissionQuoteIllustrations)
+      .where(inArray(commissionQuoteIllustrations.quoteId, quoteIds))
+      .orderBy(
+        asc(commissionQuoteIllustrations.quoteId),
+        asc(commissionQuoteIllustrations.sequence),
+        asc(commissionQuoteIllustrations.id),
+      ),
+  ]);
 
   const itemsByQuoteId = new Map<string, CommissionQuoteItem[]>();
 
@@ -79,9 +102,21 @@ export async function getCommissionQuotes(
     itemsByQuoteId.set(item.quoteId, existingItems);
   }
 
+  const illustrationsByQuoteId = new Map<string, typeof illustrationRows>();
+
+  for (const illustration of illustrationRows) {
+    const existingIllustrations =
+      illustrationsByQuoteId.get(illustration.quoteId) ?? [];
+
+    existingIllustrations.push(illustration);
+
+    illustrationsByQuoteId.set(illustration.quoteId, existingIllustrations);
+  }
+
   return quoteRows.map((quote) => ({
     quote,
     items: itemsByQuoteId.get(quote.id) ?? [],
+    illustrations: illustrationsByQuoteId.get(quote.id) ?? [],
   }));
 }
 

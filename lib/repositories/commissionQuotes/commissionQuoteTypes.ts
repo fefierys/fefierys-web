@@ -8,6 +8,7 @@ import type { CommissionManualActor } from "../../commissions/commissionActivity
 import type { CommissionTransitionValidation } from "../../commissions/commissionWorkflow";
 import type {
   commissionEvents,
+  commissionQuoteIllustrations,
   commissionQuoteItems,
   commissionQuotes,
   commissionStatusHistory,
@@ -18,11 +19,15 @@ export type CommissionQuote = typeof commissionQuotes.$inferSelect;
 
 export type CommissionQuoteItem = typeof commissionQuoteItems.$inferSelect;
 
+export type CommissionQuoteIllustration =
+  typeof commissionQuoteIllustrations.$inferSelect;
+
 export type CommissionQuoteEvent = typeof commissionEvents.$inferSelect;
 
 export interface CommissionQuoteWithItems {
   quote: CommissionQuote;
   items: CommissionQuoteItem[];
+  illustrations: CommissionQuoteIllustration[];
 }
 
 type InvalidQuoteDraftValidation = Extract<
