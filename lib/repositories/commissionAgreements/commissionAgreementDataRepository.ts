@@ -236,7 +236,10 @@ export async function getActiveCommissionAgreement(
     .where(
       and(
         eq(commissionAgreements.commissionId, commissionId),
-        inArray(commissionAgreements.status, ["draft", "sent"]),
+        inArray(
+          commissionAgreements.status,
+          ["draft", "sent", "accepted"],
+        ),
       ),
     )
     .orderBy(desc(commissionAgreements.version))

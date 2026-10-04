@@ -8,8 +8,10 @@ import CommissionStatusBadge from "@/components/admin/CommissionStatusBadge";
 import CommissionWorkflowActions from "@/components/admin/CommissionWorkflowActions";
 import CommissionConversationPanel from "@/components/admin/CommissionConversationPanel";
 import CommissionAgreementPanel from "@/components/admin/CommissionAgreementPanel";
+import CommissionAgreementPresentButton from "@/components/admin/CommissionAgreementPresentButton";
 import CommissionAgreementDocumentPreview from "@/components/admin/CommissionAgreementDocumentPreview";
 import CommissionAgreementCreatePanel from "@/components/admin/CommissionAgreementCreatePanel";
+import CommissionAgreementRevisionPanel from "@/components/admin/CommissionAgreementRevisionPanel";
 import CommissionPaymentPlanCreatePanel from "@/components/admin/CommissionPaymentPlanCreatePanel";
 import CommissionPaymentPlanPanel from "@/components/admin/CommissionPaymentPlanPanel";
 import CommissionPaymentPlanEditPanel from "@/components/admin/CommissionPaymentPlanEditPanel";
@@ -556,6 +558,18 @@ export default async function CommissionDetailPage({
                           Download draft PDF
                         </a>
 
+                        <CommissionAgreementPresentButton
+                          agreementId={
+                            activeAgreement.id
+                          }
+                          commissionId={
+                            commission.id
+                          }
+                          expectedUpdatedAt={
+                            activeAgreement.updatedAt.toISOString()
+                          }
+                        />
+
                         <p className="text-xs leading-relaxed text-white/50">
                           For internal review only. Downloading does not issue,
                           sign or send the Agreement.
@@ -617,10 +631,22 @@ export default async function CommissionDetailPage({
                           )}
 
                         {activeAgreement.status === "sent" && (
-                          <p className="text-sm leading-relaxed text-white/60">
-                            This Agreement has been presented to the client and
-                            can no longer be edited.
-                          </p>
+                          <div className="space-y-4">
+                            <p className="text-sm leading-relaxed text-white/60">
+                              This Agreement has been presented to the client
+                              and can no longer be edited.
+                            </p>
+
+                            <CommissionAgreementRevisionPanel
+                              agreementId={activeAgreement.id}
+                              commissionId={commission.id}
+                              currentVersion={activeAgreement.version}
+                              expectedAgreementUpdatedAt={
+                                activeAgreement.updatedAt.toISOString()
+                              }
+                              isOnHold={commission.isOnHold}
+                            />
+                          </div>
                         )}
                       </div>
                     ) : (
