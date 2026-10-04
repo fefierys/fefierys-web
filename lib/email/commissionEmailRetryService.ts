@@ -1,36 +1,59 @@
 import {
+  generatePublicAgreementToken,
+  hashPublicAgreementToken,
+} from "../commissions/commissionAgreementAccessToken";
+
+import {
   generatePublicQuoteToken,
   hashPublicQuoteToken,
 } from "../commissions/commissionQuoteAccessToken";
+
 import {
   getCommissionEmailMessageById,
 } from "../repositories/commissionEmailRepository";
+
 import type {
   CommissionEmailMessage,
 } from "../repositories/commissionEmails/commissionEmailTypes";
+
 import {
   getCommissionById,
   type Commission,
 } from "../repositories/commissionRepository";
+
+import {
+  getActiveCommissionAgreement,
+} from "../repositories/commissionAgreements/commissionAgreementDataRepository";
+
 import {
   getCommissionQuoteById,
 } from "../repositories/commissionQuoteRepository";
+
+import {
+  buildCommissionAgreementEmail,
+} from "./commissionAgreementEmail";
+
 import {
   buildCommissionClientDetailsRequestEmail,
 } from "./commissionClientDetailsRequestEmail";
+
 import {
   buildCommissionClientMessageEmail,
 } from "./commissionClientMessageEmail";
+
 import {
   deliverCommissionEmailMessage,
 } from "./commissionEmailDeliveryService";
+
 import type {
   CommissionEmailBody,
   CommissionEmailProvider,
 } from "./commissionEmailProvider";
+
 import {
   buildCommissionQuoteEmail,
 } from "./commissionQuoteEmail";
+
 import {
   buildClientInquiryConfirmationEmail,
 } from "./contactEmail";
@@ -63,7 +86,8 @@ export type RetryCommissionEmailMessageResult =
         CommissionEmailMessage["deliveryStatus"];
     }
   | {
-      outcome: "not_found";
+      outcome:
+        "not_found";
     }
   | {
       outcome:
@@ -384,6 +408,180 @@ async function buildQuoteRetryBody(
   };
 }
 
+async function buildAgreementRetryBody(
+  message: CommissionEmailMessage,
+  commission: Commission,
+): Promise<RetryBodyResult> {
+  /*
+   * agreement_ready is linked to the accepted Quote used by
+   * the Agreement.
+   *
+   * This relationship lets us verify that the failed logical
+   * message still belongs to the exact active Agreement.
+   */
+  if (!message.quoteId) {
+    return {
+      outcome:
+        "retry_unavailable",
+
+      message:
+        "The failed Agreement email is not linked to its Quote and cannot be regenerated safely.",
+    };
+  }
+
+  /*
+   * getActiveCommissionAgreement intentionally returns only
+   * draft / sent Agreements.
+   *
+   * Therefore an Agreement that has already been accepted,
+   * superseded or voided cannot accidentally have its original
+   * review email revived by Retry.
+   */
+  const agreement =
+    await getActiveCommissionAgreement(
+      commission.id,
+    );
+
+  if (!agreement) {
+    return {
+      outcome:
+        "retry_unavailable",
+
+      message:
+        "This Agreement is no longer awaiting client acceptance, so its email cannot be retried.",
+    };
+  }
+
+  if (
+    agreement.commissionId !==
+      commission.id ||
+    agreement.quoteId !==
+      message.quoteId
+  ) {
+    return {
+      outcome:
+        "retry_unavailable",
+
+      message:
+        "The Agreement linked to this failed email could not be matched safely.",
+    };
+  }
+
+  /*
+   * A draft Agreement has never been presented and therefore
+   * must never receive an agreement_ready retry.
+   */
+  if (
+    agreement.status !==
+    "sent"
+  ) {
+    return {
+      outcome:
+        "retry_unavailable",
+
+      message:
+        "This Agreement is not currently awaiting client acceptance, so its email cannot be retried.",
+    };
+  }
+
+  /*
+   * The commission itself must still be in the workflow state
+   * associated with Agreement review.
+   *
+   * Do not send stale review links after cancellation, payment
+   * progression, acceptance, or while the project is on hold.
+   */
+  if (
+    commission.status !==
+      "awaiting_agreement" ||
+    commission.isOnHold
+  ) {
+    return {
+      outcome:
+        "retry_unavailable",
+
+      message:
+        "This commission is no longer available for Agreement review, so the email cannot be retried.",
+    };
+  }
+
+  if (
+    !agreement.publicTokenHash ||
+    !agreement.publicTokenCreatedAt ||
+    agreement.publicTokenRevokedAt
+  ) {
+    return {
+      outcome:
+        "retry_unavailable",
+
+      message:
+        "The Agreement does not have an active public access token and its email cannot be regenerated safely.",
+    };
+  }
+
+  /*
+   * Agreement public tokens are deterministic.
+   *
+   * Reconstruct the same bearer that was used at presentation
+   * time, then prove it hashes to the value already persisted.
+   *
+   * Never persist or log the plaintext token.
+   */
+  const publicToken =
+    generatePublicAgreementToken(
+      agreement.id,
+    );
+
+  const expectedTokenHash =
+    hashPublicAgreementToken(
+      publicToken,
+    );
+
+  if (
+    agreement.publicTokenHash !==
+    expectedTokenHash
+  ) {
+    return {
+      outcome:
+        "retry_unavailable",
+
+      message:
+        "This Agreement uses a public access token that cannot be regenerated safely.",
+    };
+  }
+
+  /*
+   * Reuse the exact same builder used by the original Present
+   * operation.
+   *
+   * This produces the same Agreement URL and the same email
+   * content from persisted business data.
+   */
+  const body =
+    buildCommissionAgreementEmail({
+      clientName:
+        commission.clientName,
+
+      publicToken,
+
+      reference:
+        commission.reference,
+
+      revision:
+        agreement.version,
+
+      termsVersion:
+        agreement.termsVersion,
+    });
+
+  return {
+    outcome:
+      "ready",
+
+    body,
+  };
+}
+
 async function buildRetryBody(
   message: CommissionEmailMessage,
   commission: Commission,
@@ -415,6 +613,12 @@ async function buildRetryBody(
 
     case "quote_ready":
       return buildQuoteRetryBody(
+        message,
+        commission,
+      );
+
+    case "agreement_ready":
+      return buildAgreementRetryBody(
         message,
         commission,
       );

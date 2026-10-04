@@ -51,11 +51,17 @@ import { requestCommissionClientDetails } from "@/lib/email/commissionClientDeta
 import { sendCommissionClientMessage } from "@/lib/email/commissionClientMessageService";
 import { sendCommissionQuoteToClient } from "@/lib/email/commissionQuoteSendService";
 import { retryCommissionEmailMessage } from "@/lib/email/commissionEmailRetryService";
+import {
+  presentCommissionAgreementToClient,
+} from "@/lib/email/commissionAgreementPresentService";
 
 import { CURRENT_COMMISSION_TERMS_VERSION } from "@/lib/legal/commissionTerms";
 import { CURRENT_COMMISSION_AGREEMENT_VERSION } from "@/lib/legal/commissionAgreement";
 
 import { createCommissionAgreementDraft } from "@/lib/repositories/commissionAgreements/commissionAgreementDraftRepository";
+import {
+  createCommissionAgreementRevision,
+} from "@/lib/repositories/commissionAgreements/commissionAgreementRevisionRepository";
 import { getCommissionQuotes } from "@/lib/repositories/commissionQuoteRepository";
 import {
   createCommissionGroupedPaymentPlan,
@@ -114,8 +120,29 @@ export interface CommissionAgreementDraftActionState {
   agreementUpdatedAt?: string;
 }
 
+export interface CommissionAgreementPresentActionState {
+  outcome:
+    | "idle"
+    | "success"
+    | "warning"
+    | "error"
+    | "conflict";
+
+  message: string | null;
+}
+
 export interface CommissionAgreementCreateActionState {
   outcome: "idle" | "success" | "error" | "conflict";
+  message: string | null;
+}
+
+export interface CommissionAgreementRevisionActionState {
+  outcome:
+    | "idle"
+    | "success"
+    | "error"
+    | "conflict";
+
   message: string | null;
 }
 
@@ -2056,6 +2083,455 @@ export async function saveCommissionAgreementDraftDataAction(
     return {
       outcome: "error",
       message: "The Agreement draft could not be saved. Please try again.",
+    };
+  }
+}
+
+export async function presentCommissionAgreementAction(
+  _previousState: CommissionAgreementPresentActionState,
+  formData: FormData,
+): Promise<CommissionAgreementPresentActionState> {
+  const session =
+    await requireAdmin();
+
+  const commissionId =
+    getFormValue(
+      formData,
+      "commissionId",
+    );
+
+  const agreementId =
+    getFormValue(
+      formData,
+      "agreementId",
+    );
+
+  const expectedAgreementUpdatedAt =
+    parseRequiredDate(
+      getFormValue(
+        formData,
+        "expectedAgreementUpdatedAt",
+      ),
+    );
+
+  if (
+    !UUID_PATTERN.test(
+      commissionId,
+    ) ||
+    !UUID_PATTERN.test(
+      agreementId,
+    )
+  ) {
+    return {
+      outcome: "error",
+      message:
+        "The commission or Agreement identifier is invalid.",
+    };
+  }
+
+  if (
+    !expectedAgreementUpdatedAt
+  ) {
+    return {
+      outcome: "error",
+      message:
+        "The Agreement version timestamp is invalid.",
+    };
+  }
+
+  try {
+    const result =
+      await presentCommissionAgreementToClient({
+        commissionId,
+
+        agreementId,
+
+        expectedUpdatedAt:
+          expectedAgreementUpdatedAt,
+
+        presentedByAdminUserId:
+          session.user.id,
+      });
+
+    switch (
+      result.outcome
+    ) {
+      case "sent":
+        revalidateCommissionActivityPaths(
+          result.commissionId,
+        );
+
+        return {
+          outcome:
+            "success",
+
+          message:
+            "Agreement presented and emailed successfully.",
+        };
+
+      case "delivery_failed":
+        console.error(
+          "Commission Agreement email delivery failed:",
+          {
+            agreementId:
+              result.agreementId,
+
+            documentId:
+              result.documentId,
+
+            messageId:
+              result.messageId,
+
+            failureMessage:
+              result.failureMessage,
+          },
+        );
+
+        revalidateCommissionActivityPaths(
+          result.commissionId,
+        );
+
+        return {
+          outcome:
+            "warning",
+
+          message:
+            "The Agreement was presented successfully, but the email could not be delivered. The Agreement remains immutable and presented.",
+        };
+
+      case "delivery_pending":
+        revalidateCommissionActivityPaths(
+          result.commissionId,
+        );
+
+        if (
+          result.currentStatus ===
+          "sent"
+        ) {
+          return {
+            outcome:
+              "success",
+
+            message:
+              "Agreement presented and emailed successfully.",
+          };
+        }
+
+        if (
+          result.currentStatus ===
+          "failed"
+        ) {
+          return {
+            outcome:
+              "warning",
+
+            message:
+              "The Agreement was presented successfully, but email delivery is currently failed.",
+          };
+        }
+
+        return {
+          outcome:
+            "warning",
+
+          message:
+            "The Agreement was presented successfully and email delivery is still being finalized.",
+        };
+
+      case "document_not_ready":
+        return {
+          outcome:
+            "error",
+
+          message:
+            "The Agreement is not ready to be presented. Review its content, accepted Quote, and payment plan.",
+        };
+
+      case "storage_failed":
+        return {
+          outcome:
+            "error",
+
+          message:
+            "The Agreement PDF could not be stored. Nothing was presented to the client.",
+        };
+
+      case "not_found":
+        return {
+          outcome:
+            "error",
+
+          message:
+            "The Commission Agreement could not be found.",
+        };
+
+      case "not_draft":
+        revalidateCommissionActivityPaths(
+          commissionId,
+        );
+
+        return {
+          outcome:
+            "conflict",
+
+          message:
+            `This Agreement can no longer be presented because it is ${result.currentStatus}.`,
+        };
+
+      case "wrong_commission_status":
+        revalidateCommissionActivityPaths(
+          commissionId,
+        );
+
+        return {
+          outcome:
+            "conflict",
+
+          message:
+            `The Agreement cannot be presented while the commission is ${result.currentStatus}.`,
+        };
+
+      case "on_hold":
+        return {
+          outcome:
+            "conflict",
+
+          message:
+            "The Agreement cannot be presented while the commission is on hold.",
+        };
+
+      case "quote_not_accepted":
+        return {
+          outcome:
+            "conflict",
+
+          message:
+            "The Agreement requires an accepted Quote before it can be presented.",
+        };
+
+      case "thread_not_found":
+        return {
+          outcome:
+            "conflict",
+
+          message:
+            "The client email conversation is unavailable for this commission.",
+        };
+
+      case "thread_not_ready":
+        return {
+          outcome:
+            "conflict",
+
+          message:
+            "The client email conversation is still waiting for its root email identity to finish syncing.",
+        };
+
+      case "thread_blocked":
+        return {
+          outcome:
+            "conflict",
+
+          message:
+            "An earlier client email is still queued, sending, or failed. Resolve it before presenting the Agreement.",
+        };
+
+      case "conflict":
+        revalidateCommissionActivityPaths(
+          commissionId,
+        );
+
+        return {
+          outcome:
+            "conflict",
+
+          message:
+            "The Agreement changed before it could be presented. Refresh the page and review it again.",
+        };
+    }
+  } catch (error) {
+    console.error(
+      "Failed to present Commission Agreement:",
+      error,
+    );
+
+    return {
+      outcome:
+        "error",
+
+      message:
+        "The Agreement could not be presented safely. Please try again after reviewing the current state.",
+    };
+  }
+}
+
+export async function createCommissionAgreementRevisionAction(
+  _previousState: CommissionAgreementRevisionActionState,
+  formData: FormData,
+): Promise<CommissionAgreementRevisionActionState> {
+  const session =
+    await requireAdmin();
+
+  const commissionId =
+    getFormValue(
+      formData,
+      "commissionId",
+    );
+
+  const agreementId =
+    getFormValue(
+      formData,
+      "agreementId",
+    );
+
+  const expectedAgreementUpdatedAt =
+    parseRequiredDate(
+      getFormValue(
+        formData,
+        "expectedAgreementUpdatedAt",
+      ),
+    );
+
+  if (
+    !UUID_PATTERN.test(
+      commissionId,
+    ) ||
+    !UUID_PATTERN.test(
+      agreementId,
+    )
+  ) {
+    return {
+      outcome:
+        "error",
+
+      message:
+        "The commission or Agreement identifier is invalid.",
+    };
+  }
+
+  if (
+    !expectedAgreementUpdatedAt
+  ) {
+    return {
+      outcome:
+        "error",
+
+      message:
+        "The Agreement version timestamp is invalid.",
+    };
+  }
+
+  try {
+    const result =
+      await createCommissionAgreementRevision({
+        commissionId,
+
+        agreementId,
+
+        expectedUpdatedAt:
+          expectedAgreementUpdatedAt,
+
+        createdByAdminUserId:
+          session.user.id,
+      });
+
+    switch (
+      result.outcome
+    ) {
+      case "created":
+        revalidateCommissionActivityPaths(
+          commissionId,
+        );
+
+        return {
+          outcome:
+            "success",
+
+          message:
+            `Agreement revision ${result.agreement.version} created successfully.`,
+        };
+
+      case "not_found":
+        return {
+          outcome:
+            "error",
+
+          message:
+            "The Commission or Agreement could not be found.",
+        };
+
+      case "not_sent":
+        revalidateCommissionActivityPaths(
+          commissionId,
+        );
+
+        return {
+          outcome:
+            "conflict",
+
+          message:
+            result.currentStatus ===
+            "accepted"
+              ? "An accepted Agreement can no longer be revised. A contractual amendment is required instead."
+              : `Only a sent Agreement can be revised. This Agreement is ${result.currentStatus}.`,
+        };
+
+      case "wrong_commission_status":
+        revalidateCommissionActivityPaths(
+          commissionId,
+        );
+
+        return {
+          outcome:
+            "conflict",
+
+          message:
+            `The Agreement cannot be revised while the commission is ${result.currentStatus}.`,
+        };
+
+      case "on_hold":
+        return {
+          outcome:
+            "conflict",
+
+          message:
+            "The Agreement cannot be revised while the commission is on hold.",
+        };
+
+      case "quote_not_accepted":
+        return {
+          outcome:
+            "conflict",
+
+          message:
+            "The Agreement can only be revised while its Quote remains accepted.",
+        };
+
+      case "conflict":
+        revalidateCommissionActivityPaths(
+          commissionId,
+        );
+
+        return {
+          outcome:
+            "conflict",
+
+          message:
+            "The Agreement changed before the revision was created. Refresh the page and try again.",
+        };
+    }
+  } catch (error) {
+    console.error(
+      "Failed to create Commission Agreement revision:",
+      error,
+    );
+
+    return {
+      outcome:
+        "error",
+
+      message:
+        "The Agreement revision could not be created. Please try again.",
     };
   }
 }
