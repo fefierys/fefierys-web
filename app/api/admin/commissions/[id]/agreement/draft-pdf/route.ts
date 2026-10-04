@@ -1,12 +1,6 @@
-import { readFile } from "node:fs/promises";
-import path from "node:path";
-import { createElement } from "react";
-import type { ReactElement } from "react";
-import type { DocumentProps } from "@react-pdf/renderer";
-
-import { renderToBuffer } from "@react-pdf/renderer";
-
-import CommissionAgreementPdf from "@/components/pdf/CommissionAgreementPdf";
+import {
+  renderCommissionAgreementPdf,
+} from "@/lib/commissions/commissionAgreementPdfRenderer";
 import { getAdminSession } from "@/lib/auth/admin";
 import { buildCommissionAgreementDocumentData } from "@/lib/commissions/commissionAgreementDocumentData";
 import { getAdminCommissionDetail } from "@/lib/repositories/commissionAdminRepository";
@@ -124,26 +118,10 @@ export async function GET(
       );
     }
 
-    const backgroundPath = path.join(
-      process.cwd(),
-      "assets",
-      "agreements",
-      "Fondo-agreement.png",
-    );
-
-    const backgroundBytes = await readFile(backgroundPath);
-
-    const backgroundDataUrl =
-      `data:image/png;base64,${backgroundBytes.toString("base64")}`;
-
-    const pdfDocument = createElement(CommissionAgreementPdf, {
-        backgroundDataUrl,
+    const pdf =
+      await renderCommissionAgreementPdf(
         documentData,
-        }) as unknown as ReactElement<DocumentProps>;
-
-    // CommissionAgreementPdf renders a root <Document /> through
-    // CommissionAgreementPdfLayout.
-    const pdf = await renderToBuffer(pdfDocument);
+      );
 
     return new Response(new Uint8Array(pdf), {
       status: 200,

@@ -1,4 +1,3 @@
-
 import type { ReactNode } from "react";
 
 import {
@@ -10,9 +9,15 @@ import {
   View,
 } from "@react-pdf/renderer";
 
+export type CommissionAgreementPdfVariant =
+  | "draft"
+  | "presented"
+  | "executed";
+
 interface CommissionAgreementPdfLayoutProps {
   backgroundDataUrl: string;
   children: ReactNode;
+  variant?: CommissionAgreementPdfVariant;
 }
 
 const styles = StyleSheet.create({
@@ -34,7 +39,7 @@ const styles = StyleSheet.create({
     height: 792,
   },
 
-  draftLabel: {
+  documentLabel: {
     position: "absolute",
     top: 43,
     right: 64,
@@ -48,16 +53,56 @@ const styles = StyleSheet.create({
   },
 });
 
+function getDocumentTitle(
+  variant: CommissionAgreementPdfVariant,
+): string {
+  switch (variant) {
+    case "draft":
+      return "Fefierys Art - Commission Agreement - Draft";
+
+    case "presented":
+      return "Fefierys Art - Commission Agreement";
+
+    case "executed":
+      return "Fefierys Art - Commission Agreement - Executed";
+  }
+}
+
+function getDocumentLabel(
+  variant: CommissionAgreementPdfVariant,
+): string | null {
+  switch (variant) {
+    case "draft":
+      return "DRAFT - NOT FOR CLIENT DELIVERY";
+
+    case "presented":
+      return null;
+
+    case "executed":
+      return "EXECUTED AGREEMENT";
+  }
+}
+
 export default function CommissionAgreementPdfLayout({
   backgroundDataUrl,
   children,
+  variant = "draft",
 }: CommissionAgreementPdfLayoutProps) {
+  const documentLabel =
+    getDocumentLabel(
+      variant,
+    );
+
   return (
     <Document
-      title="Fefierys Art - Commission Agreement - Draft"
+      title={getDocumentTitle(variant)}
       author="Fefierys Art"
     >
-      <Page size="LETTER" style={styles.page} wrap>
+      <Page
+        size="LETTER"
+        style={styles.page}
+        wrap
+      >
         {/* eslint-disable-next-line jsx-a11y/alt-text -- Decorative background in a PDF; @react-pdf/renderer Image does not support alt. */}
         <Image
           src={backgroundDataUrl}
@@ -65,9 +110,14 @@ export default function CommissionAgreementPdfLayout({
           fixed
         />
 
-        <Text style={styles.draftLabel} fixed>
-          DRAFT - NOT FOR CLIENT DELIVERY
-        </Text>
+        {documentLabel && (
+          <Text
+            style={styles.documentLabel}
+            fixed
+          >
+            {documentLabel}
+          </Text>
+        )}
 
         <View style={styles.content}>
           {children}

@@ -8,6 +8,38 @@
  * presented to the Client.
  */
 
+export const COMMISSION_AGREEMENT_LAYOUT_SECTIONS = [
+  "parties",
+  "project_details",
+  "delivery",
+  "pricing",
+  "payment_plan",
+  "license",
+  "project_conditions",
+  "ai_policy",
+  "acceptance",
+] as const;
+
+export type CommissionAgreementLayoutSection =
+  (typeof COMMISSION_AGREEMENT_LAYOUT_SECTIONS)[number];
+
+export interface CommissionAgreementLayoutData {
+  pageBreakBefore: CommissionAgreementLayoutSection[];
+
+  keepTogether: CommissionAgreementLayoutSection[];
+}
+
+export const DEFAULT_COMMISSION_AGREEMENT_LAYOUT:
+  CommissionAgreementLayoutData = {
+    pageBreakBefore: [],
+
+    keepTogether: [
+      "parties",
+      "license",
+      "acceptance",
+    ],
+  };
+
 export interface CommissionAgreementDraftData {
   schemaVersion: 1;
 
@@ -33,6 +65,14 @@ export interface CommissionAgreementDraftData {
     holdDate: string | null;
     additionalTerms: string;
   };
+
+    /*
+   * Presentation-only preferences for the generated PDF.
+   *
+   * This is optional for backwards compatibility with Agreement
+   * drafts created before manual layout controls existed.
+   */
+  layout?: CommissionAgreementLayoutData;
 }
 
 export function createEmptyCommissionAgreementDraftData():
@@ -62,6 +102,16 @@ export function createEmptyCommissionAgreementDraftData():
       holdDate: null,
       additionalTerms: "",
     },
+
+    layout: {
+      pageBreakBefore: [
+        ...DEFAULT_COMMISSION_AGREEMENT_LAYOUT.pageBreakBefore,
+      ],
+
+      keepTogether: [
+        ...DEFAULT_COMMISSION_AGREEMENT_LAYOUT.keepTogether,
+      ],
+    },
   };
 }
 
@@ -83,6 +133,53 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   );
 }
 
+function isCommissionAgreementLayoutSection(
+  value: unknown,
+): value is CommissionAgreementLayoutSection {
+  return (
+    typeof value === "string" &&
+    (
+      COMMISSION_AGREEMENT_LAYOUT_SECTIONS as readonly string[]
+    ).includes(value)
+  );
+}
+
+function validateLayoutSectionList(
+  value: unknown,
+): value is CommissionAgreementLayoutSection[] {
+  return (
+    Array.isArray(value) &&
+    value.every(isCommissionAgreementLayoutSection) &&
+    new Set(value).size === value.length
+  );
+}
+
+export function getCommissionAgreementLayout(
+  data: CommissionAgreementDraftData,
+): CommissionAgreementLayoutData {
+  if (!data.layout) {
+    return {
+      pageBreakBefore: [
+        ...DEFAULT_COMMISSION_AGREEMENT_LAYOUT.pageBreakBefore,
+      ],
+
+      keepTogether: [
+        ...DEFAULT_COMMISSION_AGREEMENT_LAYOUT.keepTogether,
+      ],
+    };
+  }
+
+  return {
+    pageBreakBefore: [
+      ...data.layout.pageBreakBefore,
+    ],
+
+    keepTogether: [
+      ...data.layout.keepTogether,
+    ],
+  };
+}
+
 export function validateCommissionAgreementDraftData(
   value: unknown,
 ): CommissionAgreementDraftDataValidation {
@@ -90,7 +187,13 @@ export function validateCommissionAgreementDraftData(
     return { valid: false, field: "schemaVersion" };
   }
 
-  const { project, delivery, license, projectConditions } = value;
+  const {
+    project,
+    delivery,
+    license,
+    projectConditions,
+    layout,
+  } = value;
 
   if (!isRecord(project)) {
     return { valid: false, field: "project" };
@@ -165,6 +268,41 @@ export function validateCommissionAgreementDraftData(
       valid: false,
       field: "projectConditions.holdDate",
     };
+  }
+
+  /*
+   * layout is optional so Agreement drafts created before this
+   * feature remain valid.
+   */
+  if (layout !== undefined) {
+    if (!isRecord(layout)) {
+      return {
+        valid: false,
+        field: "layout",
+      };
+    }
+
+    if (
+      !validateLayoutSectionList(
+        layout.pageBreakBefore,
+      )
+    ) {
+      return {
+        valid: false,
+        field: "layout.pageBreakBefore",
+      };
+    }
+
+    if (
+      !validateLayoutSectionList(
+        layout.keepTogether,
+      )
+    ) {
+      return {
+        valid: false,
+        field: "layout.keepTogether",
+      };
+    }
   }
 
   return {
